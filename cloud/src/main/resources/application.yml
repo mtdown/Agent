@@ -33,7 +33,10 @@ mybatis-plus:
 
 # 接口文档配置
 knife4j:
+  # 开启 Knife4j 的增强功能
   enable: true
+  # 【关键】关闭生产环境限制，允许在线调试
+  production: false
   openapi:
     title: "接口文档"
     version: 1.0
