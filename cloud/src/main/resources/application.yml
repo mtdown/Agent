@@ -1,0 +1,44 @@
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+spring:
+  application:
+    name: cloud
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver #之前我们使用这个接收预约信息，现在我们要做用户系统，就需要进行修改，这一段是否要修改取决于使用的MySQL Connector/J的版本
+    #？代表链接参数Cloud是表名
+    url: jdbc:mysql://localhost:3307/Cloud?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 1234
+
+#这一部分的配置可以直接从官网上找
+mybatis-plus:
+  configuration:
+    # MyBatis 配置
+    map-underscore-to-camel-case: false
+    #日志，我们应该只在开发环境用，这是为了记录我们的输出
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    # 全局配置
+    db-config:
+      # 数据库配置，负责定义如何生成主键ID
+      id-type: auto
+      logic-delete-field: isDelete
+      #表示删除的逻辑化数值
+      logic-delete-value: 1
+      #未删除逻辑化值
+      logic-not-delete-value: 0
+
+# 接口文档配置
+knife4j:
+  enable: true
+  openapi:
+    title: "接口文档"
+    version: 1.0
+    group:
+      default:
+        api-rule: package
+        api-rule-resources:
+          - com.et.cloud.controller
