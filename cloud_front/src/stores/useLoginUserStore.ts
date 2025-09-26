@@ -1,12 +1,13 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getLoginUserUsingGet } from '@/api/userController.ts'
+import api from '@/api'
+import { getUserLoginUsingGet } from '@/api/userController.ts'
 
 /**
  * 存储登录用户信息的状态,扮演的是全局常量的身份
  */
 export const useLoginUserStore = defineStore('loginUser', () => {
-  const loginUser = ref<any, any>({
+  const loginUser = ref<API.LoginUserVis>({
     userName: '未登录',
   })
 
@@ -14,7 +15,7 @@ export const useLoginUserStore = defineStore('loginUser', () => {
    * 远程获取登录用户信息
    */
   async function fetchLoginUser() {
-    const res = await getLoginUserUsingGet()
+    const res = await getUserLoginUsingGet()
     if (res.data.code === 0 && res.data.data) {
       loginUser.value = res.data.data
     }

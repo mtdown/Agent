@@ -53,31 +53,18 @@ public class UserController {
         return ResultUtils.success(loginUserVis);
     }
 
-    @PostMapping("/cur/login")
+    @GetMapping("/get/login")
     public BaseResponse<LoginUserVis> getUserLogin(HttpServletRequest request) {
         User user = userService.getLoginUser(request);
         return ResultUtils.success(userService.getLoginUserVis(user));
     }
 
-    @PostMapping("/cur/logout")
+    @PostMapping("/logout")
     public BaseResponse<Boolean> UserLogout(HttpServletRequest request) {
         userService.userLogout(request);
         return ResultUtils.success(true);
     }
 
-    @PostMapping("/createUser")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Long> createUserLogin(@RequestBody UserAddRequest userAddRequest) {
-        User user = new User();
-        BeanUtil.copyProperties(userAddRequest, user);
-        final String password="1234";
-        user.setUserPassword(userService.getEncryptPassword(password));
-        Boolean result= userService.save(user);
-        if(!result){
-            throw new BusinessException(ErrorCode.OPERATION_ERROR);
-        }
-        return ResultUtils.success(user.getId());
-    }
 
     /**
      * 创建用户
