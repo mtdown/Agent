@@ -22,7 +22,6 @@ import org.apache.commons.lang3.StringUtils;
 import javax.servlet.http.HttpServletRequest;
 
 import static com.et.cloud.model.constant.UserConstant.USER_LOGIN_STATE;
-import com.et.cloud.model.vis.LoginUserVis;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -189,6 +188,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         queryWrapper.like(StrUtil.isNotBlank(userProfile), "userProfile", userProfile);
         queryWrapper.orderBy(StringUtils.isNoneBlank(sortField), sortOrder.equals("ascend"), sortField);
         return queryWrapper;
+    }
+
+    @Override
+    public Boolean isAdmin(User user) {
+        if (user == null) {
+            return false;
+        }
+        //       为什么用 .equals() 而不是 ==？
+        //== 比较的是“地址”：它检查两个变量是否指向内存中的同一个对象。
+        //.equals() 比较的是“内容”：它检查两个字符串对象中所包含的字符序列是否完全相同。
+        if (UserRoleEnum.ADMIN.getValue().equals(user.getUserRole())) {
+            return true;
+        }
+        return false;
     }
 
 

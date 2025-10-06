@@ -1,0 +1,102 @@
+package com.et.cloud.controller;
+
+import com.et.cloud.annotation.AuthCheck;
+import com.et.cloud.commen.BaseResponse;
+import com.et.cloud.commen.ResultUtils;
+import com.et.cloud.exception.BusinessException;
+import com.et.cloud.exception.ErrorCode;
+import com.et.cloud.manager.CosManager;
+import com.et.cloud.model.constant.UserConstant;
+import com.qcloud.cos.model.COSObject;
+import com.qcloud.cos.model.COSObjectInputStream;
+import com.qcloud.cos.utils.IOUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.IOException;
+
+@RestController
+@RequestMapping("/file")
+@Slf4j
+
+public class FileController {
+
+    @Resource
+    private CosManager cosManager;
+//    private final CosManager cosManager;
+
+    /**
+     * 测试文件上传
+     *
+     * @param multipartFile
+     * @return
+     */
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @PostMapping("/test/upload")
+    public BaseResponse<String> testUploadFile(@RequestPart("file") MultipartFile multipartFile) {
+        // 文件目录
+        String filename = multipartFile.getOriginalFilename();
+        String filepath = String.format("/test/%s", filename);
+        File file = null;
+        try {
+            // 上传文件
+            file = File.createTempFile(filepath, null);
+            multipartFile.transferTo(file);
+            cosManager.putObject(filepath, file);
+            // 返回可访问地址
+            return ResultUtils.success(filepath);
+        } catch (Exception e) {
+            log.error("file upload error, filepath = " + filepath, e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+        } finally {
+            if (file != null) {
+                // 删除临时文件
+                boolean delete = file.delete();
+                if (!delete) {
+                    log.error("file delete error, filepath = {}", filepath);
+                }
+            }
+        }
+    }
+
+    /**
+     * 测试文件下载
+     *
+     * @param filepath 文件路径
+     * @param response 响应对象
+     */
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @GetMapping("/test/download/")
+//    在Spring MVC开发中，当你需要绕过框架的自动响应处理机制，去完全、底层地手动控制整个HTTP响应的每一个细节时，就需要引入 HttpServletResponse。
+//    尤其体现在以下几种场景：返回非文本内容,精细化操作响应头或Cookie,执行服务器端重定向
+//    如果返回标准的JSON数据或视图名称，让Spring自动处理即可；一旦需要返回原始的、自定义的二进制流或需要直接操控HTTP协议层面的细节，HttpServletResponse 就是你必须使用的底层工具。
+    public void testDownloadFile(String filepath, HttpServletResponse response) throws IOException {
+        COSObjectInputStream cosObjectInput = null;
+        try {
+            COSObject cosObject = cosManager.getObject(filepath);
+            cosObjectInput = cosObject.getObjectContent();
+            // 处理下载到的流
+            byte[] bytes = IOUtils.toByteArray(cosObjectInput);
+            // 设置响应头
+            response.setContentType("application/octet-stream;charset=UTF-8");
+            response.setHeader("Content-Disposition", "attachment; filename=" + filepath);
+            // 写入响应
+            response.getOutputStream().write(bytes);
+            response.getOutputStream().flush();
+        } catch (Exception e) {
+            log.error("file download error, filepath = " + filepath, e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "下载失败");
+        } finally {
+            if (cosObjectInput != null) {
+                cosObjectInput.close();
+            }
+        }
+    }
+
+
+}
+

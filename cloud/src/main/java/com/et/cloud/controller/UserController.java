@@ -1,6 +1,5 @@
 package com.et.cloud.controller;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.et.cloud.annotation.AuthCheck;
 import com.et.cloud.commen.BaseResponse;
@@ -14,7 +13,6 @@ import com.et.cloud.model.constant.UserConstant;
 import com.et.cloud.model.vis.LoginUserVis;
 import com.et.cloud.service.UserService;
 import com.et.cloud.model.vis.UserVis;
-import com.et.cloud.model.vis.LoginUserVis;
 import com.et.cloud.model.entity.User;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;

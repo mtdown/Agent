@@ -1,0 +1,178 @@
+<template>
+  <div id="pictureDetailPage">
+    <a-row :gutter="[16, 16]">
+      <!-- 图片预览 -->
+      <a-col :sm="24" :md="16" :xl="18">
+        <a-card title="图片预览" class="image-preview-card">
+          <a-image :src="picture.url" class="preview-image" />
+        </a-card>
+      </a-col>
+      <!-- 图片信息区域 -->
+      <a-col :sm="24" :md="8" :xl="6">
+        <a-card title="图片信息">
+          <a-descriptions :column="1">
+            <a-descriptions-item label="作者">
+              <a-space>
+                <a-avatar :size="24" :src="picture.user?.userAvatar" />
+                <div>{{ picture.user?.userName }}</div>
+              </a-space>
+            </a-descriptions-item>
+            <a-descriptions-item label="名称">
+              {{ picture.name ?? '未命名' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="简介">
+              {{ picture.introduction ?? '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="分类">
+              {{ picture.category ?? '默认' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="标签">
+              <a-tag v-for="tag in picture.tags" :key="tag">
+                {{ tag }}
+              </a-tag>
+            </a-descriptions-item>
+            <a-descriptions-item label="格式">
+              {{ picture.picFormat ?? '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="宽度">
+              {{ picture.picWidth ?? '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="高度">
+              {{ picture.picHeight ?? '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="宽高比">
+              {{ picture.picScale ?? '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="大小">
+              {{ formatSize(picture.picSize) }}
+            </a-descriptions-item>
+          </a-descriptions>
+          <!-- 图片操作 -->
+          <a-space wrap>
+            <a-button type="primary" @click="doDownload">
+              免费下载
+              <template #icon>
+                <DownloadOutlined />
+              </template>
+            </a-button>
+            <a-button :icon="h(ShareAltOutlined)" type="primary" ghost @click="doShare">
+              分享
+            </a-button>
+            <a-button v-if="canEdit" :icon="h(EditOutlined)" type="default" @click="doEdit">
+              编辑
+            </a-button>
+            <a-button v-if="canEdit" :icon="h(DeleteOutlined)" danger @click="doDelete">
+              删除
+            </a-button>
+          </a-space>
+        </a-card>
+      </a-col>
+    </a-row>
+    <ShareModal ref="shareModalRef" :link="shareLink" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, h, onMounted, ref } from 'vue'
+import { deletePictureUsingPost, getPictureVisByIdUsingGet } from '@/api/pictureController.ts'
+import { message } from 'ant-design-vue'
+import {
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  ShareAltOutlined,
+} from '@ant-design/icons-vue'
+import { useRouter } from 'vue-router'
+import { downloadImage, formatSize } from '@/utils'
+import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
+
+const loginUserStore = useLoginUserStore()
+const canEdit = computed(() => {
+  const loginUser = loginUserStore.loginUser
+
+  if (!loginUser.id) {
+    return false
+  }
+
+  const user = picture.value.user || {}
+  return loginUser.id === user.id || loginUser.userRole === 'admin'
+})
+
+interface Props {
+  id: string | number
+}
+
+const props = defineProps<Props>()
+const picture = ref<API.PictureVis>({})
+
+// 获取图片详情
+const fetchPictureDetail = async () => {
+  try {
+    const res = await getPictureVisByIdUsingGet({
+      id: props.id,
+    })
+    if (res.data.code === 0 && res.data.data) {
+      picture.value = res.data.data
+      console.log('从后端获取到的图片详情:', picture.value)
+    } else {
+      message.error('获取图片详情失败，' + res.data.message)
+    }
+  } catch (e: any) {
+    message.error('获取图片详情失败：' + e.message)
+  }
+}
+
+onMounted(() => {
+  fetchPictureDetail()
+})
+
+const router = useRouter()
+
+const doEdit = () => {
+  router.push('/add_picture?id=' + picture.value.id)
+}
+const doDelete = async () => {
+  const id = picture.value.id
+  if (!id) {
+    return
+  }
+  const res = await deletePictureUsingPost({ id })
+  if (res.data.code === 0) {
+    message.success('删除成功')
+  } else {
+    message.error('删除失败')
+  }
+}
+// 下载图片
+const doDownload = () => {
+  downloadImage(picture.value.url)
+}
+
+// ----- 分享操作 ----
+const shareModalRef = ref()
+// 分享链接
+const shareLink = ref<string>()
+// 分享
+const doShare = () => {
+  shareLink.value = `${window.location.protocol}//${window.location.host}/picture/${picture.value.id}`
+  if (shareModalRef.value) {
+    shareModalRef.value.openModal()
+  }
+}
+</script>
+
+<style scoped>
+#pictureDetailPage {
+  margin-bottom: 16px;
+}
+:deep(.preview-image) {
+  width: 500px; /* 固定宽度为 500px */
+  height: 500px; /* 固定高度为 500px */
+  object-fit: contain; /* 关键！保持宽高比，在500x500的框内完整显示 */
+}
+.image-preview-card :deep(.ant-card-body) {
+  display: flex;
+  justify-content: center; /* 水平居中 */
+  align-items: center; /* 垂直居中 */
+}
+</style>

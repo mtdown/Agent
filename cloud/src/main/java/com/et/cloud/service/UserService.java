@@ -86,7 +86,8 @@ public interface UserService extends IService<User> {
     QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 
 
-
+    //    “编辑图片”或“删除图片”接口。它的权限逻辑是复杂的：“图片的作者 OR 管理员 都可以编辑/删除”。这就需要我们提供不同粒度的权限检验装置
+    Boolean isAdmin(User user);
 
 
 }
