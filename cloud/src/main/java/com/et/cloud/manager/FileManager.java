@@ -23,6 +23,8 @@ import java.util.List;
 
 @Service
 @Slf4j
+//表示已废弃，使用UPload包的方法
+@Deprecated
 public class FileManager {
 
     @Resource

@@ -5,6 +5,18 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseInt_ = {
+    code?: number
+    data?: number
+    message?: string
+  }
+
+  type BaseResponseListSpaceLevel_ = {
+    code?: number
+    data?: SpaceLevel[]
+    message?: string
+  }
+
   type BaseResponseLoginUserVis_ = {
     code?: number
     data?: LoginUserVis
@@ -29,6 +41,18 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponsePageSpace_ = {
+    code?: number
+    data?: PageSpace_
+    message?: string
+  }
+
+  type BaseResponsePageSpaceVis_ = {
+    code?: number
+    data?: PageSpaceVis_
+    message?: string
+  }
+
   type BaseResponsePageUserVis_ = {
     code?: number
     data?: PageUserVis_
@@ -50,6 +74,18 @@ declare namespace API {
   type BaseResponsePictureVis_ = {
     code?: number
     data?: PictureVis
+    message?: string
+  }
+
+  type BaseResponseSpace_ = {
+    code?: number
+    data?: Space
+    message?: string
+  }
+
+  type BaseResponseSpaceVis_ = {
+    code?: number
+    data?: SpaceVis
     message?: string
   }
 
@@ -81,6 +117,16 @@ declare namespace API {
   }
 
   type getPictureVisByIdUsingGETParams = {
+    /** id */
+    id?: number
+  }
+
+  type getSpaceByIdUsingGETParams = {
+    /** id */
+    id?: number
+  }
+
+  type getSpaceVisByIdUsingGETParams = {
     /** id */
     id?: number
   }
@@ -122,6 +168,22 @@ declare namespace API {
     total?: number
   }
 
+  type PageSpace_ = {
+    current?: number
+    pages?: number
+    records?: Space[]
+    size?: number
+    total?: number
+  }
+
+  type PageSpaceVis_ = {
+    current?: number
+    pages?: number
+    records?: SpaceVis[]
+    size?: number
+    total?: number
+  }
+
   type PageUserVis_ = {
     current?: number
     pages?: number
@@ -143,6 +205,11 @@ declare namespace API {
     picScale?: number
     picSize?: number
     picWidth?: number
+    reviewMessage?: string
+    reviewStatus?: number
+    reviewTime?: string
+    reviewerId?: number
+    spaceId?: number
     tags?: string
     updateTime?: string
     url?: string
@@ -163,17 +230,29 @@ declare namespace API {
     id?: number
     introduction?: string
     name?: string
+    nullSpaceId?: boolean
     pageSize?: number
     picFormat?: string
     picHeight?: number
     picScale?: number
     picSize?: number
     picWidth?: number
+    reviewMessage?: string
+    reviewStatus?: number
+    reviewerId?: number
+    reviewerTime?: string
     searchText?: string
     sortField?: string
     sortOrder?: string
+    spaceId?: number
     tags?: string[]
     userId?: number
+  }
+
+  type PictureReviewRequest = {
+    id?: number
+    reviewMessage?: string
+    reviewStatus?: number
   }
 
   type PictureTagCategory = {
@@ -189,6 +268,19 @@ declare namespace API {
     tags?: string[]
   }
 
+  type PictureUploadByBatchRequest = {
+    count?: number
+    namePrefix?: string
+    searchText?: string
+  }
+
+  type PictureUploadRequest = {
+    fileUrl?: string
+    id?: number
+    picName?: string
+    spaceId?: number
+  }
+
   type PictureVis = {
     category?: string
     createTime?: string
@@ -201,9 +293,78 @@ declare namespace API {
     picScale?: number
     picSize?: number
     picWidth?: number
+    spaceId?: number
     tags?: string[]
     updateTime?: string
     url?: string
+    user?: UserVis
+    userId?: number
+  }
+
+  type Space = {
+    createTime?: string
+    editTime?: string
+    id?: number
+    isDelete?: number
+    maxCount?: number
+    maxSize?: number
+    spaceLevel?: number
+    spaceName?: string
+    totalCount?: number
+    totalSize?: number
+    updateTime?: string
+    userId?: number
+  }
+
+  type SpaceAddRequest = {
+    spaceLevel?: number
+    spaceName?: string
+    spaceType?: number
+  }
+
+  type SpaceEditRequest = {
+    id?: number
+    spaceName?: string
+  }
+
+  type SpaceLevel = {
+    maxCount?: number
+    maxSize?: number
+    text?: string
+    value?: number
+  }
+
+  type SpaceQueryRequest = {
+    current?: number
+    id?: number
+    pageSize?: number
+    sortField?: string
+    sortOrder?: string
+    spaceLevel?: number
+    spaceName?: string
+    spaceType?: number
+    userId?: number
+  }
+
+  type SpaceUpdateRequest = {
+    id?: number
+    maxCount?: number
+    maxSize?: number
+    spaceLevel?: number
+    spaceName?: string
+  }
+
+  type SpaceVis = {
+    createTime?: string
+    editTime?: string
+    id?: number
+    maxCount?: number
+    maxSize?: number
+    spaceLevel?: number
+    spaceName?: string
+    totalCount?: number
+    totalSize?: number
+    updateTime?: string
     user?: UserVis
     userId?: number
   }
@@ -214,7 +375,10 @@ declare namespace API {
   }
 
   type uploadPictureUsingPOSTParams = {
+    fileUrl?: string
     id?: number
+    picName?: string
+    spaceId?: number
   }
 
   type User = {

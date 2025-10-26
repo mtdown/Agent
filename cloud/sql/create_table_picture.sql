@@ -24,3 +24,14 @@ create table if not exists picture
     INDEX idx_userId (userId)              -- 提升基于用户 ID 的查询性能
 ) comment '图片' collate = utf8mb4_unicode_ci;
 #     只要是区分度比较大，感觉会用上的，都可以用上索引
+
+ALTER TABLE picture
+    ADD COLUMN reviewStatus  INT DEFAULT 0 NOT NULL COMMENT '审核状态：0待审核，1审核通过，2审核拒绝',
+    ADD COLUMN reviewMessage VARCHAR(512)  NULL COMMENT '审核信息',
+    ADD COLUMN reviewerId    BIGINT        NULL COMMENT '审核人 ID',
+    ADD COLUMN reviewTime    DATETIME      NULL COMMENT '审核时间';
+
+CREATE INDEX idx_reviewStatus ON picture (reviewStatus);
+
+ALTER TABLE picture
+    ADD COLUMN thumbnailUrl varchar(512) NULL COMMENT '缩略图 url';

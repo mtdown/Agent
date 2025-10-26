@@ -50,6 +50,8 @@ public class Picture {
      */
     private Long picSize;
 
+
+
     /**
      * 图片宽度
      */
@@ -75,6 +77,8 @@ public class Picture {
      */
     private Long userId;
 
+    private Long spaceId;
+
     /**
      * 创建时间
      */
@@ -90,6 +94,17 @@ public class Picture {
      */
     private Date updateTime;
 
+    private Integer reviewStatus;
+
+
+    private String reviewMessage;
+
+
+    private Long reviewerId;
+
+
+    private Date reviewTime;
+
     /**
      * 是否删除
      */
@@ -98,4 +113,10 @@ public class Picture {
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 缩略图地址
+     */
+    @TableField(value = "thumbnailUrl") // 确保和数据库字段名一致
+    private String thumbnailUrl;
 }

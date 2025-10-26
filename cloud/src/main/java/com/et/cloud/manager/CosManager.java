@@ -1,5 +1,6 @@
 package com.et.cloud.manager;
 
+import cn.hutool.core.io.FileUtil;
 import com.et.cloud.config.CosClientConfig;
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.exception.CosClientException;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class CosManager {
@@ -61,8 +64,37 @@ public class CosManager {
         PicOperations picOperations = new PicOperations();
         // 1 表示返回原图信息
         picOperations.setIsPicInfo(1);
+//        进行图片压缩
+//        第一部是弄出图片规则
+        List<PicOperations.Rule> rules = new ArrayList<>();
+//mainName可以获取到主要部分，舍弃掉后面的后缀.png
+        String webpKey = FileUtil.mainName(key) + ".webp";
+//        1. 新建一个“图片处理规则”对象
+        PicOperations.Rule compressRule = new PicOperations.Rule();
+//        // 2. 设置具体的处理规则：“转成 webp 格式”
+        compressRule.setRule("imageMogr2/format/webp");
+// 3. 设置处理后文件的存放位置（哪个存储桶）
+        compressRule.setBucket(cosClientConfig.getBucket());
+        // 4. 设置处理后文件的存放路径和新名字
+        compressRule.setFileId(webpKey);
+//        5. 把这个“压缩规则”添加到总的“规则列表”中
+        rules.add(compressRule);
+
+//        这里开始定义规则2
+        PicOperations.Rule thumbnailRule = new PicOperations.Rule();
+//        放在哪个包
+        thumbnailRule.setBucket(cosClientConfig.getBucket());
+        String thumbnailKey = FileUtil.mainName(key) + "_thumbnail." + FileUtil.getSuffix(key);
+        thumbnailRule.setFileId(thumbnailKey);
+//  使用的缩放规则
+        thumbnailRule.setRule(String.format("imageMogr2/thumbnail/%sx%s>", 128, 128));
+        rules.add(thumbnailRule);
+
+        picOperations.setRules(rules);
         // 构造处理参数
         putObjectRequest.setPicOperations(picOperations);
         return cosClient.putObject(putObjectRequest);
     }
+
+
 }

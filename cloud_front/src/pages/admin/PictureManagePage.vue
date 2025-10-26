@@ -2,7 +2,10 @@
   <div id="pictureManagePage">
     <a-flex justify="space-between">
       <h2>图片管理</h2>
-      <a-button type="primary" href="/add_picture" target="_blank">+ 创建</a-button>
+      <a-space>
+        <a-button type="primary" href="/add_picture" target="_blank">+ 创建</a-button>
+        <a-button type="primary" href="/add_picture/batch" target="_blank"> 批量创建图片 </a-button>
+      </a-space>
     </a-flex>
     <a-form layout="inline" :model="searchParams" @finish="doSearch">
       <a-form-item label="关键词" name="searchText">
@@ -18,8 +21,19 @@
       <a-form-item label="标签" name="tags">
         <a-select
           v-model:value="searchParams.tags"
+          style="min-width: 200px"
           mode="tags"
           placeholder="请输入标签"
+          allow-clear
+        />
+      </a-form-item>
+      <!--      这玩意的下拉功能会被浏览器插件gank，请注意-->
+      <a-form-item name="reviewStatus" label="审核状态">
+        <a-select
+          v-model:value="searchParams.reviewStatus"
+          style="min-width: 200px"
+          placeholder="请选择审核状态"
+          :options="PIC_REVIEW_STATUS_OPTIONS"
           allow-clear
         />
       </a-form-item>
@@ -52,6 +66,12 @@
           <div>宽高比: {{ record.picScale }}</div>
           <div>大小: {{ (record.picSize / 1024).toFixed(2) }} KB</div>
         </template>
+        <!-- 审核信息 -->
+        <template v-if="column.dataIndex === 'reviewMessage'">
+          <div>审核状态：{{ PIC_REVIEW_STATUS_MAP[record.reviewStatus] }}</div>
+          <div>审核信息：{{ record.reviewMessage }}</div>
+          <div>审核人：{{ record.reviewerId }}</div>
+        </template>
         <template v-else-if="column.dataIndex === 'createTime'">
           {{ dayjs(record.createTime).format('YYYY-MM-DD HH:mm:ss') }}
         </template>
@@ -59,11 +79,26 @@
           {{ dayjs(record.editTime).format('YYYY-MM-DD HH:mm:ss') }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
+          <a-space wrap>
+            <a-button
+              v-if="record.reviewStatus !== PIC_REVIEW_STATUS_ENUM.PASS"
+              type="link"
+              @click="handleReview(record, PIC_REVIEW_STATUS_ENUM.PASS)"
+            >
+              通过
+            </a-button>
+            <a-button
+              v-if="record.reviewStatus !== PIC_REVIEW_STATUS_ENUM.REJECT"
+              type="link"
+              danger
+              @click="handleReview(record, PIC_REVIEW_STATUS_ENUM.REJECT)"
+            >
+              拒绝
+            </a-button>
             <a-button type="link" :href="`/add_picture?id=${record.id}`" target="_blank">
               编辑
             </a-button>
-            <a-button type="link" danger @click="doDelete(record.id)">删除</a-button>
+            <a-button danger @click="doDelete(record.id)">删除</a-button>
           </a-space>
         </template>
       </template>
@@ -73,11 +108,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { deletePictureUsingPost, listPictureByPageUsingPost } from '@/api/pictureController'
+import {
+  deletePictureUsingPost,
+  doPictureReviewUsingPost,
+  listPictureByPageUsingPost,
+} from '@/api/pictureController'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import type { API } from '@/api/typings'
-
+import {
+  PIC_REVIEW_STATUS_ENUM,
+  PIC_REVIEW_STATUS_MAP,
+  PIC_REVIEW_STATUS_OPTIONS,
+} from '@/constants/picture.ts'
+console.log('导入的审核选项:', PIC_REVIEW_STATUS_OPTIONS)
 // 表格列定义
 const columns = [
   { title: 'id', dataIndex: 'id', width: 80 },
@@ -90,6 +133,7 @@ const columns = [
   { title: '用户id', dataIndex: 'userId', width: 80 },
   { title: '创建时间', dataIndex: 'createTime' },
   { title: '编辑时间', dataIndex: 'editTime' },
+  { title: '审核信息', dataIndex: 'reviewMessage' },
   { title: '操作', key: 'action' },
 ]
 
@@ -117,10 +161,15 @@ const pagination = computed(() => {
 // 获取数据
 const fetchData = async () => {
   try {
-    const res = await listPictureByPageUsingPost({ ...searchParams })
-    if (res.data.data) {
+    const res = await listPictureByPageUsingPost({
+      ...searchParams,
+      nullSpaceId: true,
+    })
+    if (res.data.code === 0 && res.data.data) {
       dataList.value = res.data.data.records ?? []
-      total.value = res.data.data.total ?? 0
+      // 因审核状态问题修改此处，以后可能要换
+      // total.value = res.data.data.total ?? 0
+      total.value = Number(res.data.data.total ?? 0)
     } else {
       message.error('获取数据失败，' + res.data.message)
     }
@@ -128,7 +177,6 @@ const fetchData = async () => {
     message.error('获取数据失败，' + error.message)
   }
 }
-
 // 删除操作
 const doDelete = async (id: number) => {
   try {
@@ -161,10 +209,20 @@ const doTableChange = (page: any) => {
 onMounted(() => {
   fetchData()
 })
-</script>
 
-<style scoped>
-#pictureManagePage {
-  max-height: 3px;
+const handleReview = async (record: API.Picture, reviewStatus: number) => {
+  const reviewMessage =
+    reviewStatus === PIC_REVIEW_STATUS_ENUM.PASS ? '管理员操作通过' : '管理员操作拒绝'
+  const res = await doPictureReviewUsingPost({
+    id: record.id,
+    reviewStatus,
+    reviewMessage,
+  })
+  if (res.data.code === 0) {
+    message.success('审核操作成功')
+    fetchData()
+  } else {
+    message.error('审核操作失败，' + res.data.message)
+  }
 }
-</style>
+</script>

@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.util.Date;
 import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
@@ -61,11 +62,28 @@ public class PictureQueryRequest extends PageRequest implements Serializable {
      */
     private String picFormat;
 
+
+
     /**
      * 搜索词（同时搜名称、简介等）
      */
     private String searchText;
 
+
+    private Integer reviewStatus;
+
+
+    private String reviewMessage;
+
+
+    private Long spaceId;
+
+    private boolean nullSpaceId;
+
+
+    private Long reviewerId;
+
+    private Date reviewerTime;
     /**
      * 用户 id
      */

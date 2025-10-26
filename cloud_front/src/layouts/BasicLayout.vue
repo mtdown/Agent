@@ -4,9 +4,12 @@
       <a-layout-header class="header">
         <GlobalHeader />
       </a-layout-header>
-      <a-layout-content class="content">
-        <router-view />
-      </a-layout-content>
+      <a-layout>
+        <GlobalSider class="sider" />
+        <a-layout-content class="st">
+          <router-view />
+        </a-layout-content>
+      </a-layout>
       <a-layout-footer class="footer">
         <a href="https://github.com/mtdown/Agent" target="_blank"> 项目文件 </a>
       </a-layout-footer>
@@ -16,6 +19,7 @@
 
 <script setup lang="ts">
 import GlobalHeader from '@/components/GlobalHeader.vue'
+import GlobalSider from '@/components/GlobalSider.vue'
 </script>
 
 <style scoped>
@@ -51,5 +55,9 @@ import GlobalHeader from '@/components/GlobalHeader.vue'
   left: 0;
   right: 0;
   text-align: center;
+}
+
+#basicLayout .content {
+  padding: 28px;
 }
 </style>

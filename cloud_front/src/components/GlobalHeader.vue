@@ -7,7 +7,7 @@
           <div class="title-bar">
             <!--alt的作用是当别人看到你图片未加载时还有一个文字-->
             <img class="logo" src="../assets/logo.jpg" alt="logo" />
-            <div class="title">海东文库</div>
+            <div class="title">憨带图库</div>
           </div>
         </router-link>
       </a-col>
@@ -64,6 +64,7 @@ import { useRouter } from 'vue-router'
 import router from '@/router'
 import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
 import { userLogoutUsingPost } from '@/api/userController.ts'
+import AddPictureBatchPage from '@/components/AddPictureBatchPage.vue'
 const loginUserStore = useLoginUserStore()
 
 const originItems = [
@@ -84,14 +85,20 @@ const originItems = [
     title: '图片管理',
   },
   {
+    key: '/admin/spaceManage',
+    label: '空间管理',
+    title: '空间管理',
+  },
+
+  {
     key: '/add_picture',
     label: '创建图片',
     title: '创建图片',
   },
   {
-    key: 'others',
-    label: h('a', { href: 'https://www.codefather.cn', target: '_blank' }, '编程导航'),
-    title: '编程导航',
+    key: '/add_picture/batch',
+    label: '批量创建图片',
+    title: '批量创建图片',
   },
   {
     key: '个人博客',

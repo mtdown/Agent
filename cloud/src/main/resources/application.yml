@@ -1,3 +1,5 @@
+#这一个配置废弃了
+
 server:
   port: 8123
   servlet:

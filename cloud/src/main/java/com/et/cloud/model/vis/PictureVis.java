@@ -74,6 +74,8 @@ public class PictureVis implements Serializable {
      */
     private Long userId;
 
+    private Long spaceId;
+
     /**
      * 创建时间
      */
@@ -95,6 +97,11 @@ public class PictureVis implements Serializable {
     private UserVis user;
 
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 缩略图地址
+     */
+    private String thumbnailUrl;
 
     /**
      * 封装类转对象
