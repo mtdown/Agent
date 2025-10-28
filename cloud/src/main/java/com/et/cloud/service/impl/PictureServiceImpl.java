@@ -7,13 +7,13 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.et.cloud.api.aliyunai.CreateOutPaintingTaskRequest;
+import com.et.cloud.api.aliyunai.CreateOutPaintingTaskResponse;
+import com.et.cloud.api.aliyunai.model.AliYunAiApi;
 import com.et.cloud.commen.DeleteRequest;
 import com.et.cloud.commen.ResultUtils;
 import com.et.cloud.dto.file.UploadPictureResult;
-import com.et.cloud.dto.picture.PictureQueryRequest;
-import com.et.cloud.dto.picture.PictureReviewRequest;
-import com.et.cloud.dto.picture.PictureUploadByBatchRequest;
-import com.et.cloud.dto.picture.PictureUploadRequest;
+import com.et.cloud.dto.picture.*;
 import com.et.cloud.enums.PictureReviewStatusEnum;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
@@ -78,6 +78,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private TransactionTemplate transactionTemplate;
+
+    @Resource
+    private AliYunAiApi aliYunAiApi;
 
     @Override
     public PictureVis uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -503,6 +506,27 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             ThrowUtils.throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
             return true;
         });
+    }
+
+    @Override
+    public CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser) {//        想一想要使用AI扩图要做什么
+        //肯定都是有报错检测，什么输入是否为空之类的
+//        但是先不说那些，第一步我觉得是要接受前端的请求，发送到API去。查看是否连接成功。我们应该不是直接负责AI扩图，这个函数只需要做到发送，接收，包装起来就行
+        Long pictureId = createPictureOutPaintingTaskRequest.getPictureId();
+        ThrowUtils.throwIf(pictureId <= 0, ErrorCode.PARAMS_ERROR,"图片不存在");
+//        权限校验，这个有点没想到，应该认为这是一个定式思维。报错检验-权限检验
+        Picture picture = this.getById(pictureId);
+        checkPictureAuth(loginUser,this.getById(pictureId));
+//      然后就是创建扩图任务，填写里面的参数
+        CreateOutPaintingTaskRequest taskRequest = new CreateOutPaintingTaskRequest();
+        CreateOutPaintingTaskRequest.Input input = new CreateOutPaintingTaskRequest.Input();
+//        不要信任DTO的url，要自己设置
+        input.setImageUrl(picture.getUrl());
+        taskRequest.setInput(input);
+//        最后得到的结果就是一个任务ID
+        BeanUtil.copyProperties(createPictureOutPaintingTaskRequest, taskRequest);
+
+        return aliYunAiApi.createOutPaintingTask(taskRequest);
     }
 
 

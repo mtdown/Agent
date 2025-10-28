@@ -16,7 +16,28 @@
         <UrlPictureUpload :picture="picture" :spaceId="spaceId" :onSuccess="onSuccess" />
       </a-tab-pane>
     </a-tabs>
-    <!--    图片信息表单-->
+    <!--    图片编辑区域-->
+    <div v-if="picture" class="edit-bar">
+      <a-space size="middle">
+        <a-button :icon="h(EditOutlined)" @click="doEditPicture">编辑图片</a-button>
+        <a-button :icon="h(FullscreenOutlined)" @click="doImagePainting"> AI 扩图 </a-button>
+      </a-space>
+    </div>
+
+    <ImageCropper
+      ref="imageCropperRef"
+      :imageUrl="picture?.url"
+      :picture="picture"
+      :spaceId="spaceId"
+      :onSuccess="onCropSuccess"
+    />
+    <ImageOutPainting
+      ref="imageOutPaintingRef"
+      :picture="picture"
+      :spaceId="spaceId"
+      :onSuccess="onImageOutPaintingSuccess"
+    />
+
     <a-form
       v-if="picture"
       name="picture"
@@ -45,7 +66,6 @@
           allowClear
         />
       </a-form-item>
-
       <a-form-item label="标签" name="tags">
         <a-select
           v-model:value="pictureForm.tags"
@@ -55,7 +75,6 @@
           allowClear
         />
       </a-form-item>
-
       <a-form-item>
         <a-button type="primary" html-type="submit">创建</a-button>
       </a-form-item>
@@ -69,14 +88,16 @@
 import PictureUpload from '@/components/PictureUpload.vue'
 import UrlPictureUpload from '@/components/UrlPictureUpload.vue'
 import { useRoute, useRouter } from 'vue-router'
-import { reactive, ref, onMounted, computed } from 'vue'
+import { reactive, ref, onMounted, computed, h } from 'vue'
 import {
   editPictureUsingPost,
   getPictureVisByIdUsingGet,
   listPictureTagCategoryUsingGet,
 } from '@/api/pictureController.ts'
 import { message } from 'ant-design-vue'
-
+import { EditOutlined, FullscreenOutlined } from '@ant-design/icons-vue'
+import ImageCropper from '@/components/ImageCropper.vue'
+import ImageOutPainting from '@/components/ImageOutPainting.vue'
 // 把这里的逻辑从 template 移到 script 中
 const picture = ref<API.PictureVis>()
 const pictureForm = reactive<API.PictureEditRequest>({})
@@ -86,6 +107,7 @@ const onSuccess = (newPicture: API.PictureVis) => {
   // 自动填充表单名称
   pictureForm.name = newPicture.name
 }
+
 const uploadType = ref<'file' | 'url'>('file')
 const router = useRouter()
 const spaceId = computed(() => {
@@ -167,11 +189,40 @@ const getOldPicture = async () => {
 onMounted(() => {
   getOldPicture()
 })
+
+const imageCropperRef = ref()
+
+const doEditPicture = () => {
+  if (imageCropperRef.value) {
+    imageCropperRef.value.openModal()
+  }
+}
+
+const onCropSuccess = (newPicture: API.PictureVis) => {
+  picture.value = newPicture
+}
+// AI扩图软件
+const imageOutPaintingRef = ref()
+
+const doImagePainting = () => {
+  if (imageOutPaintingRef.value) {
+    imageOutPaintingRef.value.openModal()
+  }
+}
+
+const onImageOutPaintingSuccess = (newPicture: API.PictureVis) => {
+  picture.value = newPicture
+}
 </script>
 
 <style scoped>
 #addPicturePage {
   max-width: 600px;
   margin: 0 auto;
+}
+
+#addPicturePage .edit-bar {
+  text-align: center;
+  margin: 16px 0;
 }
 </style>

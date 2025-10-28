@@ -23,6 +23,7 @@ import type { UploadChangeParam, UploadProps } from 'ant-design-vue'
 import { uploadPictureUsingPost } from '@/api/pictureController.ts'
 
 interface Props {
+  imageUrl?: string
   picture?: API.PictureVis
   spaceId?: number
   onSuccess?: (newPicture: API.PictureVis) => void

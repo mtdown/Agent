@@ -2,11 +2,15 @@ package com.et.cloud.controller;
 
 //import cn.hutool.cache.Cache;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.ssh.JschUtil;
 import cn.hutool.json.JSON;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.et.cloud.annotation.AuthCheck;
+import com.et.cloud.api.aliyunai.CreateOutPaintingTaskResponse;
+import com.et.cloud.api.aliyunai.GetOutPaintingTaskResponse;
+import com.et.cloud.api.aliyunai.model.AliYunAiApi;
 import com.et.cloud.commen.BaseResponse;
 import com.et.cloud.commen.DeleteRequest;
 import com.et.cloud.commen.ResultUtils;
@@ -79,6 +83,8 @@ public class PictureController {
     @Qualifier("redisTemplate")
     @Autowired
     private RedisTemplate redisTemplate;
+    @Resource
+    private AliYunAiApi aliYunAiApi;
 
 //    构建本地缓存，最大10000条，5分钟后移除
     private final Cache<String, String> LOCAL_CACHE =
@@ -351,5 +357,32 @@ public class PictureController {
         return ResultUtils.success(uploadCount);
     }
 
+    /**
+     * 这里是创建模式
+     * @param createPictureOutPaintingTaskRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/out_painting/create_task")
+    public BaseResponse<CreateOutPaintingTaskResponse> createPictureOutPaintingTask(@RequestBody CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, HttpServletRequest request) {
+//       这就是正式的AI接口了，老规矩先写报错函数
+        ThrowUtils.throwIf(createPictureOutPaintingTaskRequest == null, ErrorCode.PARAMS_ERROR);
+        //获取用户ID，图片ID，这里是编辑，就是图片ID，之前我写的方法应该可以直接兼容这个
+        User user = userService.getLoginUser(request);
+        CreateOutPaintingTaskResponse response = pictureService.createPictureOutPaintingTask(createPictureOutPaintingTaskRequest, user);
+        return ResultUtils.success(response);
+    }
+
+    /**
+     *
+     * @param taskId
+     * @return
+     */
+    @GetMapping("/out_painting/get_task")
+    public BaseResponse<GetOutPaintingTaskResponse> getPictureOutPaintingTask(String taskId) {
+        ThrowUtils.throwIf(StrUtil.isBlank(taskId), ErrorCode.PARAMS_ERROR);
+        GetOutPaintingTaskResponse task = aliYunAiApi.getOutPaintingTask(taskId);
+        return ResultUtils.success(task);
+    }
 }
 

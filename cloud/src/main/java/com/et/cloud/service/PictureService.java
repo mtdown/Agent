@@ -2,10 +2,8 @@ package com.et.cloud.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.et.cloud.dto.picture.PictureQueryRequest;
-import com.et.cloud.dto.picture.PictureReviewRequest;
-import com.et.cloud.dto.picture.PictureUploadRequest;
-import com.et.cloud.dto.picture.PictureUploadByBatchRequest;
+import com.et.cloud.api.aliyunai.CreateOutPaintingTaskResponse;
+import com.et.cloud.dto.picture.*;
 import com.et.cloud.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.et.cloud.model.entity.User;
@@ -88,4 +86,6 @@ public interface PictureService extends IService<Picture> {
      */
     void deletePicture(long pictureId, User loginUser);
 
+//    AI图片编辑方法
+    CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
 }
