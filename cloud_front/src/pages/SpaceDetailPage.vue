@@ -2,11 +2,37 @@
   <div id="spaceDetailPage">
     <!-- 空间信息 -->
     <a-flex justify="space-between">
-      <h2>{{ space.spaceName }}（私有空间）</h2>
+      <h2>{{ space.spaceName }}（{{ SPACE_TYPE_MAP[space.spaceType] }}）</h2>
       <a-space size="middle">
-        <a-button type="primary" :href="`/add_picture?spaceId=${id}`" target="_blank">
+        <a-button
+          v-if="canUploadPicture"
+          type="primary"
+          :href="`/add_picture?spaceId=${id}`"
+          target="_blank"
+        >
           + 创建图片
         </a-button>
+        <!--        之后做空间分析加-->
+        <a-button
+          v-if="canManageSpaceUser"
+          type="primary"
+          ghost
+          :icon="h(TeamOutlined)"
+          :href="`/spaceUserManage/${id}`"
+          target="_blank"
+        >
+          成员管理
+        </a-button>
+        <!--        <a-button-->
+        <!--          v-if="canManageSpaceUser"-->
+        <!--          type="primary"-->
+        <!--          ghost-->
+        <!--          :icon="h(BarChartOutlined)"-->
+        <!--          :href="`/space_analyze?spaceId=${id}`"-->
+        <!--          target="_blank"-->
+        <!--        >-->
+        <!--          空间分析-->
+        <!--        </a-button>-->
         <a-tooltip
           :title="`占用空间 ${formatSize(space.totalSize)} / ${formatSize(space.maxSize)}`"
         >
@@ -19,7 +45,14 @@
       </a-space>
     </a-flex>
     <!-- 图片列表 -->
-    <PictureList :dataList="dataList" :loading="loading" :showOp="true" />
+    <PictureList
+      :dataList="dataList"
+      :loading="loading"
+      :showOp="true"
+      :canEdit="canEditPicture"
+      :canDelete="canDeletePicture"
+      :onReload="fetchData"
+    />
     <a-pagination
       v-model:current="searchParams.current"
       v-model:pageSize="searchParams.pageSize"
@@ -30,17 +63,34 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref } from 'vue'
+import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { deleteSpaceUsingPost, getSpaceVisByIdUsingGet } from '@/api/spaceController.ts'
 import PictureList from '@/components/PictureList.vue'
 import { message } from 'ant-design-vue'
 import { listPictureByPageUsingPost } from '@/api/pictureController.ts'
 import { formatSize } from '@/utils'
+import { TeamOutlined } from '@ant-design/icons-vue'
+import { SPACE_PERMISSION_ENUM, SPACE_TYPE_MAP } from '@/constants/space.ts'
 
-const props = defineProps<{
+interface Props {
   id: string | number
-}>()
+}
+
+const props = defineProps<Props>()
 const space = ref<API.SpaceVis>({})
+
+// 通用权限检查函数
+function createPermissionChecker(permission: string) {
+  return computed(() => {
+    return (space.value.permissionList ?? []).includes(permission)
+  })
+}
+
+// 定义权限检查
+const canManageSpaceUser = createPermissionChecker(SPACE_PERMISSION_ENUM.SPACE_USER_MANAGE)
+const canUploadPicture = createPermissionChecker(SPACE_PERMISSION_ENUM.PICTURE_UPLOAD)
+const canEditPicture = createPermissionChecker(SPACE_PERMISSION_ENUM.PICTURE_EDIT)
+const canDeletePicture = createPermissionChecker(SPACE_PERMISSION_ENUM.PICTURE_DELETE)
 
 const fetchSpaceDetail = async () => {
   try {
@@ -98,6 +148,15 @@ const fetchData = async () => {
 onMounted(() => {
   fetchData()
 })
+
+// 空间 id 改变时，必须重新获取数据
+watch(
+  () => props.id,
+  (newSpaceId) => {
+    fetchSpaceDetail()
+    fetchData()
+  },
+)
 </script>
 
 <style scoped>

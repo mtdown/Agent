@@ -26,14 +26,10 @@
               </template>
             </a-card-meta>
             <template v-if="showOp" #actions>
-              <a-space @click="(e) => doEdit(picture, e)">
-                <edit-outlined />
-                编辑
-              </a-space>
-              <a-space @click="(e) => doDelete(picture, e)">
-                <delete-outlined />
-                删除
-              </a-space>
+              <!--              <ShareAltOutlined @click="(e) => doShare(picture, e)" />-->
+              <!--              <SearchOutlined @click="(e) => doSearch(picture, e)" />-->
+              <EditOutlined v-if="canEdit" @click="(e) => doEdit(picture, e)" />
+              <DeleteOutlined v-if="canDelete" @click="(e) => doDelete(picture, e)" />
             </template>
           </a-card>
         </a-list-item>
@@ -51,12 +47,17 @@ interface Props {
   dataList?: API.PictureVis[]
   loading?: boolean
   showOp?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
+  onReload?: () => void
 }
 
 const props = withDefaults(defineProps<Props>(), {
   dataList: () => [],
   loading: false,
   showOp: false,
+  canEdit?: false,
+  canDelete?: false,
 })
 
 // 跳转至图片详情

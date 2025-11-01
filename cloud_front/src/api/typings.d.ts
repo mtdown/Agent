@@ -29,6 +29,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseListSpaceUserVis_ = {
+    code?: number
+    data?: SpaceUserVis[]
+    message?: string
+  }
+
   type BaseResponseLoginUserVis_ = {
     code?: number
     data?: LoginUserVis
@@ -92,6 +98,12 @@ declare namespace API {
   type BaseResponseSpace_ = {
     code?: number
     data?: Space
+    message?: string
+  }
+
+  type BaseResponseSpaceUser_ = {
+    code?: number
+    data?: SpaceUser
     message?: string
   }
 
@@ -354,6 +366,7 @@ declare namespace API {
     id?: number
     introduction?: string
     name?: string
+    permissionList?: string[]
     picFormat?: string
     picHeight?: number
     picScale?: number
@@ -377,6 +390,7 @@ declare namespace API {
     maxSize?: number
     spaceLevel?: number
     spaceName?: string
+    spaceType?: number
     totalCount?: number
     totalSize?: number
     updateTime?: string
@@ -421,14 +435,54 @@ declare namespace API {
     spaceName?: string
   }
 
+  type SpaceUser = {
+    createTime?: string
+    id?: number
+    spaceId?: number
+    spaceRole?: string
+    updateTime?: string
+    userId?: number
+  }
+
+  type SpaceUserAddRequest = {
+    spaceId?: number
+    spaceRole?: string
+    userId?: number
+  }
+
+  type SpaceUserEditRequest = {
+    id?: number
+    spaceRole?: string
+  }
+
+  type SpaceUserQueryRequest = {
+    id?: number
+    spaceId?: number
+    spaceRole?: string
+    userId?: number
+  }
+
+  type SpaceUserVis = {
+    createTime?: string
+    id?: number
+    space?: SpaceVis
+    spaceId?: number
+    spaceRole?: string
+    updateTime?: string
+    user?: UserVis
+    userId?: number
+  }
+
   type SpaceVis = {
     createTime?: string
     editTime?: string
     id?: number
     maxCount?: number
     maxSize?: number
+    permissionList?: string[]
     spaceLevel?: number
     spaceName?: string
+    spaceType?: number
     totalCount?: number
     totalSize?: number
     updateTime?: string

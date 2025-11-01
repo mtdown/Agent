@@ -104,6 +104,10 @@ const columns = [
     dataIndex: 'spaceLevel',
   },
   {
+    title: '空间类别',
+    dataIndex: 'spaceType',
+  },
+  {
     title: '使用情况',
     dataIndex: 'spaceUseInfo',
   },

@@ -8,6 +8,8 @@ import com.et.cloud.dto.user.UserQueryRequest;
 import com.et.cloud.enums.UserRoleEnum;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
+import com.et.cloud.manager.auth.StpKit;
+import com.et.cloud.model.constant.UserConstant;
 import com.et.cloud.model.entity.User;
 import com.et.cloud.model.vis.LoginUserVis;
 import com.et.cloud.model.vis.UserVis;
@@ -108,6 +110,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         // 3. 记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATE, user);
+//        记录用户登录态到satoken，用在空间鉴定权限时使用
+        StpKit.SPACE.login(user.getId());
+        StpKit.SPACE.getSession().set(USER_LOGIN_STATE, user);
         return this.getLoginUserVis(user);
     }
 

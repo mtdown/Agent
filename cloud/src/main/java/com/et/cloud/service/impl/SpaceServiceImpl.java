@@ -15,6 +15,8 @@ import com.et.cloud.dto.space.SpaceAddRequest;
 import com.et.cloud.dto.space.SpaceQueryRequest;
 import com.et.cloud.enums.PictureReviewStatusEnum;
 import com.et.cloud.enums.SpaceLevelEnum;
+import com.et.cloud.enums.SpaceRoleEnum;
+import com.et.cloud.enums.SpaceTypeEnum;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
@@ -28,11 +30,13 @@ import com.et.cloud.mapper.UserMapper;
 import com.et.cloud.model.entity.Picture;
 import com.et.cloud.model.entity.Space;
 
+import com.et.cloud.model.entity.SpaceUser;
 import com.et.cloud.model.entity.User;
 import com.et.cloud.model.vis.PictureVis;
 import com.et.cloud.model.vis.SpaceVis;
 import com.et.cloud.model.vis.UserVis;
 import com.et.cloud.service.SpaceService;
+import com.et.cloud.service.SpaceUserService;
 import com.et.cloud.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -56,6 +60,9 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
     @Resource
     private UserService userService;
 
+    @Resource
+    private SpaceUserService spaceUserService;
+
     @Override
     public void vaildSpace(Space space, boolean add) {
         ThrowUtils.throwIf(space == null, ErrorCode.PARAMS_ERROR);
@@ -64,12 +71,20 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         Integer spaceLevel = space.getSpaceLevel();
         SpaceLevelEnum spaceLevelEnum = SpaceLevelEnum.getEnumByValue(spaceLevel);
 
+//        现在要增加spaceType校验
+        Integer spaceType=space.getSpaceType();
+        SpaceTypeEnum spaceTypeEnum = SpaceTypeEnum.getEnumByValue(spaceType);
+
+
         if (add) {
             if (StrUtil.isBlank(spaceName)) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间名称不能为空");
             }
             if (spaceLevel == null) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间级别不能为空");
+            }
+            if (spaceType == null) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间类别不能为空");
             }
         }
 
@@ -78,6 +93,9 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         }
         if (StrUtil.isNotBlank(spaceName) && spaceName.length() > 30) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间名称过长");
+        }
+        if (spaceType != null && spaceTypeEnum == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间类别不存在");
         }
     }
 
@@ -187,6 +205,10 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         if (spaceAddRequest.getSpaceLevel() == null) {
             space.setSpaceLevel(SpaceLevelEnum.COMMON.getValue());
         }
+//        因为追加了团队空间，自然也要追加一个初始的默认值
+        if (spaceAddRequest.getSpaceType() == null) {
+            spaceAddRequest.setSpaceType(SpaceTypeEnum.PRIVATE.getValue());
+        }
 
         this.fillSpaceBySpaceLevel(space);
 
@@ -204,18 +226,30 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
 //        这里是使用synchronized实现的
         synchronized (lock) {
 //            这里使用编程性事务，声明型的事务可能导致重复读取，所以这里就要用编程性事务
+//            注意一下，事务里面的操作要么都成功，要么都失败
             Long newSpaceId = transactionTemplate.execute(status -> {
 //                QueryWrapper 是非类型安全的。如果不小心拼错了列名，只有在程序运行时才会遇到问题
 //                LambdaQueryWrapper 是类型安全.eq(Space::getUserId, userId)就是直接关联到你的 Space 实体类
 //                exists是找记录，count是数条数，所以当我们判断存在不存在的适合用exist更好
+//                新增，每个用户只有一个私有空间，也只有一个团队空间？这个不太对，应该是多对多的啊
                 boolean exists = this.lambdaQuery()
                         .eq(Space::getUserId, userId)
+                        .eq(Space::getSpaceType, space.getSpaceType())
                         .exists();
-                ThrowUtils.throwIf(exists, ErrorCode.OPERATION_ERROR, "每个用户仅能有一个私有空间");
+                ThrowUtils.throwIf(exists, ErrorCode.OPERATION_ERROR, "每个用户仅能有一个私有空间或者团队空间");
 
                 boolean result = this.save(space);
-                ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-
+                ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR,"保存空间到数据库失败");
+                // 创建成功后，如果是团队空间，关联新增团队成员记录
+                if (SpaceTypeEnum.TEAM.getValue() == space.getSpaceType()) {
+                    SpaceUser spaceUser = new SpaceUser();
+                    spaceUser.setSpaceId(space.getId());
+                    spaceUser.setUserId(userId);
+                    spaceUser.setSpaceRole(SpaceRoleEnum.ADMIN.getValue());
+//                    将团队用户插入进去
+                    result = spaceUserService.save(spaceUser);
+                    ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "创建团队成员记录失败");
+                }
                 return space.getId();
             });
 //声明式事务和编程性事务private TransactionTemplate transactionTemplate;这个就算编程性事务

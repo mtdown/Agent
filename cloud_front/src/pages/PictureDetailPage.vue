@@ -61,7 +61,7 @@
             <a-button v-if="canEdit" :icon="h(EditOutlined)" type="default" @click="doEdit">
               编辑
             </a-button>
-            <a-button v-if="canEdit" :icon="h(DeleteOutlined)" danger @click="doDelete">
+            <a-button v-if="canDelete" :icon="h(DeleteOutlined)" danger @click="doDelete">
               删除
             </a-button>
           </a-space>
@@ -85,18 +85,9 @@ import {
 import { useRouter } from 'vue-router'
 import { downloadImage, formatSize } from '@/utils'
 import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
+import { SPACE_PERMISSION_ENUM } from '@/constants/space.ts'
 
 const loginUserStore = useLoginUserStore()
-const canEdit = computed(() => {
-  const loginUser = loginUserStore.loginUser
-
-  if (!loginUser.id) {
-    return false
-  }
-
-  const user = picture.value.user || {}
-  return loginUser.id === user.id || loginUser.userRole === 'admin'
-})
 
 interface Props {
   id: string | number
@@ -104,6 +95,17 @@ interface Props {
 
 const props = defineProps<Props>()
 const picture = ref<API.PictureVis>({})
+
+// 通用权限检查函数
+function createPermissionChecker(permission: string) {
+  return computed(() => {
+    return (picture.value.permissionList ?? []).includes(permission)
+  })
+}
+
+// 定义权限检查
+const canEdit = createPermissionChecker(SPACE_PERMISSION_ENUM.PICTURE_EDIT)
+const canDelete = createPermissionChecker(SPACE_PERMISSION_ENUM.PICTURE_DELETE)
 
 // 获取图片详情
 const fetchPictureDetail = async () => {

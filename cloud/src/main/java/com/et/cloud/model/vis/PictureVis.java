@@ -4,6 +4,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.annotation.*;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -97,6 +98,8 @@ public class PictureVis implements Serializable {
     private UserVis user;
 
     private static final long serialVersionUID = 1L;
+
+    private List<String> permissionList = new ArrayList<>();
 
     /**
      * 缩略图地址

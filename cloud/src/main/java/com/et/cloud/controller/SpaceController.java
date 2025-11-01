@@ -15,6 +15,7 @@ import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
 import com.et.cloud.manager.CosManager;
+import com.et.cloud.manager.auth.SpaceUserAuthManager;
 import com.et.cloud.model.constant.UserConstant;
 import com.et.cloud.model.entity.Space;
 import com.et.cloud.model.entity.User;
@@ -52,6 +53,8 @@ public class SpaceController {
     private UserService userService;
     @Resource
     private SpaceService spaceService;
+    @Resource
+    private SpaceUserAuthManager spaceUserAuthManager;
 
     @PostMapping("/add")
     public BaseResponse<Long> addSpace(@RequestBody SpaceAddRequest spaceAddRequest, HttpServletRequest request) {
@@ -133,8 +136,14 @@ public class SpaceController {
         // 查询数据库
         Space space = spaceService.getById(id);
         ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR);
+//        登录用户信息获取
+        SpaceVis spaceVis = spaceService.getspaceVis(space, request);
+        User loginUser = userService.getLoginUser(request);
+//        设置指令
+        List<String> permissionList = spaceUserAuthManager.getPermissionList(space,loginUser);
+        spaceVis.setPermissionList(permissionList);
         // 获取封装类
-        return ResultUtils.success(spaceService.getspaceVis(space, request));
+        return ResultUtils.success(spaceVis);
     }
 
 

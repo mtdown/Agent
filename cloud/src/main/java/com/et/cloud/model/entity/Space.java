@@ -70,6 +70,8 @@ public class Space {
      */
     private Date updateTime;
 
+    private Integer spaceType;
+
     /**
      * 是否删除
      */

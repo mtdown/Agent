@@ -516,7 +516,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         ThrowUtils.throwIf(pictureId <= 0, ErrorCode.PARAMS_ERROR,"图片不存在");
 //        权限校验，这个有点没想到，应该认为这是一个定式思维。报错检验-权限检验
         Picture picture = this.getById(pictureId);
-        checkPictureAuth(loginUser,this.getById(pictureId));
+//        checkPictureAuth(loginUser,this.getById(pictureId));
 //      然后就是创建扩图任务，填写里面的参数
         CreateOutPaintingTaskRequest taskRequest = new CreateOutPaintingTaskRequest();
         CreateOutPaintingTaskRequest.Input input = new CreateOutPaintingTaskRequest.Input();

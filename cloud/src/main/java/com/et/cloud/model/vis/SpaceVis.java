@@ -5,7 +5,9 @@ import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Data
 public class SpaceVis implements Serializable {
@@ -45,7 +47,11 @@ public class SpaceVis implements Serializable {
 
     private UserVis user;
 
+    private Integer spaceType;
+
     private static final long serialVersionUID = 1L;
+
+    private List<String> permissionList = new ArrayList<>();
 
 
     public static Space visToObj(SpaceVis spaceVis) {

@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.et.cloud.mapper.SpaceMapper">
+<mapper namespace="generator.mapper.SpaceMapper">
 
-    <resultMap id="BaseResultMap" type="com.et.cloud.model.entity.Space">
+    <resultMap id="BaseResultMap" type="generator.domain.Space">
             <id property="id" column="id" />
             <result property="spaceName" column="spaceName" />
             <result property="spaceLevel" column="spaceLevel" />
@@ -17,11 +17,12 @@
             <result property="editTime" column="editTime" />
             <result property="updateTime" column="updateTime" />
             <result property="isDelete" column="isDelete" />
+            <result property="spaceType" column="spaceType" />
     </resultMap>
 
     <sql id="Base_Column_List">
         id,spaceName,spaceLevel,maxSize,maxCount,totalSize,
         totalCount,userId,createTime,editTime,updateTime,
-        isDelete
+        isDelete,spaceType
     </sql>
 </mapper>
