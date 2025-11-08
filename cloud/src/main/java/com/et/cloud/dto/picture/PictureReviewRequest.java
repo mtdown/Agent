@@ -16,6 +16,8 @@ public class PictureReviewRequest implements Serializable {
     //审核信息
     private String reviewMessage;
 
+    private Long spaceId;
+
 
     private static final long serialVersionUID = 1L;
 }

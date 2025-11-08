@@ -15,6 +15,7 @@ import com.et.cloud.commen.ResultUtils;
 import com.et.cloud.dto.file.UploadPictureResult;
 import com.et.cloud.dto.picture.*;
 import com.et.cloud.enums.PictureReviewStatusEnum;
+import com.et.cloud.enums.SpaceTypeEnum;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
@@ -86,9 +87,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     public PictureVis uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
 //        空间信息检验
+        Space space = null;
         Long spaceId = pictureUploadRequest.getSpaceId();
         if (spaceId != null) {
-            Space space = spaceService.getById(spaceId);
+            space = spaceService.getById(spaceId);
             ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
 
             if (!loginUser.getId().equals(space.getUserId())) {
@@ -172,7 +174,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             picture.setId(pictureId);
             picture.setEditTime(new Date());
         }
-        this.fillReviewParams(picture, loginUser);
+
+        fillReviewParams(picture, loginUser,spaceId);
         //通过检测主键是否有值，判断是上传还是新建
 //        需要更新空间的额度
         // 在事务外部先获取旧图片信息，以便在事务中使用
@@ -398,15 +401,58 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
      * @param loginUser
      */
     @Override
+    @Deprecated
     public void fillReviewParams(Picture picture, User loginUser) {
-        if (userService.isAdmin(loginUser)) {
+        fillReviewParams(picture, loginUser, picture.getSpaceId());
+//        if (userService.isAdmin(loginUser)) {
+//
+//            picture.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+//            picture.setReviewMessage("管理员自动过审");
+//            picture.setReviewTime(new Date());
+//        } else {
+//            picture.setReviewStatus(PictureReviewStatusEnum.REVIEWING.getValue());
+//        }
+    }
+//    看来是有什么东西一直在调用这个函数
 
-            picture.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
-            picture.setReviewMessage("管理员自动过审");
-            picture.setReviewTime(new Date());
+    /**
+     * 填充审核参数
+     *
+     * @param picture
+     * @param loginUser
+     * @param spaceId 所属空间，可能为 null（表示公共空间）
+     */
+    @Override
+    public void fillReviewParams(Picture picture, User loginUser, Long spaceId) {
+        // 🔍 添加调试日志
+        log.info("========== fillReviewParams 调试信息 ==========");
+        log.info("传入的 spaceId: {}", spaceId);
+        log.info("是否为管理员: {}", userService.isAdmin(loginUser));
+
+        if (spaceId == null) {
+            log.info("执行分支: 公共空间");
+            // 公共空间
+            if (userService.isAdmin(loginUser)) {
+                picture.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+                picture.setReviewMessage("管理员自动过审");
+                picture.setReviewTime(new Date());
+                picture.setReviewerId(loginUser.getId());
+            } else {
+                picture.setReviewStatus(PictureReviewStatusEnum.REVIEWING.getValue());
+                picture.setReviewMessage("公共空间，待审核");
+            }
         } else {
-            picture.setReviewStatus(PictureReviewStatusEnum.REVIEWING.getValue());
+            log.info("执行分支: 私有/团队空间");
+            // 私有空间/团队空间，自动过审
+            picture.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+            picture.setReviewMessage("私有空间自动过审_spaceId=" + spaceId);
+            picture.setReviewTime(new Date());
+            picture.setReviewerId(loginUser.getId());
         }
+
+        log.info("最终设置的审核状态: {}", picture.getReviewStatus());
+        log.info("最终设置的审核消息: {}", picture.getReviewMessage());
+        log.info("==========================================");
     }
 
     @Override

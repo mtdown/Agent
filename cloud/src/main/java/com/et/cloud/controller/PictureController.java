@@ -153,7 +153,9 @@ public class PictureController {
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
 
         User loginUser = userService.getLoginUser(request);
-        pictureService.fillReviewParams(picture, loginUser);
+//        pictureService.fillReviewParams(picture, loginUser);
+//        System.out.println("是我updatePicture在工作！！！！");
+        pictureService.fillReviewParams(picture, loginUser, oldPicture.getSpaceId());
         // 操作数据库
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -176,7 +178,7 @@ public class PictureController {
      * 根据 id 获取图片（封装类）
      */
     @GetMapping("/get/vis")
-//    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_VIEW)
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_VIEW)
     public BaseResponse<PictureVis> getPictureVisById(long id, HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         // 查询数据库
@@ -207,28 +209,30 @@ public class PictureController {
     @PostMapping("/list/page")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<Picture>> listPictureByPage(@RequestBody PictureQueryRequest pictureQueryRequest,HttpServletRequest request) {
+
         long current = pictureQueryRequest.getCurrent();
         long size = pictureQueryRequest.getPageSize();
-        Long spaceId = pictureQueryRequest.getSpaceId();
-//        不输入Id就是公开图库
-        if (spaceId == null) {
-//获取公开图库
-            pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
-            pictureQueryRequest.setNullSpaceId(true);
-        } else {
-//
-            User loginUser = userService.getLoginUser(request);
-            Space space = spaceService.getById(spaceId);
-            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
-            if (!loginUser.getId().equals(space.getUserId())) {
-                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
-            }
-        }
+//删除这部分权限校验代码
+//        Long spaceId = pictureQueryRequest.getSpaceId();
+////        不输入Id就是公开图库
+//        if (spaceId == null) {
+////获取公开图库
+//            pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+//            pictureQueryRequest.setNullSpaceId(true);
+//        } else {
+//            User loginUser = userService.getLoginUser(request);
+//            Space space = spaceService.getById(spaceId);
+//            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+//            if (!loginUser.getId().equals(space.getUserId())) {
+//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
+//            }
+//        }
         //普通用户只能看到审核通过的数据,原本QueryRequest是不带satus标记的，就不会查询，这里增加一行实现了查询效果
 //        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
         // 查询数据库
         Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
                 pictureService.getQueryWrapper(pictureQueryRequest));
+
         return ResultUtils.success(picturePage);
     }
 
@@ -236,7 +240,7 @@ public class PictureController {
      * 分页获取图片列表（封装类）
      */
     @PostMapping("/list/page/vis")
-//    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_VIEW)
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_VIEW)
     public BaseResponse<Page<PictureVis>> listPictureVisByPage(@RequestBody PictureQueryRequest pictureQueryRequest,HttpServletRequest request) {
         long current = pictureQueryRequest.getCurrent();
         long size = pictureQueryRequest.getPageSize();
@@ -250,6 +254,17 @@ public class PictureController {
 //            pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
 //        }
 
+        // 空间权限校验
+        Long spaceId = pictureQueryRequest.getSpaceId();
+        if (spaceId == null) {
+            // 公开图库
+            // 普通用户默认只能看到审核通过的数据
+            pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+            pictureQueryRequest.setNullSpaceId(true);
+        } else {
+            boolean hasPermission = StpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
+            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
+        }
         pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
         Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
                 pictureService.getQueryWrapper(pictureQueryRequest));
@@ -329,14 +344,16 @@ public class PictureController {
         pictureService.vaildPicture(picture);
         User loginUser = userService.getLoginUser(request);
 
-        pictureService.fillReviewParams(picture, loginUser);
+//        pictureService.fillReviewParams(picture, loginUser);
+
         // 判断是否存在,这里先获取图片，在把这个图片的id放过去是为了拒绝用户给的信息，转而使用自己的信息
         long id = pictureEditRequest.getId();
         Picture oldPicture = pictureService.getById(id);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可编辑,！！！
 //        pictureService.checkPictureAuth(loginUser, oldPicture);
-
+//        System.out.println("是我editPicture在工作！！！！");
+        pictureService.fillReviewParams(picture, loginUser, picture.getSpaceId());
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(result);

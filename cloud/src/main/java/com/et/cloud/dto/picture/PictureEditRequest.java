@@ -28,6 +28,8 @@ public class PictureEditRequest implements Serializable {
      */
     private String category;
 
+    private Long spaceId;
+
     /**
      * 标签
      */

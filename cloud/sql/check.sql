@@ -1,0 +1,1 @@
+SELECT * FROM space_user WHERE userId = 1987091320446574593;

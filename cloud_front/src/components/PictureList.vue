@@ -56,13 +56,13 @@ const props = withDefaults(defineProps<Props>(), {
   dataList: () => [],
   loading: false,
   showOp: false,
-  canEdit?: false,
-  canDelete?: false,
+  canEdit: false,
+  canDelete: false,
 })
 
 // 跳转至图片详情
 const router = useRouter()
-const doClickPicture = (picture) => {
+const doClickPicture = (picture: API.PictureVis) => {
   router.push({
     path: `/picture/${picture.id}`,
   })

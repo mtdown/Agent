@@ -31,6 +31,8 @@ public class PictureUpdateRequest implements Serializable {
      */
     private String category;
 
+    private Long spaceId;
+
     /**
      * 标签
      */

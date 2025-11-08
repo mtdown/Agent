@@ -2,56 +2,62 @@ server:
   port: 8123
   servlet:
     context-path: /api
+    session:
+      cookie:
+        max-age: 2592000
 
 spring:
   application:
     name: cloud
+  # Session 配置 (使用 Redis 存储，与本地保持一致)
+  session:
+    store-type: redis
+    timeout: 2592000
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # 【注意】数据库名已更新为 picture，请确保线上数据库已创建此库
+    # 使用环境变量配置敏感信息，格式：${ENV_VAR:default_value}
     url: jdbc:mysql://localhost:3306/picture?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: picture
-    password: test
-  #    开放更大的文件上传
+    username: ${DB_USERNAME:root}  # 建议生产环境不要用 root
+    password: ${DB_PASSWORD}      # 必须通过环境变量设置
+  # 文件上传配置
   servlet:
     multipart:
       max-file-size: 30MB
+      max-request-size: 30MB
+  # Redis 配置 (使用旧线上的主机地址，合并本地的超时设置)
   redis:
-    database: 0
-    host: 111.230.167.134
-    port: 6379
+    database: ${REDIS_DB:0}
+    host: ${REDIS_HOST:111.230.167.134}
+    port: ${REDIS_PORT:6379}
     timeout: 5000
-    password: test
+    password: ${REDIS_PASSWORD} # 必须通过环境变量设置
 
-#这一部分的配置可以直接从官网上找
 mybatis-plus:
   configuration:
-    # MyBatis 配置
     map-underscore-to-camel-case: false
-    #日志，我们应该只在开发环境用，这是为了记录我们的输出
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 【重要】生产环境通常关闭 StdOutImpl，改用日志框架的文件输出
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
-    # 全局配置
     db-config:
-      # 数据库配置，负责定义如何生成主键ID
       id-type: auto
       logic-delete-field: isDelete
-      #表示删除的逻辑化数值
       logic-delete-value: 1
-      #未删除逻辑化值
       logic-not-delete-value: 0
 
 # 接口文档配置
 knife4j:
+  # 开启 Basic 认证，保护线上接口文档
   basic:
-    username: root
-    password: test
-  # 开启 Knife4j 的增强功能
+    enable: true
+    username: ${DOC_USERNAME:admin} # 接口文档登录账号
+    password: ${DOC_PASSWORD}       # 接口文档登录密码
   enable: true
-  # 【关键】关闭生产环境限制，允许在线调试
+  # 生产环境通常建议设为 true 来关闭在线调试功能，如果您确实需要在线调试则保持 false
   production: false
   openapi:
-    title: "接口文档"
+    title: "云图库接口文档"
     version: 1.0
     group:
       default:
@@ -59,11 +65,85 @@ knife4j:
         api-rule-resources:
           - com.et.cloud.controller
 
-# 对象存储配置（需要从腾讯云获取）
+# 对象存储配置 (腾讯云 COS)
 cos:
   client:
     host: https://cloud-1380686335.cos.ap-chongqing.myqcloud.com
-    secretId: ${COS_SECRET_ID}
-    secretKey: ${COS_SECRET_KEY}
     region: ap-chongqing
     bucket: cloud-1380686335
+    secretId: ${COS_SECRET_ID}   # 从环境变量读取
+    secretKey: ${COS_SECRET_KEY} # 从环境变量读取
+
+# 阿里云 AI 配置
+aliYunAi:
+  apiKey: ${ALIYUN_AI_API_KEY}   # 从环境变量读取
+
+#server:
+#  port: 8123
+#  servlet:
+#    context-path: /api
+#
+#spring:
+#  application:
+#    name: cloud
+#  # 数据库配置
+#  datasource:
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+#    url: jdbc:mysql://localhost:3306/picture?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+#    username: picture
+#    password: test
+#  #    开放更大的文件上传
+#  servlet:
+#    multipart:
+#      max-file-size: 30MB
+#  redis:
+#    database: 0
+#    host: 111.230.167.134
+#    port: 6379
+#    timeout: 5000
+#    password: test
+#
+##这一部分的配置可以直接从官网上找
+#mybatis-plus:
+#  configuration:
+#    # MyBatis 配置
+#    map-underscore-to-camel-case: false
+#    #日志，我们应该只在开发环境用，这是为了记录我们的输出
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+#  global-config:
+#    # 全局配置
+#    db-config:
+#      # 数据库配置，负责定义如何生成主键ID
+#      id-type: auto
+#      logic-delete-field: isDelete
+#      #表示删除的逻辑化数值
+#      logic-delete-value: 1
+#      #未删除逻辑化值
+#      logic-not-delete-value: 0
+#
+## 接口文档配置
+#knife4j:
+#  basic:
+#    username: root
+#    password: test
+#  # 开启 Knife4j 的增强功能
+#  enable: true
+#  # 【关键】关闭生产环境限制，允许在线调试
+#  production: false
+#  openapi:
+#    title: "接口文档"
+#    version: 1.0
+#    group:
+#      default:
+#        api-rule: package
+#        api-rule-resources:
+#          - com.et.cloud.controller
+#
+## 对象存储配置（需要从腾讯云获取）
+#cos:
+#  client:
+#    host: https://cloud-1380686335.cos.ap-chongqing.myqcloud.com
+#    secretId: ${COS_SECRET_ID}
+#    secretKey: ${COS_SECRET_KEY}
+#    region: ap-chongqing
+#    bucket: cloud-1380686335

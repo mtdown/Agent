@@ -6,6 +6,7 @@ import com.et.cloud.api.aliyunai.CreateOutPaintingTaskResponse;
 import com.et.cloud.dto.picture.*;
 import com.et.cloud.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.et.cloud.model.entity.Space;
 import com.et.cloud.model.entity.User;
 import com.et.cloud.model.vis.PictureVis;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,6 +60,8 @@ public interface PictureService extends IService<Picture> {
      * @param loginUser
      */
     public void fillReviewParams(Picture picture, User loginUser);
+
+    public void fillReviewParams(Picture picture, User loginUser, Long spaceId);
 
     /**
      * 批量抓取图片

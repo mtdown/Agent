@@ -67,7 +67,10 @@ import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { deleteSpaceUsingPost, getSpaceVisByIdUsingGet } from '@/api/spaceController.ts'
 import PictureList from '@/components/PictureList.vue'
 import { message } from 'ant-design-vue'
-import { listPictureByPageUsingPost } from '@/api/pictureController.ts'
+import {
+  listPictureByPageUsingPost,
+  listPictureVisByPageUsingPost,
+} from '@/api/pictureController.ts'
 import { formatSize } from '@/utils'
 import { TeamOutlined } from '@ant-design/icons-vue'
 import { SPACE_PERMISSION_ENUM, SPACE_TYPE_MAP } from '@/constants/space.ts'
@@ -135,7 +138,7 @@ const fetchData = async () => {
     spaceId: props.id,
     ...searchParams.value,
   }
-  const res = await listPictureByPageUsingPost(params)
+  const res = await listPictureVisByPageUsingPost(params)
   if (res.data.code === 0 && res.data.data) {
     dataList.value = res.data.data.records ?? []
     total.value = res.data.data.total ?? 0
