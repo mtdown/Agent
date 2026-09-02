@@ -7,6 +7,8 @@ import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 包装请求，使 InputStream 可以重复读取
@@ -16,34 +18,35 @@ import java.io.*;
 @Slf4j
 public class RequestWrapper extends HttpServletRequestWrapper {
 
-    private final String body;
+    private final byte[] body;
 
     public RequestWrapper(HttpServletRequest request) {
         super(request);
-        StringBuilder stringBuilder = new StringBuilder();
-        try (InputStream inputStream = request.getInputStream(); BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream))) {
-            char[] charBuffer = new char[128];
-            int bytesRead = -1;
-            while ((bytesRead = bufferedReader.read(charBuffer)) > 0) {
-                stringBuilder.append(charBuffer, 0, bytesRead);
+        byte[] requestBody = new byte[0];
+        try (InputStream inputStream = request.getInputStream(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
             }
+            requestBody = outputStream.toByteArray();
         } catch (IOException ignored) {
         }
-        body = stringBuilder.toString();
+        body = requestBody;
     }
 
     @Override
     public ServletInputStream getInputStream() throws IOException {
-        final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(body.getBytes());
+        final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(body);
         return new ServletInputStream() {
             @Override
             public boolean isFinished() {
-                return false;
+                return byteArrayInputStream.available() == 0;
             }
 
             @Override
             public boolean isReady() {
-                return false;
+                return true;
             }
 
             @Override
@@ -60,11 +63,15 @@ public class RequestWrapper extends HttpServletRequestWrapper {
 
     @Override
     public BufferedReader getReader() throws IOException {
-        return new BufferedReader(new InputStreamReader(this.getInputStream()));
+        String characterEncoding = getCharacterEncoding();
+        Charset charset = characterEncoding == null ? StandardCharsets.UTF_8 : Charset.forName(characterEncoding);
+        return new BufferedReader(new InputStreamReader(this.getInputStream(), charset));
     }
 
     public String getBody() {
-        return this.body;
+        String characterEncoding = getCharacterEncoding();
+        Charset charset = characterEncoding == null ? StandardCharsets.UTF_8 : Charset.forName(characterEncoding);
+        return new String(this.body, charset);
     }
 
 }

@@ -83,7 +83,11 @@ const doDelete = async () => {
 }
 
 const formatTime = (time?: string) => {
-  return time ? new Date(time).toLocaleString() : '-'
+  if (!time) {
+    return '-'
+  }
+  const date = /^\d+$/.test(time) ? new Date(Number(time)) : new Date(time)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
 }
 
 onMounted(() => {
