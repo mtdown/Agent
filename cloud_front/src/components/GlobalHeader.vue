@@ -89,6 +89,11 @@ const originItems = [
     label: '空间管理',
     title: '空间管理',
   },
+  {
+    key: '/documentWiki',
+    label: 'Wiki 文档',
+    title: 'Wiki 文档',
+  },
 
   {
     key: '/add_picture',

@@ -5,6 +5,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseDocumentWikiVis_ = {
+    code?: number
+    data?: DocumentWikiVis
+    message?: string
+  }
+
   type BaseResponseCreateOutPaintingTaskResponse_ = {
     code?: number
     data?: CreateOutPaintingTaskResponse
@@ -56,6 +62,12 @@ declare namespace API {
   type BaseResponsePagePictureVis_ = {
     code?: number
     data?: PagePictureVis_
+    message?: string
+  }
+
+  type BaseResponsePageDocumentWikiVis_ = {
+    code?: number
+    data?: PageDocumentWikiVis_
     message?: string
   }
 
@@ -147,12 +159,63 @@ declare namespace API {
     id?: number
   }
 
+  type DocumentWikiAddRequest = {
+    category?: string
+    content?: string
+    summary?: string
+    tags?: string[]
+    title?: string
+  }
+
+  type DocumentWikiEditRequest = {
+    category?: string
+    content?: string
+    id?: number
+    summary?: string
+    tags?: string[]
+    title?: string
+  }
+
+  type DocumentWikiQueryRequest = {
+    category?: string
+    current?: number
+    id?: number
+    pageSize?: number
+    searchText?: string
+    sortField?: string
+    sortOrder?: string
+    summary?: string
+    tags?: string[]
+    title?: string
+    userId?: number
+  }
+
+  type DocumentWikiVis = {
+    category?: string
+    content?: string
+    createTime?: string
+    editTime?: string
+    id?: number
+    summary?: string
+    tags?: string[]
+    title?: string
+    updateTime?: string
+    user?: UserVis
+    userId?: number
+    viewCount?: number
+  }
+
   type GetOutPaintingTaskResponse = {
     output?: Output1
     requestId?: string
   }
 
   type getPictureByIdUsingGETParams = {
+    /** id */
+    id?: number
+  }
+
+  type getDocumentWikiVisByIdUsingGETParams = {
     /** id */
     id?: number
   }
@@ -219,6 +282,14 @@ declare namespace API {
     current?: number
     pages?: number
     records?: Picture[]
+    size?: number
+    total?: number
+  }
+
+  type PageDocumentWikiVis_ = {
+    current?: number
+    pages?: number
+    records?: DocumentWikiVis[]
     size?: number
     total?: number
   }

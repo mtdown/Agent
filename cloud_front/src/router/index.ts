@@ -13,6 +13,10 @@ import AddSpacePage from '@/pages/AddSpacePage.vue'
 import MySpacePage from '@/pages/MySpacePage.vue'
 import SpaceDetailPage from '@/pages/SpaceDetailPage.vue'
 import SpaceUserManagePage from '@/pages/admin/SpaceUserManagePage.vue'
+import DocumentWikiListPage from '@/pages/documentWiki/DocumentWikiListPage.vue'
+import DocumentWikiDetailPage from '@/pages/documentWiki/DocumentWikiDetailPage.vue'
+import AddDocumentWikiPage from '@/pages/documentWiki/AddDocumentWikiPage.vue'
+import EditDocumentWikiPage from '@/pages/documentWiki/EditDocumentWikiPage.vue'
 // 扮演路由组件的位置
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -52,6 +56,27 @@ const router = createRouter({
       name: '图片详情',
       component: PictureDetailPage,
       props: true,
+    },
+    {
+      path: '/documentWiki',
+      name: 'Wiki 文档',
+      component: DocumentWikiListPage,
+    },
+    {
+      path: '/documentWiki/:id',
+      name: '文档详情',
+      component: DocumentWikiDetailPage,
+      props: true,
+    },
+    {
+      path: '/add_documentWiki',
+      name: '创建文档',
+      component: AddDocumentWikiPage,
+    },
+    {
+      path: '/edit_documentWiki/:id',
+      name: '编辑文档',
+      component: EditDocumentWikiPage,
     },
     {
       path: '/add_space',

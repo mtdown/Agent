@@ -1,98 +1,117 @@
-## Purpose
-
-This capability introduces Wiki documents as first-class knowledge records while preserving image assets for use as document covers, embedded images, and workspace materials.
+# wiki-document-model Specification
 
 ## ADDED Requirements
 
-### Requirement: Wiki documents can be created
-The system SHALL allow an authenticated user to create a Wiki document with a title, optional summary, optional content, optional category, optional tags, optional cover image reference, optional source file metadata, and optional space ownership.
+### Requirement: Create Wiki Document
 
-#### Scenario: Create public Wiki document
-- **WHEN** an authenticated user creates a document without a space identifier
-- **THEN** the system stores the document as a public Wiki document owned by that user
+The system SHALL allow a logged-in user to create a wiki document with a title and body content.
 
-#### Scenario: Create space Wiki document
-- **WHEN** an authenticated user creates a document with a valid space identifier
-- **THEN** the system stores the document under that Wiki space and keeps the creating user as the document owner
+#### Scenario: Create document successfully
 
-#### Scenario: Reject invalid title
-- **WHEN** an authenticated user creates a document with a blank title
-- **THEN** the system rejects the request with a parameter error
+- **GIVEN** the user is logged in
+- **AND** the request contains a valid title and content
+- **WHEN** the user submits the create document action
+- **THEN** the system SHALL save a `DocumentWiki` record to MySQL
+- **AND** return the created document id
+- **AND** clear affected document list cache entries
 
-### Requirement: Wiki documents can be edited
-The system SHALL allow an authenticated user to edit the metadata and content of an existing Wiki document without changing its document identifier, owner, or space ownership.
+#### Scenario: Reject invalid document creation
 
-#### Scenario: Edit document content
-- **WHEN** an authenticated user edits an existing document title, summary, content, category, tags, or cover image reference
-- **THEN** the system updates the document and records a new edit time
+- **GIVEN** the user is logged in
+- **AND** the request is missing a title or contains invalid content
+- **WHEN** the user submits the create document action
+- **THEN** the system SHALL reject the request
+- **AND** no document record SHALL be created
 
-#### Scenario: Reject editing missing document
-- **WHEN** an authenticated user edits a document identifier that does not exist
-- **THEN** the system rejects the request with a not found error
+### Requirement: Query Wiki Document List
 
-### Requirement: Wiki documents can be queried
-The system SHALL expose document detail and paginated document list behavior for public Wiki documents and space-owned Wiki documents.
+The system SHALL allow users to query paged wiki document lists.
 
-#### Scenario: Query document detail
-- **WHEN** a caller requests a document detail by an existing document identifier
-- **THEN** the system returns the document fields, owner display information, parsed tags, and an initialized permission list
+#### Scenario: Query document list
 
-#### Scenario: Query paginated public documents
-- **WHEN** a caller queries documents without a space identifier and requests public records only
-- **THEN** the system returns paginated public Wiki documents
+- **GIVEN** wiki documents exist
+- **WHEN** the user opens the document list page
+- **THEN** the system SHALL return non-deleted documents
+- **AND** include list display fields such as title, summary, category, tags, creator, and edit time
 
-#### Scenario: Query paginated space documents
-- **WHEN** a caller queries documents with a valid space identifier
-- **THEN** the system returns paginated Wiki documents that belong to that space
+#### Scenario: Use Redis list cache
 
-#### Scenario: Search documents by text
-- **WHEN** a caller provides a search keyword
-- **THEN** the system matches documents by title, summary, content, or category
+- **GIVEN** an equivalent document list query has been requested recently
+- **WHEN** the user requests the same list query again
+- **THEN** the system MAY return the list result from Redis cache
+- **AND** the result SHALL still exclude deleted documents
 
-### Requirement: Wiki documents can be deleted
-The system SHALL allow an authenticated user to logically delete an existing Wiki document so it no longer appears in normal document queries.
+### Requirement: View Wiki Document Detail
 
-#### Scenario: Delete existing document
-- **WHEN** an authenticated user deletes an existing document
-- **THEN** the system marks the document as deleted and excludes it from normal query results
+The system SHALL allow users to view a single wiki document detail.
 
-#### Scenario: Reject deleting missing document
-- **WHEN** an authenticated user deletes a document identifier that does not exist
-- **THEN** the system rejects the request with a not found error
+#### Scenario: View document detail successfully
 
-### Requirement: Wiki document versions are recorded
-The system SHALL record immutable version entries for Wiki documents when a document is created or edited.
+- **GIVEN** a non-deleted wiki document exists
+- **WHEN** the user opens the document detail page
+- **THEN** the system SHALL return the document title and saved body content
 
-#### Scenario: Initial version after creation
-- **WHEN** an authenticated user creates a Wiki document
-- **THEN** the system records version number 1 with the created title, summary, and content
+#### Scenario: Use Redis detail cache
 
-#### Scenario: Incremental version after edit
-- **WHEN** an authenticated user edits a Wiki document that already has versions
-- **THEN** the system records a new version with the next version number and the updated title, summary, and content
+- **GIVEN** a document detail has been requested recently
+- **WHEN** the user requests the same document detail again
+- **THEN** the system MAY return the detail result from Redis cache
 
-#### Scenario: List document versions
-- **WHEN** a caller requests versions for an existing document
-- **THEN** the system returns version records ordered from newest to oldest
+#### Scenario: Deleted document is not visible
 
-### Requirement: Wiki document chunks are available for future retrieval
-The system SHALL support storing and querying text chunks associated with a Wiki document and its space for future retrieval-augmented generation.
+- **GIVEN** a wiki document has been soft deleted
+- **WHEN** the user requests its detail
+- **THEN** the system SHALL reject or return no visible document result
 
-#### Scenario: Store document chunk
-- **WHEN** the system is given a document identifier, chunk index, chunk content, and optional token count
-- **THEN** the system stores the chunk with the associated document and space identifiers
+### Requirement: Edit Wiki Document Online
 
-#### Scenario: Query document chunks
-- **WHEN** a caller requests chunks for an existing document
-- **THEN** the system returns non-deleted chunks in chunk index order
+The system SHALL provide an online editor page for creating and editing wiki document content.
 
-### Requirement: Image assets remain available
-The system SHALL preserve existing image asset behavior so images can continue to be uploaded, stored, queried, and associated with spaces independently of Wiki documents.
+#### Scenario: Save edited document
 
-#### Scenario: Existing image upload behavior remains available
-- **WHEN** an authenticated user uploads an image through the existing image upload behavior
-- **THEN** the system continues to store the image with its URL, thumbnail URL, metadata, owner, and optional space identifier
+- **GIVEN** the user is logged in
+- **AND** the user can edit the selected document
+- **WHEN** the user changes the document title or content in the online editor and saves
+- **THEN** the system SHALL persist the updated content to MySQL
+- **AND** update the document edit time
+- **AND** clear affected Redis cache entries
 
-#### Scenario: Wiki document references image asset
-- **WHEN** a Wiki document stores a cover image reference
-- **THEN** the system stores the reference without modifying or deleting the underlying image asset
+#### Scenario: Reject unauthorized edit
+
+- **GIVEN** the user is logged in
+- **AND** the user does not have edit permission for the selected document
+- **WHEN** the user submits an edit action
+- **THEN** the system SHALL reject the request
+- **AND** the saved document content SHALL remain unchanged
+
+### Requirement: Delete Wiki Document
+
+The system SHALL allow a permitted user to soft delete a wiki document.
+
+#### Scenario: Delete document successfully
+
+- **GIVEN** the user is logged in
+- **AND** the user can delete the selected document
+- **WHEN** the user submits the delete action
+- **THEN** the system SHALL soft delete the document in MySQL
+- **AND** clear affected Redis cache entries
+- **AND** the document SHALL no longer appear in normal list results
+
+#### Scenario: Reject unauthorized delete
+
+- **GIVEN** the user is logged in
+- **AND** the user does not have delete permission for the selected document
+- **WHEN** the user submits the delete action
+- **THEN** the system SHALL reject the request
+- **AND** the document SHALL remain visible to permitted users
+
+### Requirement: Stage 1 Scope Boundary
+
+The system SHALL keep Stage 1 limited to basic `DocumentWiki` CRUD and online editing.
+
+#### Scenario: No later-stage behavior in Stage 1
+
+- **GIVEN** Stage 1 is implemented
+- **WHEN** the document feature is inspected
+- **THEN** it SHALL NOT require personal wiki spaces, team wiki spaces, document version history, RAG chunks, URL crawling, or document-file upload parsing
+- **AND** it SHALL NOT require object storage for saved text content

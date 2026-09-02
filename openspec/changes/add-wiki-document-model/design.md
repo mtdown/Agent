@@ -1,91 +1,163 @@
+# Design: DocumentWiki MVP
+
 ## Context
 
-See `proposal.md` for motivation. The existing backend is a Spring Boot monolith with MyBatis-Plus entities, DTO request objects, `Vis` response objects, controller/service/mapper layering, logical delete through `isDelete`, and unified `BaseResponse` results. The existing domain already has `User`, `Space`, `SpaceUser`, and `Picture`.
+The current project is a cloud image gallery with Spring Boot, MyBatis-Plus, MySQL, Redis, Tencent COS, and a Vue frontend. The target product direction is an enterprise wiki with document editing, document upload, RAG, URL crawling, and later agent collaboration.
 
-The important constraint for this change is that `Picture` remains a valid model. It is not replaced by `Document`; it becomes a reusable Wiki asset model for covers, embedded images, attachments, and space materials.
+This change intentionally implements only Stage 1: a visible and working `DocumentWiki` CRUD module with online editing. It should be small enough to complete on the current codebase and clear enough to use as the foundation for later stages.
 
-## Goals / Non-Goals
+## Goals
 
-**Goals:**
+- Add a document feature users can actually operate from the frontend.
+- Keep MySQL as the permanent storage for saved document data.
+- Reuse the existing Redis setup for cache.
+- Reuse existing login and permission style from picture CRUD.
+- Keep the existing picture model available for later wiki image insertion.
+- Avoid introducing document upload, parsing, chunks, RAG, spaces, or agents in this change.
 
-- Add document-centered backend data structures without breaking picture behavior.
-- Keep document ownership and space ownership consistent with the existing picture model.
-- Provide basic document CRUD behavior for later frontend Wiki pages.
-- Record document versions at create/edit time so the later editor has history support.
-- Add document chunks as a simple persistence foundation for later RAG.
-- Follow existing project style: entity + DTO + Vis + Mapper + Service + Controller.
+## Non-Goals
 
-**Non-Goals:**
+- No team/private wiki space behavior.
+- No multi-format file parser.
+- No URL crawling.
+- No RAG chunk table or embedding pipeline.
+- No version table.
+- No object storage requirement for document text.
+- No rich collaborative editor.
 
-- No document file upload or text parsing in this change.
-- No PDF, DOCX, Markdown, or TXT parser implementation in this change.
-- No frontend Wiki page implementation in this change.
-- No RAG, embedding generation, vector database, URL crawling, or Agent orchestration.
-- No rewrite of the existing picture, space, or team member permission modules.
+## Naming Decision
 
-## Decisions
+Use `DocumentWiki` for Java classes and frontend domain names.
 
-### Decision 1: Add `Document` beside `Picture`
+Reason:
 
-`Document` is introduced as the Wiki content model. `Picture` remains the image asset model.
+- `Document` is too generic and conflicts conceptually with common parser classes such as `org.jsoup.nodes.Document`.
+- `DocumentWiki` communicates that this is a wiki document module in the current product direction.
 
-Alternative considered: rename `Picture` to a generic file model and store documents and images in one table. This was rejected because the existing picture upload, thumbnail, review, and image metadata behavior is already specialized and useful for Wiki image assets.
+Naming conventions:
 
-### Decision 2: Reuse `spaceId` semantics
+- Java entity: `DocumentWiki`
+- Controller: `DocumentWikiController`
+- Service: `DocumentWikiService`
+- Mapper: `DocumentWikiMapper`
+- DTO package: `dto/documentWiki`
+- VO class: `DocumentWikiVis`
+- API path: `/documentWiki`
+- Database table: `document_wiki`
 
-Documents use the same space ownership pattern as pictures:
+## Data Model
 
-- `spaceId == null` means public Wiki document.
-- `spaceId != null` means the document belongs to a personal Wiki or team Wiki space.
+`document_wiki`
 
-This preserves the existing mental model and prepares the document APIs for stage 4 permission checks.
+- `id`: primary key.
+- `title`: document title.
+- `content`: saved document body, stored as `longtext`.
+- `summary`: optional short summary for list display.
+- `category`: optional category string.
+- `tags`: optional JSON string, following the existing picture tag style.
+- `userId`: creator/owner user id.
+- `viewCount`: read count.
+- `createTime`: creation time.
+- `editTime`: last user edit time.
+- `updateTime`: row update time.
+- `isDelete`: soft delete flag.
 
-### Decision 3: Store current document content on `document`
+Stage 1 does not add `spaceId`, version tables, chunk tables, or upload file tables. These can be introduced later when team/private wiki and RAG are implemented.
 
-The `document` table stores the current editable content and metadata. The `document_version` table stores immutable snapshots.
+## Storage And Cache
 
-Alternative considered: store all content only in `document_version` and compute current content from the latest version. This was rejected for MVP because it makes list/detail queries and updates more complex than the current project needs.
+### MySQL
 
-### Decision 4: Save a version when documents are created or edited
+MySQL is the source of truth for saved document content. Every create/edit/delete operation must write to MySQL first.
 
-Create records version `1`. Edit records the next version number.
+### Redis
 
-The implementation should use a transaction when saving the document and version together. This prevents a document update from succeeding while its version record fails.
+Redis reuses the existing application Redis connection. It is used for read cache only:
 
-### Decision 5: Add `document_chunk` now, keep chunk generation simple later
+- document detail cache
+- document list query cache
 
-Stage 1 only adds storage and basic query behavior for chunks. Stage 2 will decide how to generate chunks from parsed text. Stage 6 will decide embedding generation and retrieval behavior.
+Suggested key style:
 
-This keeps database shape stable before RAG without pulling AI concerns into the first backend model change.
+- `agentWiki:documentWiki:detail:{id}`
+- `agentWiki:documentWiki:list:{queryHash}`
 
-### Decision 6: Use numeric status fields for compatibility
+After create, edit, or delete, related cache entries must be invalidated. Redis must not be treated as permanent content storage in Stage 1.
 
-`reviewStatus`, `parseStatus`, and `embeddingStatus` use integers, matching the existing `Picture.reviewStatus` style.
+### Object Storage
 
-Initial recommended status meanings:
+Stage 1 does not need object storage for online text documents. Existing COS configuration remains available for the picture module and future file/image upload work.
 
-- `reviewStatus`: `0` reviewing, `1` pass, `2` reject.
-- `parseStatus`: `0` pending, `1` processing, `2` success, `3` failed.
-- `embeddingStatus`: `0` pending, `1` processing, `2` success, `3` failed.
+## Backend Flow
 
-### Decision 7: Keep stage 1 permissions minimal
+### Create
 
-Stage 1 should require login for mutating document operations and support public/space query structure. Full Wiki document permissions are stage 4.
+1. Require login.
+2. Validate title/content length.
+3. Save `DocumentWiki` to MySQL with current user id.
+4. Clear document list cache.
+5. Return created document id.
 
-This lets the backend document model land before the permission map changes from picture-focused keys to document-focused keys.
+### Read List
 
-## Risks / Trade-offs
+1. Accept query conditions such as title, category, tags, and paging.
+2. Try Redis cache for repeated queries.
+3. Query MySQL if cache misses.
+4. Return `DocumentWikiVis` page data.
 
-- [Risk] `Document` name can conflict with `org.jsoup.nodes.Document` in existing URL image batch code. -> Mitigation: use fully qualified imports carefully and avoid editing Jsoup-heavy code in this change.
-- [Risk] `document.content` can become large. -> Mitigation: use `longtext` in MySQL and avoid loading content in future list summaries unless needed.
-- [Risk] Version creation can become inconsistent with document edits. -> Mitigation: save document and version in one transaction.
-- [Risk] Stage 1 APIs may be accessible before stage 4 permission refinement. -> Mitigation: require login for create/edit/delete and document that space-level document permissions are stage 4.
-- [Risk] Chunks exist before parser/RAG behavior. -> Mitigation: keep chunk APIs/internal service minimal and treat chunks as persistence preparation.
+### Read Detail
 
-## Migration Plan
+1. Validate document id.
+2. Try Redis detail cache.
+3. Query MySQL if cache misses.
+4. Reject deleted/missing documents.
+5. Return `DocumentWikiVis`.
 
-1. Add `cloud/sql/create_table_document.sql` for the three new tables.
-2. Apply the SQL to the local `picture` database before manually testing endpoints.
-3. Deploy backend code with new document classes and endpoints.
-4. Existing users, spaces, pictures, and space members require no data migration.
-5. Rollback can remove the new document endpoints from the running service; existing picture behavior is unaffected because existing tables and code paths are not modified.
+### Edit
+
+1. Require login.
+2. Confirm current user can edit the document.
+3. Validate new title/content.
+4. Update MySQL content and `editTime`.
+5. Clear related Redis cache.
+6. Return success.
+
+### Delete
+
+1. Require login.
+2. Confirm current user can delete the document.
+3. Soft delete in MySQL.
+4. Clear related Redis cache.
+5. Return success.
+
+## Frontend Flow
+
+### Document List
+
+- Show document title, summary, category/tags, creator, and edit time.
+- Provide create, view, edit, and delete entry points.
+
+### Document Detail
+
+- Show saved title and content.
+- Provide edit and delete actions when the user has permission.
+
+### Online Editor
+
+- Shared editor component for create and edit pages.
+- Stage 1 can use a stable textarea-based editor to avoid adding a rich-editor dependency too early.
+- Save calls backend create/edit APIs and then navigates to detail or list.
+
+## Replacement Checkpoint
+
+Before implementing, review the original picture operation flow:
+
+- list
+- detail
+- create/upload
+- edit
+- delete
+- permission check
+- Redis/MySQL usage
+
+Then implement the analogous `DocumentWiki` flow using document text instead of uploaded image files.
