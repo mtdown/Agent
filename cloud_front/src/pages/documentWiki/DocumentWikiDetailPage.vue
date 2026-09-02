@@ -55,7 +55,7 @@ const canDelete = canEdit
 const fetchDocumentWikiDetail = async () => {
   loading.value = true
   try {
-    const res = await getDocumentWikiVisByIdUsingGet({ id: Number(props.id) })
+    const res = await getDocumentWikiVisByIdUsingGet({ id: String(props.id) })
     if (res.data.code === 0 && res.data.data) {
       documentWiki.value = res.data.data
     } else {

@@ -55,6 +55,8 @@ const handleSubmit = async (values: any) => {
   console.log('后端返回的响应:', res)
   // 登录成功，把登录态保存到全局状态中
   if (res.data.code === 0 && res.data.data) {
+    // 先用登录接口返回的数据立即写入 store，避免依赖二次请求导致登录状态不更新
+    loginUserStore.setLoginUser(res.data.data)
     await loginUserStore.fetchLoginUser()
     message.success('登录成功')
     router.push({

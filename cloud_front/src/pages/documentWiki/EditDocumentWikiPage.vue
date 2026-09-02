@@ -29,7 +29,7 @@ const documentWiki = ref<API.DocumentWikiVis>({})
 const fetchLoading = ref(false)
 const saveLoading = ref(false)
 
-const documentWikiId = Number(route.params.id)
+const documentWikiId = String(route.params.id)
 
 const fetchDocumentWiki = async () => {
   fetchLoading.value = true

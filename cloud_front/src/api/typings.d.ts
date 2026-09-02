@@ -156,7 +156,7 @@ declare namespace API {
   }
 
   type DeleteRequest = {
-    id?: number
+    id?: string | number
   }
 
   type DocumentWikiAddRequest = {
@@ -170,7 +170,7 @@ declare namespace API {
   type DocumentWikiEditRequest = {
     category?: string
     content?: string
-    id?: number
+    id?: string
     summary?: string
     tags?: string[]
     title?: string
@@ -179,7 +179,7 @@ declare namespace API {
   type DocumentWikiQueryRequest = {
     category?: string
     current?: number
-    id?: number
+    id?: string
     pageSize?: number
     searchText?: string
     sortField?: string
@@ -195,7 +195,7 @@ declare namespace API {
     content?: string
     createTime?: string
     editTime?: string
-    id?: number
+    id?: string
     summary?: string
     tags?: string[]
     title?: string
@@ -217,7 +217,7 @@ declare namespace API {
 
   type getDocumentWikiVisByIdUsingGETParams = {
     /** id */
-    id?: number
+    id?: string
   }
 
   type getPictureOutPaintingTaskUsingGETParams = {
