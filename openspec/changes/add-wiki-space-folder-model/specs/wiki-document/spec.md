@@ -22,7 +22,7 @@ The system SHALL require a destination space (public, a joined team space, or th
 
 ### Requirement: View documents across visible spaces
 
-The system SHALL let a user browse documents in every space they can see: the public space, each team space they belong to, and their own personal space.
+The system SHALL let a user browse documents in every space they can see: the public space, each team space they belong to, and their own personal space. The wiki left navigation SHALL display visible documents directly under their folders, grouped as `公开文档`, `团队文档`, `个人文档`, and `回收站`.
 
 #### Scenario: Personal region lists own documents
 
@@ -35,6 +35,49 @@ The system SHALL let a user browse documents in every space they can see: the pu
 - **GIVEN** a user who is a member of one or more team spaces
 - **WHEN** the user opens the team region
 - **THEN** the team spaces the user belongs to are listed with their folder trees and documents
+
+#### Scenario: Public region lists public documents
+
+- **GIVEN** a logged-in user and the public wiki space contains folders and documents
+- **WHEN** the user opens the public region
+- **THEN** public folders are listed with their documents under `公开文档`
+
+#### Scenario: Selecting a document shows content in the right panel
+
+- **GIVEN** a user can see a document under a folder in the left navigation
+- **WHEN** the user selects that document
+- **THEN** the right panel displays the document title and full content without requiring a separate page navigation
+
+### Requirement: Search authorized documents by selectable match mode
+
+The system SHALL search only documents in spaces visible to the current user, and SHALL support keyword match modes for title-only, title-or-content, and content-only search.
+
+#### Scenario: Default search is limited to authorized spaces
+
+- **GIVEN** a user can see the public space, their personal space, and one joined team space
+- **WHEN** the user searches without choosing a single space
+- **THEN** results may include matching documents from those visible spaces only
+- **AND** documents from teams they have not joined and other users' personal spaces are excluded
+
+#### Scenario: Search by title only
+
+- **GIVEN** a visible document has the keyword in its title but not content
+- **WHEN** the user searches with title-only mode
+- **THEN** that document is returned
+- **AND** visible documents with the keyword only in content are not returned
+
+#### Scenario: Search by title or content
+
+- **GIVEN** visible documents may contain the keyword in either title or content
+- **WHEN** the user searches with title-or-content mode
+- **THEN** documents matching either field are returned
+
+#### Scenario: Search by content only
+
+- **GIVEN** a visible document has the keyword in its content but not title
+- **WHEN** the user searches with content-only mode
+- **THEN** that document is returned
+- **AND** visible documents with the keyword only in title are not returned
 
 ### Requirement: Edit any document in a visible space
 

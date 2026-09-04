@@ -16,8 +16,15 @@ The system SHALL maintain one folder tree per wiki space, where folders belong t
 
 #### Scenario: Folders can nest infinitely
 
+- **GIVEN** a visible member has selected any folder in a visible space
 - **WHEN** a visible member creates a folder inside another folder of the same space
-- **THEN** the new folder is nested at any depth below its parent without a fixed depth limit
+- **THEN** the new folder is nested below the selected parent and can itself contain more child folders without a fixed depth limit
+
+#### Scenario: Nested folders are visible in the left tree
+
+- **GIVEN** a visible space has folders nested more than one level deep
+- **WHEN** the user expands that space in the wiki left navigation
+- **THEN** each child folder appears under its parent in the same hierarchy used by create and move operations
 
 ### Requirement: Folder operations by visible members
 

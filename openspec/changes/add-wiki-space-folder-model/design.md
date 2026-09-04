@@ -15,7 +15,7 @@ The wiki product needs its own three-region model. See proposal.md for the motiv
 - Platform `admin` manages team spaces and membership; ordinary users only operate inside spaces they can see.
 
 **Non-Goals:**
-- Per-document ACLs, public-space moderation, wiki search/RAG, version history.
+- Per-document ACLs, public-space moderation, RAG, version history.
 - Reusing picture `Space`/`Sa-Token` machinery wholesale for wiki (see Decision 3).
 - Fine-grained space-role enforcement now (roles are stored, not yet differentiated).
 
@@ -56,6 +56,7 @@ Why not copy picture's `@SaSpaceCheckPermission`? The wiki rule set is a flat "i
 
 - Folders belong to exactly one space; every operation validates the folder's `spaceId` against the acting user's visibility.
 - Creation/rename/move/delete of folders is allowed for any visible member (the earlier "admin-only folder delete" rule is superseded by the new "visible means full power + recycle bin" rule).
+- The frontend must expose child-folder creation from any selected folder, passing that folder as `parentId`; users must be able to create folder-under-folder structures from the UI, not only through the backend API.
 - Deleting a folder is a logical delete of the folder **and its whole subtree** (documents + nested folders) in one transaction; the subtree is recoverable as a unit.
 - `document_wiki.folderId` is nullable at the DB layer: NULL means "space root" and exists purely as a migration/restore fallback. New/edited documents must pass a real folder id (UI enforces folder selection); records whose parent folder was permanently deleted fall back to root on restore.
 
@@ -72,7 +73,21 @@ Moving a document (or folder) updates `spaceId`/`folderId` only; content untouch
 
 ### 8. Frontend layout
 
-Wiki entry becomes a sidebar shell: `[公开文档] [我的团队(joined list)] [我的个人区]`, each expanding into its folder tree; document create/edit reuse `DocumentWikiEditor.vue`; a location picker (space → folder) drives both create and move; per-space recycle-bin page lists deletable documents/folders with delete-time/deleter and restore/permanent-delete actions.
+Wiki entry becomes a two-pane shell:
+- Left navigation is the primary browse tree: `公开文档 -> visible public space -> folders -> documents`, `团队文档 -> joined team spaces -> folders -> documents`, `个人文档 -> own personal space -> folders -> documents`, plus `回收站`.
+- Each folder node can contain both child folders and documents. Folder nesting is unlimited and must be visible/operable from the tree.
+- The right panel defaults to the existing filter/search controls. When the user selects a concrete document in the left tree or in search results, the right panel renders that document's title and content in-place.
+- Document create/edit reuse `DocumentWikiEditor.vue`; a location picker (space -> folder) drives both create and move.
+- The recycle-bin view lists deletable documents/folders with delete-time/deleter and restore/permanent-delete actions.
+
+### 8a. Search/filter semantics
+
+Search runs against the current user's authorized space set, not only the currently selected folder. The backend derives the visible public/team/personal space ids for the login user, intersects any explicit space filters with that allowed set, and rejects or ignores invisible targets. The keyword match mode is explicit:
+- `title`: match title only.
+- `titleOrContent`: match title or content.
+- `content`: match content only.
+
+Search results include document identity, title, summary/content preview, and space/folder context so selecting a result can open the full content in the right panel.
 
 ### 9. Member exit semantics
 
