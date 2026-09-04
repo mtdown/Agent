@@ -9,6 +9,9 @@ import * as pictureController from './pictureController'
 import * as spaceController from './spaceController'
 import * as spaceUserController from './spaceUserController'
 import * as userController from './userController'
+import * as wikiFolderController from './wikiFolderController'
+import * as wikiRecycleController from './wikiRecycleController'
+import * as wikiSpaceController from './wikiSpaceController'
 export default {
   documentWikiController,
   fileController,
@@ -17,4 +20,7 @@ export default {
   spaceController,
   spaceUserController,
   userController,
+  wikiFolderController,
+  wikiRecycleController,
+  wikiSpaceController,
 }

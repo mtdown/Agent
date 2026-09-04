@@ -11,7 +11,6 @@
       <article class="document-body">
         <h1>{{ documentWiki.title }}</h1>
         <a-space wrap class="meta">
-          <a-tag v-if="documentWiki.category" color="blue">{{ documentWiki.category }}</a-tag>
           <a-tag v-for="tag in documentWiki.tags" :key="tag">{{ tag }}</a-tag>
           <span>作者：{{ documentWiki.user?.userName ?? documentWiki.userId ?? '-' }}</span>
           <span>编辑于：{{ formatTime(documentWiki.editTime) }}</span>
@@ -46,8 +45,7 @@ const loading = ref(false)
 const documentWiki = ref<API.DocumentWikiVis>({})
 
 const canEdit = computed(() => {
-  const loginUser = loginUserStore.loginUser
-  return loginUser?.userRole === 'admin' || loginUser?.id === documentWiki.value.userId
+  return Boolean(loginUserStore.loginUser?.id && documentWiki.value.id)
 })
 
 const canDelete = canEdit

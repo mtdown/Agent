@@ -49,9 +49,11 @@ class DocumentWikiServiceImplTest {
     void getQueryWrapperBuildsSearchAndFilterConditions() {
         DocumentWikiQueryRequest request = new DocumentWikiQueryRequest();
         request.setSearchText("redis");
+        request.setMatchMode("titleOrContent");
         request.setTitle("cache");
-        request.setCategory("backend");
         request.setTags(Arrays.asList("java", "wiki"));
+        request.setSpaceId(3L);
+        request.setVisibleSpaceIds(Arrays.asList(1L, 3L));
         request.setUserId(1L);
         request.setSortField("editTime");
         request.setSortOrder("ascend");
@@ -60,9 +62,9 @@ class DocumentWikiServiceImplTest {
         String sqlSegment = queryWrapper.getSqlSegment();
 
         assertTrue(sqlSegment.contains("title"));
-        assertTrue(sqlSegment.contains("summary"));
         assertTrue(sqlSegment.contains("content"));
-        assertTrue(sqlSegment.contains("category"));
+        assertTrue(sqlSegment.contains("spaceId"));
+        assertTrue(sqlSegment.contains("isDelete"));
         assertTrue(sqlSegment.contains("tags"));
         assertTrue(sqlSegment.contains("userId"));
         assertTrue(sqlSegment.contains("ORDER BY editTime ASC"));

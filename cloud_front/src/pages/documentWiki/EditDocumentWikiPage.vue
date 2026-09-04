@@ -56,7 +56,7 @@ const handleSubmit = async (values: API.DocumentWikiEditRequest) => {
     })
     if (res.data.code === 0) {
       message.success('保存成功')
-      router.push(`/documentWiki/${documentWikiId}`)
+      router.push(`/documentWiki?open=${documentWikiId}`)
     } else {
       message.error('保存失败，' + res.data.message)
     }

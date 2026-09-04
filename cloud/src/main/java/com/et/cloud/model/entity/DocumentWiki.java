@@ -54,6 +54,16 @@ public class DocumentWiki {
     private Long userId;
 
     /**
+     * Wiki space id.
+     */
+    private Long spaceId;
+
+    /**
+     * Wiki folder id. Null means the space root.
+     */
+    private Long folderId;
+
+    /**
      * View count.
      */
     private Long viewCount;
@@ -72,6 +82,16 @@ public class DocumentWiki {
      * Update time.
      */
     private Date updateTime;
+
+    /**
+     * Logical delete time.
+     */
+    private Date deleteTime;
+
+    /**
+     * User who logically deleted this document.
+     */
+    private Long deleteBy;
 
     /**
      * Soft delete flag.

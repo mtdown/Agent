@@ -47,12 +47,41 @@ export async function editDocumentWikiUsingPost(
   })
 }
 
+/** moveDocumentWiki POST /api/documentWiki/move */
+export async function moveDocumentWikiUsingPost(
+  body: API.DocumentWikiMoveRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean_>('/api/documentWiki/move', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
 /** getDocumentWikiVisById GET /api/documentWiki/get/vis */
 export async function getDocumentWikiVisByIdUsingGet(
   params: API.getDocumentWikiVisByIdUsingGETParams,
   options?: { [key: string]: any }
 ) {
   return request<API.BaseResponseDocumentWikiVis_>('/api/documentWiki/get/vis', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  })
+}
+
+/** listRootDocumentWiki GET /api/documentWiki/root/list */
+export async function listRootDocumentWikiUsingGet(
+  params: API.listRootDocumentWikiUsingGETParams,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseListDocumentWikiVis_>('/api/documentWiki/root/list', {
     method: 'GET',
     params: {
       ...params,

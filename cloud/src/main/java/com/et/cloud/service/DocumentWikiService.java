@@ -38,7 +38,20 @@ public interface DocumentWikiService extends IService<DocumentWiki> {
     void checkDocumentWikiAuth(User loginUser, DocumentWiki documentWiki);
 
     /**
+     * Check whether the login user can operate this document through its space.
+     */
+    void checkDocumentWikiVisible(User loginUser, DocumentWiki documentWiki);
+
+    /**
      * Build list summary from content.
      */
     String buildSummary(String content);
+
+    DocumentWiki getByIdIncludeDeleted(Long id);
+
+    Boolean logicalDelete(Long id, Long deleteBy);
+
+    Boolean restore(Long id);
+
+    Boolean permanentDelete(Long id);
 }

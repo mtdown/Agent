@@ -29,14 +29,19 @@ public class DocumentWikiEditRequest implements Serializable {
     private String summary;
 
     /**
-     * Category.
-     */
-    private String category;
-
-    /**
      * Tags.
      */
     private List<String> tags;
+
+    /**
+     * Current wiki space. Kept for client compatibility; edit does not move.
+     */
+    private Long spaceId;
+
+    /**
+     * Current folder. Kept for client compatibility; edit does not move.
+     */
+    private Long folderId;
 
     private static final long serialVersionUID = 1L;
 }

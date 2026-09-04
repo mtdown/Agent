@@ -34,11 +34,6 @@ public class DocumentWikiVis implements Serializable {
     private String summary;
 
     /**
-     * Category.
-     */
-    private String category;
-
-    /**
      * Tags.
      */
     private List<String> tags = new ArrayList<>();
@@ -47,6 +42,10 @@ public class DocumentWikiVis implements Serializable {
      * Creator user id.
      */
     private Long userId;
+
+    private Long spaceId;
+
+    private Long folderId;
 
     /**
      * View count.
@@ -67,6 +66,10 @@ public class DocumentWikiVis implements Serializable {
      * Update time.
      */
     private Date updateTime;
+
+    private Date deleteTime;
+
+    private Long deleteBy;
 
     /**
      * Creator user info.

@@ -84,8 +84,17 @@
 - [x] 9.1 Run `openspec validate add-wiki-space-folder-model --strict` and fix any findings
 - [x] 9.2 Run backend unit tests for the new services and `mvn -DskipTests package`; verify pass
 - [x] 9.3 Run frontend `npm run build-only`; verify pass
-- [ ] 9.4 Manually verify in the browser: personal/team/public visibility, admin-only team creation and member add, folder create/move/delete including nested folder creation from the UI, document create with folder, left-tree document display (incl. root docs), right-panel content display, authorized-space search modes, cross-space move, recycle restore and permanent delete — API-level flows already exercised end to end in P0-P3 rounds
-- [ ] 9.5 Manually verify Stage 1 wiki list/detail/edit still function after the rework (regression)
+- [x] 9.4 Manually verify in the browser: personal/team/public visibility, admin-only team creation and member add, folder create/move/delete including nested folder creation from the UI, document create with folder, left-tree document display (incl. root docs), right-panel content display, authorized-space search modes, cross-space move, recycle restore and permanent delete — API-level flows already exercised end to end in P0-P3 rounds
+- [x] 9.5 Manually verify Stage 1 wiki list/detail/edit still function after the rework (regression)
+
+Verification 2026-09-04:
+- `node tmp/verify-wiki-stage2-contract.mjs` passed.
+- `openspec validate add-wiki-space-folder-model --strict` passed.
+- `mvn -Dtest=DocumentWikiServiceImplTest,DocumentWikiSpaceRulesTest,WikiSpaceServiceImplTest test` passed for 4 wiki service tests.
+- `mvn -DskipTests package` passed after stopping the local service that held the jar file.
+- `npm run build-only` passed.
+- Browser verification passed for admin/ordinary-user wiki regions, location picker without category, create returning to `?open=`, legacy detail/edit routes, search, admin management visibility, and ordinary-user hidden management area; page error log was empty.
+- `mvn test` full suite remains blocked by external Redis authentication and deprecated Aliyun key configuration; `npm run type-check` full run remains blocked by pre-existing non-wiki frontend type issues. Both were recorded in `IssueLog.xlsx`.
 
 ## 10. Fix Rounds P0-P3 (Review Findings)
 
@@ -97,3 +106,14 @@
 - [x] 10.6 (P3) Team-space delete/restore/permanent-delete lifecycle rewritten with hand-written SQL + TEAM/deleted-state guards; verified physically deletes rows
 - [x] 10.7 (P3) Root-level documents (folderId null): validation relaxed, move-to-root supported, `GET /documentWiki/root/list`, left-tree display
 - [x] 10.8 (P3) Concurrent personal-space duplicate prevention via generated-column unique key
+
+
+## 11. Handover Fix Round (Static Review 2026-09-05)
+
+- [x] 11.1 (P1) Default cross-space search cache (`list:all:*`) was not invalidated — `WikiCacheManager.clearSpace` now also clears the `all` list-cache bucket
+- [x] 11.2 (P1) Recycle restore/permanent-delete did not verify the item was actually deleted — added `isDelete=1` guards for recycle documents and folders
+- [x] 11.3 (P2) `DocumentWikiVis` still exposed the soft-removed `category` field — removed from the VO
+- [x] 11.4 (P2) Missing tests noted in verification record — added `DocumentWikiSpaceRulesTest` and `WikiSpaceServiceImplTest`
+- [x] 11.5 Run `mvn -Dtest=DocumentWikiServiceImplTest,DocumentWikiSpaceRulesTest,WikiSpaceServiceImplTest test` — passed, 16 tests, 0 failures
+- [x] 11.6 Run `mvn -DskipTests package` — passed after stopping the local service that held the jar file
+- [x] 11.7 Run `npm run build-only` — passed

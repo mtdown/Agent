@@ -21,7 +21,7 @@ const handleSubmit = async (values: API.DocumentWikiAddRequest) => {
     const res = await addDocumentWikiUsingPost(values)
     if (res.data.code === 0 && res.data.data) {
       message.success('创建成功')
-      router.push(`/documentWiki/${res.data.data}`)
+      router.push(`/documentWiki?open=${res.data.data}`)
     } else {
       message.error('创建失败，' + res.data.message)
     }

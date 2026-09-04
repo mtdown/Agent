@@ -24,14 +24,19 @@ public class DocumentWikiAddRequest implements Serializable {
     private String summary;
 
     /**
-     * Category.
-     */
-    private String category;
-
-    /**
      * Tags.
      */
     private List<String> tags;
+
+    /**
+     * Destination wiki space.
+     */
+    private Long spaceId;
+
+    /**
+     * Destination folder. Null means the space root.
+     */
+    private Long folderId;
 
     private static final long serialVersionUID = 1L;
 }

@@ -15,6 +15,7 @@ import com.et.cloud.model.vis.LoginUserVis;
 import com.et.cloud.model.vis.UserVis;
 import com.et.cloud.service.UserService;
 import com.et.cloud.mapper.UserMapper;
+import com.et.cloud.service.WikiSpaceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
-        implements UserService{
+    implements UserService{
+
+    @javax.annotation.Resource
+    private WikiSpaceService wikiSpaceService;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -74,6 +78,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (!saveResult) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
         }
+        wikiSpaceService.ensurePersonalSpaceForUser(user.getId());
         return user.getId();
     }
 
@@ -113,6 +118,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 //        记录用户登录态到satoken，用在空间鉴定权限时使用
         StpKit.SPACE.login(user.getId());
         StpKit.SPACE.getSession().set(USER_LOGIN_STATE, user);
+        wikiSpaceService.ensurePersonalSpaceForUser(user.getId());
         return this.getLoginUserVis(user);
     }
 
@@ -211,7 +217,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
 
 }
-
 
 
 

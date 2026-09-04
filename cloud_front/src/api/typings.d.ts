@@ -11,6 +11,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseListDocumentWikiVis_ = {
+    code?: number
+    data?: DocumentWikiVis[]
+    message?: string
+  }
+
   type BaseResponseCreateOutPaintingTaskResponse_ = {
     code?: number
     data?: CreateOutPaintingTaskResponse
@@ -38,6 +44,30 @@ declare namespace API {
   type BaseResponseListSpaceUserVis_ = {
     code?: number
     data?: SpaceUserVis[]
+    message?: string
+  }
+
+  type BaseResponseListWikiFolderVis_ = {
+    code?: number
+    data?: WikiFolderVis[]
+    message?: string
+  }
+
+  type BaseResponseListWikiRecycleItemVis_ = {
+    code?: number
+    data?: WikiRecycleItemVis[]
+    message?: string
+  }
+
+  type BaseResponseListWikiSpaceUserVis_ = {
+    code?: number
+    data?: WikiSpaceUserVis[]
+    message?: string
+  }
+
+  type BaseResponseListWikiSpaceVis_ = {
+    code?: number
+    data?: WikiSpaceVis[]
     message?: string
   }
 
@@ -160,30 +190,40 @@ declare namespace API {
   }
 
   type DocumentWikiAddRequest = {
-    category?: string
     content?: string
+    folderId?: string | number
+    spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
   }
 
   type DocumentWikiEditRequest = {
-    category?: string
     content?: string
+    folderId?: string | number
     id?: string
+    spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
   }
 
+  type DocumentWikiMoveRequest = {
+    id?: string | number
+    targetFolderId?: string | number
+    targetSpaceId?: string | number
+  }
+
   type DocumentWikiQueryRequest = {
-    category?: string
+    folderId?: string | number
     current?: number
     id?: string
+    matchMode?: string
     pageSize?: number
     searchText?: string
     sortField?: string
     sortOrder?: string
+    spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
@@ -191,11 +231,14 @@ declare namespace API {
   }
 
   type DocumentWikiVis = {
-    category?: string
     content?: string
     createTime?: string
+    deleteBy?: string | number
+    deleteTime?: string
     editTime?: string
+    folderId?: string | number
     id?: string
+    spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
@@ -218,6 +261,22 @@ declare namespace API {
   type getDocumentWikiVisByIdUsingGETParams = {
     /** id */
     id?: string
+  }
+
+  type listFolderTreeUsingGETParams = {
+    spaceId?: string | number
+  }
+
+  type listRecycleUsingGETParams = {
+    spaceId?: string | number
+  }
+
+  type listRootDocumentWikiUsingGETParams = {
+    spaceId?: string | number
+  }
+
+  type listTeamMembersUsingGETParams = {
+    spaceId?: string | number
   }
 
   type getPictureOutPaintingTaskUsingGETParams = {
@@ -640,5 +699,94 @@ declare namespace API {
     userName?: string
     userProfile?: string
     userRole?: string
+  }
+
+  type WikiFolderAddRequest = {
+    name?: string
+    parentId?: string | number
+    spaceId?: string | number
+  }
+
+  type WikiFolderMoveRequest = {
+    id?: string | number
+    parentId?: string | number
+  }
+
+  type WikiFolderRenameRequest = {
+    id?: string | number
+    name?: string
+  }
+
+  type WikiFolderVis = {
+    children?: WikiFolderVis[]
+    createTime?: string
+    deleteBy?: string | number
+    deleteTime?: string
+    deleteUser?: UserVis
+    documents?: DocumentWikiVis[]
+    editTime?: string
+    id?: string | number
+    name?: string
+    parentId?: string | number
+    spaceId?: string | number
+    updateTime?: string
+  }
+
+  type WikiRecycleActionRequest = {
+    confirm?: boolean
+    itemId?: string | number
+    itemType?: string
+    spaceId?: string | number
+  }
+
+  type WikiRecycleItemVis = {
+    deleteBy?: string | number
+    deleteTime?: string
+    deleteUser?: UserVis
+    itemId?: string | number
+    itemType?: string
+    parentId?: string | number
+    spaceId?: string | number
+    title?: string
+  }
+
+  type WikiSpaceConfirmRequest = {
+    confirm?: boolean
+    id?: string | number
+  }
+
+  type WikiSpaceUserVis = {
+    createTime?: string
+    id?: string | number
+    spaceId?: string | number
+    spaceRole?: string
+    updateTime?: string
+    user?: UserVis
+    userId?: string | number
+  }
+
+  type WikiSpaceVis = {
+    createTime?: string
+    id?: string | number
+    isDelete?: number
+    name?: string
+    ownerUserId?: string | number
+    type?: number
+    updateTime?: string
+  }
+
+  type WikiTeamMemberAddRequest = {
+    spaceId?: string | number
+    spaceRole?: string
+    userId?: string | number
+  }
+
+  type WikiTeamMemberDeleteRequest = {
+    spaceId?: string | number
+    userId?: string | number
+  }
+
+  type WikiTeamSpaceAddRequest = {
+    name?: string
   }
 }

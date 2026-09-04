@@ -17,12 +17,14 @@ import com.et.cloud.model.vis.DocumentWikiVis;
 import com.et.cloud.model.vis.UserVis;
 import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
+import com.et.cloud.service.WikiSpaceService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -42,6 +44,9 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
     @Resource
     private UserService userService;
 
+    @Resource
+    private WikiSpaceService wikiSpaceService;
+
     @Override
     public QueryWrapper<DocumentWiki> getQueryWrapper(DocumentWikiQueryRequest documentWikiQueryRequest) {
         QueryWrapper<DocumentWiki> queryWrapper = new QueryWrapper<>();
@@ -51,26 +56,41 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         Long id = documentWikiQueryRequest.getId();
         String title = documentWikiQueryRequest.getTitle();
         String summary = documentWikiQueryRequest.getSummary();
-        String category = documentWikiQueryRequest.getCategory();
         List<String> tags = documentWikiQueryRequest.getTags();
         String searchText = documentWikiQueryRequest.getSearchText();
+        String matchMode = documentWikiQueryRequest.getMatchMode();
+        Long spaceId = documentWikiQueryRequest.getSpaceId();
+        Long folderId = documentWikiQueryRequest.getFolderId();
         Long userId = documentWikiQueryRequest.getUserId();
+        List<Long> visibleSpaceIds = documentWikiQueryRequest.getVisibleSpaceIds();
         String sortField = documentWikiQueryRequest.getSortField();
         String sortOrder = documentWikiQueryRequest.getSortOrder();
 
         if (StrUtil.isNotBlank(searchText)) {
-            queryWrapper.and(qw -> qw.like("title", searchText)
-                    .or()
-                    .like("summary", searchText)
-                    .or()
-                    .like("content", searchText)
-            );
+            if ("title".equals(matchMode)) {
+                queryWrapper.like("title", searchText);
+            } else if ("content".equals(matchMode)) {
+                queryWrapper.like("content", searchText);
+            } else {
+                queryWrapper.and(qw -> qw.like("title", searchText).or().like("content", searchText));
+            }
         }
         queryWrapper.eq(ObjUtil.isNotEmpty(id), "id", id);
         queryWrapper.eq(ObjUtil.isNotEmpty(userId), "userId", userId);
+        queryWrapper.eq(ObjUtil.isNotEmpty(spaceId), "spaceId", spaceId);
+        if (folderId != null) {
+            queryWrapper.eq("folderId", folderId);
+        }
+        if (visibleSpaceIds != null) {
+            if (visibleSpaceIds.isEmpty()) {
+                queryWrapper.apply("1 = 0");
+            } else {
+                queryWrapper.in("spaceId", visibleSpaceIds);
+            }
+        }
+        queryWrapper.eq("isDelete", 0);
         queryWrapper.like(StrUtil.isNotBlank(title), "title", title);
         queryWrapper.like(StrUtil.isNotBlank(summary), "summary", summary);
-        queryWrapper.eq(StrUtil.isNotBlank(category), "category", category);
         if (CollUtil.isNotEmpty(tags)) {
             for (String tag : tags) {
                 queryWrapper.like("tags", "\"" + tag + "\"");
@@ -126,7 +146,8 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         ThrowUtils.throwIf(StrUtil.isBlank(content), ErrorCode.PARAMS_ERROR, "正文不能为空");
         ThrowUtils.throwIf(content.length() > MAX_CONTENT_LENGTH, ErrorCode.PARAMS_ERROR, "正文过长");
         ThrowUtils.throwIf(StrUtil.isNotBlank(summary) && summary.length() > MAX_SUMMARY_LENGTH, ErrorCode.PARAMS_ERROR, "摘要过长");
-        ThrowUtils.throwIf(StrUtil.isNotBlank(category) && category.length() > MAX_CATEGORY_LENGTH, ErrorCode.PARAMS_ERROR, "分类过长");
+        ThrowUtils.throwIf(category != null && category.length() > MAX_CATEGORY_LENGTH, ErrorCode.PARAMS_ERROR, "分类过长");
+        ThrowUtils.throwIf(documentWiki.getSpaceId() == null || documentWiki.getSpaceId() <= 0, ErrorCode.PARAMS_ERROR, "空间不能为空");
     }
 
     @Override
@@ -139,11 +160,41 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
     }
 
     @Override
+    public void checkDocumentWikiVisible(User loginUser, DocumentWiki documentWiki) {
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+        ThrowUtils.throwIf(documentWiki == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(documentWiki.getIsDelete() != null && documentWiki.getIsDelete() == 1, ErrorCode.NOT_FOUND_ERROR);
+        wikiSpaceService.requireVisibleSpace(documentWiki.getSpaceId(), loginUser);
+    }
+
+    @Override
     public String buildSummary(String content) {
         if (StrUtil.isBlank(content)) {
             return "";
         }
         String normalizedContent = content.replaceAll("\\s+", " ").trim();
         return StrUtil.sub(normalizedContent, 0, SUMMARY_LENGTH);
+    }
+
+    @Override
+    public DocumentWiki getByIdIncludeDeleted(Long id) {
+        return baseMapper.selectByIdIncludeDeleted(id);
+    }
+
+    @Override
+    public Boolean logicalDelete(Long id, Long deleteBy) {
+        return baseMapper.logicalDeleteById(id, new Date(), deleteBy) > 0;
+    }
+
+    @Override
+    public Boolean restore(Long id) {
+        DocumentWiki documentWiki = baseMapper.selectByIdIncludeDeleted(id);
+        ThrowUtils.throwIf(documentWiki == null, ErrorCode.NOT_FOUND_ERROR);
+        return baseMapper.restoreById(id) > 0;
+    }
+
+    @Override
+    public Boolean permanentDelete(Long id) {
+        return baseMapper.physicallyDeleteById(id) > 0;
     }
 }

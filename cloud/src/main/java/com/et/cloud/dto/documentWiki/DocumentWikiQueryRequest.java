@@ -27,11 +27,6 @@ public class DocumentWikiQueryRequest extends PageRequest implements Serializabl
     private String summary;
 
     /**
-     * Category.
-     */
-    private String category;
-
-    /**
      * Tags.
      */
     private List<String> tags;
@@ -42,9 +37,23 @@ public class DocumentWikiQueryRequest extends PageRequest implements Serializabl
     private String searchText;
 
     /**
+     * title, titleOrContent, content.
+     */
+    private String matchMode;
+
+    private Long spaceId;
+
+    private Long folderId;
+
+    /**
      * Creator user id.
      */
     private Long userId;
+
+    /**
+     * Filled by the controller after visibility checks.
+     */
+    private List<Long> visibleSpaceIds;
 
     private static final long serialVersionUID = 1L;
 }
