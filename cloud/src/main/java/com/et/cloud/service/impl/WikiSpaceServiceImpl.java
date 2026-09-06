@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
+import com.et.cloud.enums.SpaceRoleEnum;
 import com.et.cloud.mapper.DocumentWikiMapper;
 import com.et.cloud.mapper.UserMapper;
 import com.et.cloud.mapper.WikiFolderMapper;
@@ -114,6 +115,36 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
         WikiSpace wikiSpace = this.getById(spaceId);
         ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!checkSpaceVisible(wikiSpace, loginUser), ErrorCode.NO_AUTH_ERROR);
+        return wikiSpace;
+    }
+
+    @Override
+    public boolean checkSpaceEditable(WikiSpace wikiSpace, User loginUser) {
+        if (wikiSpace == null || loginUser == null || Objects.equals(wikiSpace.getIsDelete(), 1)) {
+            return false;
+        }
+        if (isAdmin(loginUser)) {
+            return true;
+        }
+        if (Objects.equals(wikiSpace.getType(), TYPE_PERSONAL)) {
+            return Objects.equals(wikiSpace.getOwnerUserId(), loginUser.getId());
+        }
+        if (Objects.equals(wikiSpace.getType(), TYPE_TEAM)) {
+            return wikiSpaceUserMapper.selectCount(new QueryWrapper<WikiSpaceUser>()
+                    .eq("spaceId", wikiSpace.getId())
+                    .eq("userId", loginUser.getId())
+                    .eq("isDelete", 0)
+                    .in("spaceRole", SpaceRoleEnum.ADMIN.getValue(), SpaceRoleEnum.EDITOR.getValue())) > 0;
+        }
+        return false;
+    }
+
+    @Override
+    public WikiSpace requireEditableSpace(Long spaceId, User loginUser) {
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
+        WikiSpace wikiSpace = this.getById(spaceId);
+        ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(!checkSpaceEditable(wikiSpace, loginUser), ErrorCode.NO_AUTH_ERROR);
         return wikiSpace;
     }
 

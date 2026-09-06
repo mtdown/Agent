@@ -24,6 +24,10 @@ public interface WikiSpaceService extends IService<WikiSpace> {
 
     WikiSpace requireVisibleSpace(Long spaceId, User loginUser);
 
+    boolean checkSpaceEditable(WikiSpace wikiSpace, User loginUser);
+
+    WikiSpace requireEditableSpace(Long spaceId, User loginUser);
+
     List<WikiSpaceVis> listVisibleSpaceVis(User loginUser);
 
     List<Long> listVisibleSpaceIds(User loginUser);

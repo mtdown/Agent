@@ -52,6 +52,15 @@ public class CosManager {
     }
 
     /**
+     * 删除对象
+     *
+     * @param key 唯一键
+     */
+    public void deleteObject(String key) {
+        cosClient.deleteObject(cosClientConfig.getBucket(), key);
+    }
+
+    /**
      * 上传对象（附带图片信息）
      *
      * @param key  唯一键
