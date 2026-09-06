@@ -35,12 +35,12 @@ import GlobalHeader from '@/components/GlobalHeader.vue'
 #basicLayout .content {
   min-height: calc(100vh - 106px);
   padding: 0;
-  background: #f5eddf;
+  background: var(--wiki-bg, #f5eddf);
   margin-bottom: 48px;
 }
 
 #basicLayout .footer {
-  background: #e8dac6;
+  background: var(--wiki-panel-head, #e8dac6);
   padding: 12px;
   position: fixed;
   bottom: 0;

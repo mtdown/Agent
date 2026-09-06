@@ -1,5 +1,5 @@
 <template>
-  <div id="documentWikiListPage">
+  <div id="documentWikiListPage" data-warm-page>
     <div v-if="activeRegion === 'docs'" class="wiki-shell">
       <aside class="wiki-panel wiki-tree-column">
         <WikiSpaceTree ref="spaceTreeRef" :spaces="spaces" @select="handleTreeSelect" />
@@ -287,31 +287,36 @@ onMounted(async () => {
 #documentWikiListPage {
   min-height: calc(100vh - 106px);
   padding: 16px;
-  background: #f5eddf;
-  color: #251f18;
+  background: var(--wiki-bg);
+  color: var(--wiki-text);
 }
 
 .wiki-shell {
   display: grid;
   grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) minmax(180px, 220px);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  height: calc(100vh - 138px);
+  min-height: 360px;
 }
 
 .wiki-panel {
   min-width: 0;
-  background: #fffaf1;
-  border: 1px solid #ded0bc;
+  background: var(--wiki-panel);
+  border: 1px solid var(--wiki-border);
   border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .wiki-tree-column,
 .wiki-document-column,
 .wiki-outline-column {
-  max-height: calc(100vh - 90px);
+  height: 100%;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: #e07a2d #ece0ce;
+  scrollbar-color: var(--wiki-accent) var(--wiki-muted);
 }
 
 .wiki-tree-column::-webkit-scrollbar,
@@ -324,7 +329,7 @@ onMounted(async () => {
 .wiki-tree-column::-webkit-scrollbar-thumb,
 .wiki-document-column::-webkit-scrollbar-thumb,
 .wiki-outline-column::-webkit-scrollbar-thumb {
-  background: #e07a2d;
+  background: var(--wiki-accent);
   border-radius: 999px;
 }
 
@@ -333,10 +338,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   padding: 0 14px;
-  border-bottom: 1px solid #ded0bc;
-  background: #fbf3e7;
+  border-bottom: 1px solid var(--wiki-border);
+  background: var(--wiki-panel-head);
   border-radius: 6px 6px 0 0;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .wiki-tree-column {
@@ -345,6 +351,7 @@ onMounted(async () => {
 
 .wiki-tree-column :deep(.wiki-space-tree) {
   padding: 12px;
+  background: transparent;
 }
 
 .wiki-document-column {
@@ -373,7 +380,7 @@ onMounted(async () => {
   border-left: 2px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #7b6c5d;
+  color: var(--wiki-text-muted);
   cursor: pointer;
   min-height: 32px;
   padding: 6px 8px;
@@ -382,8 +389,8 @@ onMounted(async () => {
 
 .outline-item:hover {
   color: #a14f16;
-  background: #fff0df;
-  border-left-color: #e07a2d;
+  background: var(--wiki-accent-soft);
+  border-left-color: var(--wiki-accent);
 }
 
 .outline-item.level-2 {
@@ -399,19 +406,22 @@ onMounted(async () => {
   margin: 12px;
   padding: 12px;
   border-radius: 4px;
-  background: #f1eadf;
-  color: #7b6c5d;
+  background: var(--wiki-muted);
+  color: var(--wiki-text-muted);
   line-height: 1.6;
 }
 
 @media (max-width: 900px) {
   .wiki-shell {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
   }
 
   .wiki-tree-column,
   .wiki-document-column,
   .wiki-outline-column {
+    height: auto;
     max-height: none;
   }
 }

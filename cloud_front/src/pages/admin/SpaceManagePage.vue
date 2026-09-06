@@ -1,5 +1,5 @@
 <template>
-  <div id="spaceManagePage">
+  <div id="spaceManagePage" data-warm-page>
     <a-flex justify="space-between">
       <h2>空间管理</h2>
       <a-space>
@@ -200,3 +200,9 @@ const doDelete = async (id: string) => {
   }
 }
 </script>
+
+<style scoped>
+#spaceManagePage {
+  padding: 16px;
+}
+</style>

@@ -11,8 +11,8 @@
     <a-form-item label="匹配模式" name="matchMode">
       <a-radio-group v-model:value="searchParams.matchMode">
         <a-radio-button value="title">标题</a-radio-button>
-        <a-radio-button value="titleOrContent">标题或正文</a-radio-button>
         <a-radio-button value="content">正文</a-radio-button>
+        <a-radio-button value="titleOrContent">标题或正文</a-radio-button>
       </a-radio-group>
     </a-form-item>
     <a-form-item label="空间" name="spaceId">

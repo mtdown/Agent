@@ -91,29 +91,32 @@ const selectedFolderId = ref<IdValue | null>(null)
 
 const folderDialogsRef = ref<InstanceType<typeof WikiFolderDialogs>>()
 
-const spaceGroups = computed(() => [
-  { key: 'group:public', label: '公开文档', spaces: props.spaces.filter((s) => s.type === 2) },
+const publicSpaces = computed(() => props.spaces.filter((s) => s.type === 2))
+const groupedSpaces = computed(() => [
   { key: 'group:team', label: '团队文档', spaces: props.spaces.filter((s) => s.type === 1) },
   { key: 'group:personal', label: '个人文档', spaces: props.spaces.filter((s) => s.type === 0) },
 ])
 
-const treeData = computed<TreeNodePayload[]>(() =>
-  spaceGroups.value
+const buildSpaceNode = (space: API.WikiSpaceVis): TreeNodePayload => ({
+  key: `space:${space.id}`,
+  label: String(space.name ?? space.id),
+  nodeType: 'space' as const,
+  space,
+  children: buildFolderNodes(folderTrees.value[String(space.id)] ?? [], space.id),
+})
+
+const treeData = computed<TreeNodePayload[]>(() => [
+  ...publicSpaces.value.map(buildSpaceNode),
+  ...groupedSpaces.value
     .filter((group) => group.spaces.length > 0)
     .map((group) => ({
       key: group.key,
       label: group.label,
       nodeType: 'group' as const,
       selectable: false,
-      children: group.spaces.map((space) => ({
-        key: `space:${space.id}`,
-        label: String(space.name ?? space.id),
-        nodeType: 'space' as const,
-        space,
-        children: buildFolderNodes(folderTrees.value[String(space.id)] ?? [], space.id),
-      })),
+      children: group.spaces.map(buildSpaceNode),
     })),
-)
+])
 
 const buildFolderNodes = (folders: API.WikiFolderVis[], spaceId: IdValue): TreeNodePayload[] =>
   folders.map((folder) => ({
@@ -234,12 +237,13 @@ watch(
     try {
       await refresh()
       if (isFirstLoad) {
-        const firstGroup = spaceGroups.value.find((group) => group.spaces.length > 0)
-        const firstSpace = firstGroup?.spaces[0]
+        const firstSpace =
+          publicSpaces.value[0] ??
+          groupedSpaces.value.find((group) => group.spaces.length > 0)?.spaces[0]
         if (firstSpace?.id != null) {
           selectedSpaceId.value = firstSpace.id
           selectedKeys.value = [`space:${firstSpace.id}`]
-          expandedKeys.value = [firstGroup!.key, `space:${firstSpace.id}`]
+          expandedKeys.value = [`space:${firstSpace.id}`]
           emitSelection()
         }
       }

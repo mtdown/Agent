@@ -1,5 +1,5 @@
 <template>
-  <div id="pictureManagePage">
+  <div id="pictureManagePage" data-warm-page>
     <a-flex justify="space-between">
       <h2>图片管理</h2>
       <a-space>
@@ -120,7 +120,6 @@ import {
   PIC_REVIEW_STATUS_MAP,
   PIC_REVIEW_STATUS_OPTIONS,
 } from '@/constants/picture.ts'
-console.log('导入的审核选项:', PIC_REVIEW_STATUS_OPTIONS)
 // 表格列定义
 const columns = [
   { title: 'id', dataIndex: 'id', width: 80 },
@@ -226,3 +225,9 @@ const handleReview = async (record: API.Picture, reviewStatus: number) => {
   }
 }
 </script>
+
+<style scoped>
+#pictureManagePage {
+  padding: 16px;
+}
+</style>
