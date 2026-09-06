@@ -4,7 +4,6 @@
       <h3>{{ selectedDocument.title }}</h3>
       <a-space wrap>
         <a-button @click="emit('move', selectedDocument)">移动</a-button>
-        <a-button @click="router.push(`/documentWiki/${selectedDocument.id}`)">查看</a-button>
         <a-button @click="router.push(`/edit_documentWiki/${selectedDocument.id}`)">编辑</a-button>
         <a-button danger @click="emit('delete', selectedDocument)">删除</a-button>
       </a-space>
@@ -62,7 +61,7 @@
         <a-list-item>
           <template #actions>
             <a-button type="link" @click="emit('open', item.id)">打开</a-button>
-            <a-button type="link" @click="router.push(`/documentWiki/${item.id}`)">查看</a-button>
+            <a-button type="link" @click="emit('open', item.id)">查看</a-button>
             <a-button type="link" @click="router.push(`/edit_documentWiki/${item.id}`)"
               >编辑</a-button
             >
@@ -97,7 +96,7 @@
         <a-list-item>
           <template #actions>
             <a-button type="link" @click="emit('open', item.id)">打开</a-button>
-            <a-button type="link" @click="router.push(`/documentWiki/${item.id}`)">查看</a-button>
+            <a-button type="link" @click="emit('open', item.id)">查看</a-button>
             <a-button type="link" @click="router.push(`/edit_documentWiki/${item.id}`)"
               >编辑</a-button
             >

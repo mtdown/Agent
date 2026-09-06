@@ -49,7 +49,6 @@ import {
   BookOutlined,
   DeleteOutlined,
   FileAddOutlined,
-  FileSearchOutlined,
   FolderOpenOutlined,
   FolderOutlined,
   LogoutOutlined,
@@ -93,12 +92,6 @@ const originItems: RawNavItem[] = [
     adminOnly: true,
   },
   {
-    key: '/documentWiki?region=docs&manage=1',
-    icon: () => h(FileSearchOutlined),
-    label: '文档管理',
-    adminOnly: true,
-  },
-  {
     key: '/admin/spaceManage',
     icon: () => h(FolderOutlined),
     label: '图片空间管理',
@@ -131,9 +124,6 @@ const current = computed(() => {
   }
   if (route.path === '/documentWiki' && route.query.region === 'recycle') {
     return ['/documentWiki?region=recycle']
-  }
-  if (route.path === '/documentWiki' && route.query.manage === '1') {
-    return ['/documentWiki?region=docs&manage=1']
   }
   if (route.path.startsWith('/documentWiki') || route.path.startsWith('/edit_documentWiki')) {
     return ['/documentWiki']

@@ -1,22 +1,7 @@
 <template>
   <div id="documentWikiListPage">
-    <a-flex justify="space-between" align="center" wrap="wrap" gap="middle" class="page-header">
-      <h2>Wiki 文档</h2>
-      <a-space wrap>
-        <a-button @click="refreshAll">刷新</a-button>
-        <a-button type="primary" @click="router.push('/add_documentWiki')">创建文档</a-button>
-      </a-space>
-    </a-flex>
-
-    <a-tabs v-model:active-key="activeRegion" @change="syncRegionToRoute">
-      <a-tab-pane key="docs" tab="文档" />
-      <a-tab-pane key="recycle" tab="回收站" />
-      <a-tab-pane v-if="isAdmin" key="manage" tab="文档空间管理" />
-    </a-tabs>
-
     <div v-if="activeRegion === 'docs'" class="wiki-shell">
       <aside class="wiki-panel wiki-tree-column">
-        <div class="panel-head">空间目录</div>
         <WikiSpaceTree ref="spaceTreeRef" :spaces="spaces" @select="handleTreeSelect" />
       </aside>
 
@@ -87,7 +72,7 @@
 </template>
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   deleteDocumentWikiUsingPost,
@@ -111,7 +96,6 @@ const recyclePanelRef = ref<InstanceType<typeof WikiRecyclePanel>>()
 const managePanelRef = ref<InstanceType<typeof WikiSpaceManagePanel>>()
 const moveDialogRef = ref<InstanceType<typeof WikiDocumentMoveDialog>>()
 const route = useRoute()
-const router = useRouter()
 const loginUserStore = useLoginUserStore()
 
 const loading = ref(false)
@@ -261,15 +245,6 @@ const doSearch = () => {
   fetchSearchResults()
 }
 
-const syncRegionToRoute = (key: string | number) => {
-  const region = String(key)
-  if (region === 'docs') {
-    router.push('/documentWiki')
-    return
-  }
-  router.push(`/documentWiki?region=${region}`)
-}
-
 const scrollToOutline = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 }
@@ -316,10 +291,6 @@ onMounted(async () => {
   color: #251f18;
 }
 
-.page-header {
-  margin-bottom: 12px;
-}
-
 .wiki-shell {
   display: grid;
   grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) minmax(180px, 220px);
@@ -337,7 +308,7 @@ onMounted(async () => {
 .wiki-tree-column,
 .wiki-document-column,
 .wiki-outline-column {
-  max-height: calc(100vh - 198px);
+  max-height: calc(100vh - 90px);
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: #e07a2d #ece0ce;
