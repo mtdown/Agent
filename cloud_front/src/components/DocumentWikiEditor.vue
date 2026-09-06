@@ -36,11 +36,12 @@
       />
     </a-form-item>
     <a-form-item label="正文" name="content" :rules="[{ required: true, message: '请输入正文' }]">
-      <a-textarea
-        v-model:value="formState.content"
-        placeholder="请输入 Wiki 文档正文"
-        :rows="18"
-        allow-clear
+      <MdEditor
+        v-model="formState.content"
+        language="zh-CN"
+        style="height: 480px"
+        :on-upload-img="onUploadImg"
+        placeholder="请输入 Wiki 文档正文，支持直接粘贴或拖拽图片"
       />
     </a-form-item>
     <a-form-item>
@@ -55,8 +56,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { MdEditor } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController.ts'
 import { listFolderTreeUsingGet } from '@/api/wikiFolderController.ts'
+import { uploadWikiImageUsingPost } from '@/api/documentWikiController.ts'
 
 type SelectValue = string | number | undefined
 
@@ -164,7 +168,32 @@ const handleFinish = () => {
     ...formState,
     folderId: formState.folderId || undefined,
     tags: formState.tags ?? [],
+    contentFormat: 'markdown',
   })
+}
+
+const onUploadImg = async (files: File[], callback: (urls: string[]) => void) => {
+  if (!formState.spaceId) {
+    message.warning('请先选择文档空间再上传图片')
+    callback([])
+    return
+  }
+  const urls: string[] = []
+  for (const file of files) {
+    try {
+      const res = (await uploadWikiImageUsingPost({ spaceId: formState.spaceId }, {}, file)) as {
+        data: API.BaseResponseString_
+      }
+      if (res.data.code === 0 && res.data.data) {
+        urls.push(res.data.data)
+      } else {
+        message.error('图片上传失败，' + res.data.message)
+      }
+    } catch (e: any) {
+      message.error('图片上传失败，' + e.message)
+    }
+  }
+  callback(urls)
 }
 
 const spaceRegionName = (type?: number) => {

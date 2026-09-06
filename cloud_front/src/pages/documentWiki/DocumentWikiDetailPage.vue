@@ -18,7 +18,12 @@
         <a-typography-paragraph v-if="documentWiki.summary" type="secondary">
           {{ documentWiki.summary }}
         </a-typography-paragraph>
-        <div class="content">{{ documentWiki.content }}</div>
+        <MdPreview
+          v-if="documentWiki.contentFormat === 'markdown'"
+          :model-value="documentWiki.content ?? ''"
+          language="zh-CN"
+        />
+        <div v-else class="content">{{ documentWiki.content }}</div>
       </article>
     </a-spin>
   </div>
@@ -28,6 +33,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { MdPreview } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 import {
   deleteDocumentWikiUsingPost,
   getDocumentWikiVisByIdUsingGet,

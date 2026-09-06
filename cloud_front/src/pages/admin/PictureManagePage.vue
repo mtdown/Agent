@@ -3,8 +3,8 @@
     <a-flex justify="space-between">
       <h2>图片管理</h2>
       <a-space>
-        <a-button type="primary" href="/add_picture" target="_blank">+ 创建</a-button>
-        <a-button type="primary" href="/add_picture/batch" target="_blank"> 批量创建图片 </a-button>
+        <a-button type="primary" href="/gallery/add_picture" target="_blank">+ 创建</a-button>
+        <a-button type="primary" href="/gallery/add_picture/batch" target="_blank"> 批量创建图片 </a-button>
       </a-space>
     </a-flex>
     <a-form layout="inline" :model="searchParams" @finish="doSearch">
@@ -95,7 +95,7 @@
             >
               拒绝
             </a-button>
-            <a-button type="link" :href="`/add_picture?id=${record.id}`" target="_blank">
+            <a-button type="link" :href="`/gallery/add_picture?id=${record.id}`" target="_blank">
               编辑
             </a-button>
             <a-button danger @click="doDelete(record.id)">删除</a-button>

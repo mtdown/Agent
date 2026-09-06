@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
 import UserManagePage from '@/pages/admin/UserManagePage.vue'
 import UserRegisterPage from '@/pages/user/UserRegisterPage.vue'
 import UserLoginPage from '@/pages/user/UserLoginPage.vue'
@@ -14,16 +13,17 @@ import MySpacePage from '@/pages/MySpacePage.vue'
 import SpaceDetailPage from '@/pages/SpaceDetailPage.vue'
 import SpaceUserManagePage from '@/pages/admin/SpaceUserManagePage.vue'
 import DocumentWikiListPage from '@/pages/documentWiki/DocumentWikiListPage.vue'
-import DocumentWikiDetailPage from '@/pages/documentWiki/DocumentWikiDetailPage.vue'
-import AddDocumentWikiPage from '@/pages/documentWiki/AddDocumentWikiPage.vue'
-import EditDocumentWikiPage from '@/pages/documentWiki/EditDocumentWikiPage.vue'
 // 扮演路由组件的位置
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
+      redirect: '/documentWiki',
+    },
+    {
+      path: '/gallery',
+      name: 'gallery',
       component: HomePage,
     },
     {
@@ -47,12 +47,12 @@ const router = createRouter({
       component: PictureManagePage,
     },
     {
-      path: '/add_picture/batch',
+      path: '/gallery/add_picture/batch',
       name: '批量创建图片',
       component: AddPictureBatchPage,
     },
     {
-      path: '/picture/:id',
+      path: '/gallery/picture/:id',
       name: '图片详情',
       component: PictureDetailPage,
       props: true,
@@ -65,26 +65,26 @@ const router = createRouter({
     {
       path: '/documentWiki/:id',
       name: '文档详情',
-      component: DocumentWikiDetailPage,
+      component: () => import('@/pages/documentWiki/DocumentWikiDetailPage.vue'),
       props: true,
     },
     {
       path: '/add_documentWiki',
       name: '创建文档',
-      component: AddDocumentWikiPage,
+      component: () => import('@/pages/documentWiki/AddDocumentWikiPage.vue'),
     },
     {
       path: '/edit_documentWiki/:id',
       name: '编辑文档',
-      component: EditDocumentWikiPage,
+      component: () => import('@/pages/documentWiki/EditDocumentWikiPage.vue'),
     },
     {
-      path: '/add_space',
+      path: '/gallery/add_space',
       name: '创建空间',
       component: AddSpacePage,
     },
     {
-      path: '/add_picture',
+      path: '/gallery/add_picture',
       name: '创建图片',
       component: AddPicturePage,
     },
@@ -94,18 +94,18 @@ const router = createRouter({
       component: SpaceManagePage,
     },
     {
-      path: '/spaceUserManage/:id',
+      path: '/gallery/spaceUserManage/:id',
       name: '空间成员管理',
       component: SpaceUserManagePage,
       props: true,
     },
     {
-      path: '/my_space',
+      path: '/gallery/my_space',
       name: '我的空间',
       component: MySpacePage,
     },
     {
-      path: '/space/:id',
+      path: '/gallery/space/:id',
       name: '空间详情',
       component: SpaceDetailPage,
       props: true,

@@ -3,7 +3,7 @@
     <a-flex justify="space-between">
       <h2>空间成员管理</h2>
       <a-space>
-        <a-button type="primary" href="/add_space" target="_blank">+ 创建空间</a-button>
+        <a-button type="primary" href="/gallery/add_space" target="_blank">+ 创建空间</a-button>
         <!--        <a-button type="primary" ghost href="/space_analyze?queryPublic=1" target="_blank"-->
         <!--          >分析公共图库-->
         <!--        </a-button>-->
