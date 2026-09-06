@@ -8,18 +8,19 @@
       </a-space>
     </a-flex>
 
-    <a-tabs v-model:active-key="activeRegion">
+    <a-tabs v-model:active-key="activeRegion" @change="syncRegionToRoute">
       <a-tab-pane key="docs" tab="文档" />
       <a-tab-pane key="recycle" tab="回收站" />
       <a-tab-pane v-if="isAdmin" key="manage" tab="文档空间管理" />
     </a-tabs>
 
     <div v-if="activeRegion === 'docs'" class="wiki-shell">
-      <aside class="wiki-nav">
+      <aside class="wiki-panel wiki-tree-column">
+        <div class="panel-head">空间目录</div>
         <WikiSpaceTree ref="spaceTreeRef" :spaces="spaces" @select="handleTreeSelect" />
       </aside>
 
-      <main class="wiki-content">
+      <main class="wiki-panel wiki-document-column" ref="documentColumnRef">
         <section class="content-section">
           <WikiSearchBar
             v-model="searchParams"
@@ -42,23 +43,41 @@
           />
         </section>
       </main>
+
+      <aside class="wiki-panel wiki-outline-column">
+        <div class="panel-head">本文大纲</div>
+        <nav v-if="documentOutline.length" class="outline-list" aria-label="本文大纲">
+          <button
+            v-for="item in documentOutline"
+            :key="item.id"
+            type="button"
+            class="outline-item"
+            :class="`level-${item.level}`"
+            @click="scrollToOutline(item.id)"
+          >
+            {{ item.title }}
+          </button>
+        </nav>
+        <div v-else class="outline-empty">当前文档暂无可用大纲</div>
+      </aside>
     </div>
-    <WikiRecyclePanel
-      v-else-if="activeRegion === 'recycle'"
-      ref="recyclePanelRef"
-      v-model:space-id="recycleSpaceId"
-      :all-space-options="allSpaceOptions"
-      :loading="loading"
-      @restored="refreshAll"
-    />
-    <WikiSpaceManagePanel
-      v-if="isAdmin"
-      v-show="activeRegion === 'manage'"
-      :active="activeRegion === 'manage'"
-      ref="managePanelRef"
-      :loading="loading"
-      @changed="fetchSpaces"
-    />
+    <section v-else-if="activeRegion === 'recycle'" class="wiki-panel page-panel">
+      <WikiRecyclePanel
+        ref="recyclePanelRef"
+        v-model:space-id="recycleSpaceId"
+        :all-space-options="allSpaceOptions"
+        :loading="loading"
+        @restored="refreshAll"
+      />
+    </section>
+    <section v-if="isAdmin && activeRegion === 'manage'" class="wiki-panel page-panel">
+      <WikiSpaceManagePanel
+        :active="activeRegion === 'manage'"
+        ref="managePanelRef"
+        :loading="loading"
+        @changed="fetchSpaces"
+      />
+    </section>
     <WikiDocumentMoveDialog
       ref="moveDialogRef"
       :all-space-options="allSpaceOptions"
@@ -102,6 +121,7 @@ const browseDocuments = ref<API.DocumentWikiVis[]>([])
 const selectedDocument = ref<API.DocumentWikiVis>({})
 const recycleSpaceId = ref<IdValue>()
 const spaceTreeRef = ref<InstanceType<typeof WikiSpaceTree>>()
+const documentColumnRef = ref<HTMLElement>()
 const currentSelection = ref<WikiTreeSelection>({
   spaceId: undefined,
   folderId: null,
@@ -123,6 +143,25 @@ const currentFolderName = computed(() => {
   const name = currentSelection.value.folder?.name
   return name ? String(name) : ''
 })
+const documentOutline = computed(() =>
+  extractDocumentOutline(selectedDocument.value.content ?? '').map((item, index) => ({
+    ...item,
+    id: `wiki-heading-${index}`,
+  })),
+)
+
+const extractDocumentOutline = (content: string) => {
+  const outline: { level: number; title: string }[] = []
+  const headingPattern = /^(#{1,4})\s+(.+)$/gm
+  let match: RegExpExecArray | null
+  while ((match = headingPattern.exec(content))) {
+    outline.push({
+      level: Math.min(match[1].length, 3),
+      title: match[2].trim(),
+    })
+  }
+  return outline
+}
 
 watch(
   () => route.query.open,
@@ -131,6 +170,25 @@ watch(
       openDocument(id as string)
     }
   },
+)
+watch(
+  () => [route.query.region, route.query.manage, isAdmin.value] as const,
+  ([region, manage, admin]) => {
+    if (region === 'recycle') {
+      activeRegion.value = 'recycle'
+      return
+    }
+    if (region === 'manage' && admin) {
+      activeRegion.value = 'manage'
+      return
+    }
+    if (manage === '1' && admin) {
+      activeRegion.value = 'docs'
+      return
+    }
+    activeRegion.value = 'docs'
+  },
+  { immediate: true },
 )
 
 const refreshAll = async () => {
@@ -203,6 +261,19 @@ const doSearch = () => {
   fetchSearchResults()
 }
 
+const syncRegionToRoute = (key: string | number) => {
+  const region = String(key)
+  if (region === 'docs') {
+    router.push('/documentWiki')
+    return
+  }
+  router.push(`/documentWiki?region=${region}`)
+}
+
+const scrollToOutline = (id: string) => {
+  document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
 const openDocument = async (id: IdValue) => {
   if (!id) return
   const res = await getDocumentWikiVisByIdUsingGet({ id: String(id) })
@@ -239,7 +310,10 @@ onMounted(async () => {
 </script>
 <style scoped>
 #documentWikiListPage {
-  padding: 0 24px 24px;
+  min-height: calc(100vh - 106px);
+  padding: 16px;
+  background: #f5eddf;
+  color: #251f18;
 }
 
 .page-header {
@@ -248,21 +322,115 @@ onMounted(async () => {
 
 .wiki-shell {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) minmax(180px, 220px);
+  gap: 16px;
   align-items: start;
 }
 
-.wiki-nav {
-  border-right: 1px solid #f0f0f0;
-  padding-right: 16px;
-  min-height: 560px;
+.wiki-panel {
+  min-width: 0;
+  background: #fffaf1;
+  border: 1px solid #ded0bc;
+  border-radius: 6px;
 }
 
-.wiki-content,
+.wiki-tree-column,
+.wiki-document-column,
+.wiki-outline-column {
+  max-height: calc(100vh - 198px);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e07a2d #ece0ce;
+}
+
+.wiki-tree-column::-webkit-scrollbar,
+.wiki-document-column::-webkit-scrollbar,
+.wiki-outline-column::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.wiki-tree-column::-webkit-scrollbar-thumb,
+.wiki-document-column::-webkit-scrollbar-thumb,
+.wiki-outline-column::-webkit-scrollbar-thumb {
+  background: #e07a2d;
+  border-radius: 999px;
+}
+
+.panel-head {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid #ded0bc;
+  background: #fbf3e7;
+  border-radius: 6px 6px 0 0;
+  font-weight: 600;
+}
+
+.wiki-tree-column {
+  padding-bottom: 12px;
+}
+
+.wiki-tree-column :deep(.wiki-space-tree) {
+  padding: 12px;
+}
+
+.wiki-document-column {
+  padding: 18px 22px 24px;
+}
+
 .content-section,
-.manage-section {
+.manage-section,
+.page-panel {
   min-width: 0;
+}
+
+.page-panel {
+  padding: 18px 22px 24px;
+}
+
+.outline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+}
+
+.outline-item {
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #7b6c5d;
+  cursor: pointer;
+  min-height: 32px;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.outline-item:hover {
+  color: #a14f16;
+  background: #fff0df;
+  border-left-color: #e07a2d;
+}
+
+.outline-item.level-2 {
+  padding-left: 18px;
+}
+
+.outline-item.level-3 {
+  padding-left: 28px;
+  font-size: 13px;
+}
+
+.outline-empty {
+  margin: 12px;
+  padding: 12px;
+  border-radius: 4px;
+  background: #f1eadf;
+  color: #7b6c5d;
+  line-height: 1.6;
 }
 
 @media (max-width: 900px) {
@@ -270,12 +438,10 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .wiki-nav {
-    border-right: 0;
-    border-bottom: 1px solid #f0f0f0;
-    padding-right: 0;
-    padding-bottom: 16px;
-    min-height: 0;
+  .wiki-tree-column,
+  .wiki-document-column,
+  .wiki-outline-column {
+    max-height: none;
   }
 }
 </style>

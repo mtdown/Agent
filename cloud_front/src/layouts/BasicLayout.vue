@@ -4,12 +4,9 @@
       <a-layout-header class="header">
         <GlobalHeader />
       </a-layout-header>
-      <a-layout>
-        <GlobalSider class="sider" />
-        <a-layout-content class="st">
-          <router-view />
-        </a-layout-content>
-      </a-layout>
+      <a-layout-content class="content">
+        <router-view />
+      </a-layout-content>
       <a-layout-footer class="footer">
         <a href="https://github.com/mtdown/Agent" target="_blank"> 项目文件 </a>
       </a-layout-footer>
@@ -19,21 +16,15 @@
 
 <script setup lang="ts">
 import GlobalHeader from '@/components/GlobalHeader.vue'
-import GlobalSider from '@/components/GlobalSider.vue'
 </script>
 
 <style scoped>
 #basicLayout .header {
-  padding-inline: 20px;
-  background: white;
+  height: auto;
+  min-height: 58px;
+  padding: 0;
+  background: #111111;
   color: unset;
-  margin-bottom: 1px;
-}
-
-#basicLayout .sider {
-  background: #fff;
-  border-right: 0.5px solid #eee;
-  padding-top: 20px;
 }
 
 #basicLayout :deep(.ant-menu-root) {
@@ -42,22 +33,19 @@ import GlobalSider from '@/components/GlobalSider.vue'
 }
 
 #basicLayout .content {
-  padding: 28px;
-  background: linear-gradient(to right, #fefefe, #fff);
-  margin-bottom: 28px;
+  min-height: calc(100vh - 106px);
+  padding: 0;
+  background: #f5eddf;
+  margin-bottom: 48px;
 }
 
 #basicLayout .footer {
-  background: #efefef;
-  padding: 16px;
+  background: #e8dac6;
+  padding: 12px;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   text-align: center;
-}
-
-#basicLayout .content {
-  padding: 28px;
 }
 </style>
