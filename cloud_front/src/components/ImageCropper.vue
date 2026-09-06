@@ -55,13 +55,14 @@ import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
 import { SPACE_TYPE_ENUM } from '@/constants/space.ts'
 import PictureEditWebSocket from '@/utils/pictureEditWebSocket.ts'
 import { PICTURE_EDIT_ACTION_ENUM, PICTURE_EDIT_MESSAGE_TYPE_ENUM } from '@/constants/picture.ts'
+import type { EntityId } from '@/utils'
 
 // 定义组件接收的属性
 interface Props {
   imageUrl?: string
   picture?: API.PictureVis
   space?: any // 添加 space 属性
-  spaceId?: number // 保留 spaceId 用于上传
+  spaceId?: EntityId // 保留 spaceId 用于上传
   onSuccess?: (newPicture: API.PictureVis) => void
 }
 

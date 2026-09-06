@@ -98,6 +98,7 @@ import { message } from 'ant-design-vue'
 import { EditOutlined, FullscreenOutlined } from '@ant-design/icons-vue'
 import ImageCropper from '@/components/ImageCropper.vue'
 import ImageOutPainting from '@/components/ImageOutPainting.vue'
+import { normalizeRouteId } from '@/utils'
 // 把这里的逻辑从 template 移到 script 中
 const picture = ref<API.PictureVis>()
 const pictureForm = reactive<API.PictureEditRequest>({})
@@ -111,7 +112,7 @@ const onSuccess = (newPicture: API.PictureVis) => {
 const uploadType = ref<'file' | 'url'>('file')
 const router = useRouter()
 const spaceId = computed(() => {
-  return route.query?.spaceId
+  return normalizeRouteId(route.query?.spaceId)
 })
 
 // 修正 handleSubmit 逻辑
@@ -140,8 +141,8 @@ const handleSubmit = async (values: any) => {
   }
 }
 
-const categoryOptions = ref<string[]>([])
-const tagOptions = ref<string[]>([])
+const categoryOptions = ref<{ value: string; label: string }[]>([])
+const tagOptions = ref<{ value: string; label: string }[]>([])
 
 const getTagCategoryOptions = async () => {
   const res = await listPictureTagCategoryUsingGet()
@@ -170,7 +171,7 @@ onMounted(() => {
 const route = useRoute()
 
 const getOldPicture = async () => {
-  const id = route.query?.id
+  const id = normalizeRouteId(route.query?.id)
   if (id) {
     const res = await getPictureVisByIdUsingGet({
       id: id,
