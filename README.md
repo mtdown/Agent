@@ -95,7 +95,7 @@
 1. **多对多关系：** 1个用户可以创建并加入多个团队空间；1个空间可以拥有多个成员。
 2. **角色隔离：** 必须引入“角色”概念（如管理员、编辑者、浏览者），不同角色在**同一个空间**内具有**不同**的操作权限。
 3. **权限控制：** 所有关键操作（如删除图片、邀请成员）必须被权限系统拦截和校验。
-4. **前端动态渲染：** 前端UI（如操作按钮）必须根据用户在**当前空间**的权限动态显示或隐藏,很遗憾，这个还没有很成功，权限校验方面有点问题
+4. **前端动态渲染：** 前端 UI（如操作按钮）根据用户在**当前空间**的权限动态显示或隐藏；后端关键操作仍以权限校验为准，前端展示只作为体验优化。
 
 ## 3.技术选型与实现思路
 
@@ -423,3 +423,40 @@
 2.  前端执行一次 `npm run openapi`。
 
 这样，前端就能获得与后端完全同步的、带有类型提示的API请求代码，无需手动编写和调试接口。
+
+## 11. Wiki-First 改造
+
+> Change ID：`wiki-first-refactor`（OpenSpec 管理，详见 `openspec/changes/wiki-first-refactor/`）
+
+### 11.1 背景与目标
+
+项目从"云图库为中心"收敛为"企业 Wiki 为中心"：Wiki 成为站点首页与主导航，图片模块降级为文件与图库次级入口；文档支持 Markdown 与粘贴图片；为将来云端知识库（RAG 接本地 Agent）预留数据字段。
+
+### 11.2 五个模块
+
+| 模块 | 内容 |
+|---|---|
+| M1 后端数据层 | 新表 `wiki_attachment`（文件模块雏形，图片为第一种附件类型，权限基于 Wiki 空间可见性而非图片空间体系）；`document_wiki` 一次补 7 列：contentFormat/sourceType/sourceUrl/contentHash/contentVersion/visibility/metadataJson（来源溯源 + RAG 预留，全部可空带默认值）；新接口 `POST /documentWiki/image/upload` |
+| M2 编辑器与渲染 | textarea → md-editor-v3（CodeMirror 内核）；粘贴/拖拽图片自动上传并插入 Markdown 图片语法；详情页按 contentFormat 分流渲染（老 plain 文档原样兼容） |
+| M3 树形结构重做 | 左侧统一导航树：公开/团队/个人分组 → 空间根节点 → 按 parentId 无限嵌套文件夹；点文件夹名=选中（修复了原先点名称弹新建框的反直觉交互）；树只导航到文件夹，文档统一在右侧列表展示 |
+| M4 组件拆分 + 导航 | 969 行巨石组件拆为 8 个子组件/composable，ListPage 降为 281 行组合层；路由 `/`→`/documentWiki`，图库整体迁移 `/gallery` 前缀；全局导航 Wiki 化（憨带 Wiki） |
+| M5 全链路回归 | 建文档→渲染→编辑→删除→回收站恢复全链路、图库回归、老数据兼容、预留字段落库核对 |
+
+### 11.3 关键技术点
+
+1. **双权限体系隔离**：Wiki 附件走 `requireVisibleSpace`（Wiki 空间可见性），与图片模块的 `Space`/`SpaceUser` 完全解耦，绕开公共区普通用户无上传权限的死结。
+2. **multipart 哈希陷阱**：`transferTo()` 后 Tomcat 上传临时文件已被移动，再调 `getBytes()` 必然 FileNotFoundException——改为对自有临时文件计算 MD5（`fileHash` 落库，为 RAG 去重预留）。
+3. **RAG 字段预留原则**：只补最小集（内容格式 + 来源溯源 + hash/version/visibility/metadata），完整向量索引字段（index_status/embedding_model/外部知识库映射等）等建 `knowledge_item` 新表时再上；现在留空壳，将来填值不改表。
+4. **sa-token 1.44 冷启动注册**：注解里的 `type = StpKit.SPACE_TYPE` 是编译期内联常量，不会触发 StpKit 类加载，而 StpLogic 注册发生在类加载时——冷启动首个带 `@SaSpaceCheckPermission` 的请求会抛"未能获取对应 StpLogic"。修复：`StpKitRegisterConfig` 启动期 `@PostConstruct` 显式注册。
+5. **OpenAPI 生成防坑**：`openapi.config.js` 增加 Basic 认证构造与 `customType` 钩子（int64 → `string | number`），根治重新生成覆盖雪花 ID 字符串类型的精度回退问题。
+
+### 11.4 数据库变更
+
+- `cloud/sql/create_table_wiki_attachment.sql`（新表）
+- `cloud/sql/alter_table_document_wiki_wikifirst.sql`（document_wiki 补 7 列）
+
+两个脚本需在各环境按序执行。
+
+### 11.5 问题记录
+
+全过程问题与解决方案见根目录 `IssueLog.xlsx`（本 Change 相关 20 条，含 2 条自动化测试环境暂缓项）。
