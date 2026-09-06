@@ -460,3 +460,17 @@
 ### 11.5 问题记录
 
 全过程问题与解决方案见根目录 `IssueLog.xlsx`（本 Change 相关 20 条，含 2 条自动化测试环境暂缓项）。
+
+## 12. Wiki 缺陷整治（fix-wiki-defects）
+
+> Change ID：`fix-wiki-defects`（OpenSpec 管理，54/54 任务完成；代码随 wiki-first 合并提交 9c7ab06 / 289f767 进入 main）
+
+Wiki-First 改造合入后的一次逐行复审发现 12 项测试与构建覆盖不到的缺陷，按危害分三层整治：
+
+| 层次 | 内容 |
+|---|---|
+| 附件通道正确性（P0） | `WikiAttachmentServiceImpl.uploadImage` 补 `@Transactional(rollbackFor)`，COS 孤儿对象清理；`documentId` 增加归属空间校验（`validateDocumentInSpace`），杜绝跨空间挂附件 |
+| 中文全文检索（P0） | `document_wiki` 增加 FULLTEXT 索引（`alter_table_document_wiki_fulltext.sql`）与 ngram 分词检索，替换无法走索引、不分词、无排序的 `LIKE '%kw%'` |
+| 遗留负债（P1/P2） | 移除 sharding 残留代码；`mvn test` 解除对本地 Redis 的硬依赖；文档列表 N+1 查询治理；上传入口加固与全局异常补齐 |
+
+测试从 21 项扩至 43 项全绿（新增 sa-token 配置、全局异常、控制器缓存等用例）。
