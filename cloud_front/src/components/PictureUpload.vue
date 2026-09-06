@@ -21,11 +21,12 @@ import { PlusOutlined, LoadingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import type { UploadChangeParam, UploadProps } from 'ant-design-vue'
 import { uploadPictureUsingPost } from '@/api/pictureController.ts'
+import type { EntityId } from '@/utils'
 
 interface Props {
   imageUrl?: string
   picture?: API.PictureVis
-  spaceId?: number
+  spaceId?: EntityId
   onSuccess?: (newPicture: API.PictureVis) => void
 }
 
@@ -45,7 +46,7 @@ const handleUpload = async ({ file }: any) => {
   // loading是用来实现等待效果的
   loading.value = true
   try {
-    const params = props.picture ? { id: props.picture.id } : {}
+    const params: API.PictureUploadRequest = props.picture ? { id: props.picture.id } : {}
     params.spaceId = props.spaceId
     // 文件上传接口代码
     const res = await uploadPictureUsingPost(params, {}, file)
@@ -62,7 +63,7 @@ const handleUpload = async ({ file }: any) => {
   }
 }
 
-const beforeUpload = (file: UploadProps['fileList'][number]) => {
+const beforeUpload = (file: File) => {
   const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
   if (!isJpgOrPng) {
     message.error('不支持上传该格式的图片，推荐 jpg 或 png')

@@ -18,11 +18,12 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { uploadPictureByUrlUsingPost, uploadPictureUsingPost } from '@/api/pictureController.ts'
+import { uploadPictureByUrlUsingPost } from '@/api/pictureController.ts'
+import type { EntityId } from '@/utils'
 
 interface Props {
   picture?: API.PictureVis
-  spaceId?: number
+  spaceId?: EntityId
   onSuccess?: (newPicture: API.PictureVis) => void
 }
 
@@ -42,7 +43,8 @@ const handleUpload = async () => {
   try {
     const params: API.PictureUploadRequest = props.picture ? { id: props.picture.id } : {}
     params.spaceId = props.spaceId
-    const res = await uploadPictureUsingPost(params, {}, file)
+    params.fileUrl = fileUrl.value
+    const res = await uploadPictureByUrlUsingPost(params)
     if (res.data.code === 0 && res.data.data) {
       message.success('图片上传成功')
 

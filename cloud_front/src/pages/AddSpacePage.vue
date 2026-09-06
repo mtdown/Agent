@@ -46,7 +46,7 @@ import {
   SPACE_TYPE_ENUM,
   SPACE_TYPE_MAP,
 } from '@/constants/space.ts'
-import { formatSize } from '@/utils'
+import { formatSize, normalizeRouteId } from '@/utils'
 
 // 把这里的逻辑从 template 移到 script 中
 const space = ref<API.SpaceVis>()
@@ -92,7 +92,7 @@ const handleSubmit = async (values: any) => {
 }
 
 const getOldSpace = async () => {
-  const id = route.query?.id
+  const id = normalizeRouteId(route.query?.id)
   if (id) {
     const res = await getSpaceVisByIdUsingGet({
       id: id,

@@ -137,7 +137,7 @@ const columns = [
   { title: '操作', key: 'action' },
 ]
 
-const dataList = ref([])
+const dataList = ref<API.Picture[]>([])
 const total = ref(0)
 // 搜索参数，包含分页和排序
 const searchParams = reactive<API.PictureQueryRequest>({

@@ -28,8 +28,8 @@
             <template v-if="showOp" #actions>
               <!--              <ShareAltOutlined @click="(e) => doShare(picture, e)" />-->
               <!--              <SearchOutlined @click="(e) => doSearch(picture, e)" />-->
-              <EditOutlined v-if="canEdit" @click="(e) => doEdit(picture, e)" />
-              <DeleteOutlined v-if="canDelete" @click="(e) => doDelete(picture, e)" />
+              <EditOutlined v-if="canEdit" @click="(e: MouseEvent) => doEdit(picture, e)" />
+              <DeleteOutlined v-if="canDelete" @click="(e: MouseEvent) => doDelete(picture, e)" />
             </template>
           </a-card>
         </a-list-item>
@@ -68,7 +68,7 @@ const doClickPicture = (picture: API.PictureVis) => {
   })
 }
 // 编辑
-const doEdit = (picture, e) => {
+const doEdit = (picture: API.PictureVis, e: MouseEvent) => {
   // 阻止冒泡
   e.stopPropagation()
   // 跳转时一定要携带 spaceId
@@ -82,7 +82,7 @@ const doEdit = (picture, e) => {
 }
 
 // 删除数据
-const doDelete = async (picture, e) => {
+const doDelete = async (picture: API.PictureVis, e: MouseEvent) => {
   // 阻止冒泡
   e.stopPropagation()
   const id = picture.id

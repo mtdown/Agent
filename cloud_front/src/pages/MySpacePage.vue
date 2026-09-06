@@ -30,8 +30,8 @@ const checkUserSpace = async () => {
     spaceType: SPACE_TYPE_ENUM.PRIVATE,
   })
   if (res.data.code === 0) {
-    if (res.data.data?.records?.length > 0) {
-      const space = res.data.data.records[0]
+    const space = res.data.data?.records?.[0]
+    if (space?.id) {
       router.replace(`/gallery/space/${space.id}`)
     } else {
       router.replace('/gallery/add_space')

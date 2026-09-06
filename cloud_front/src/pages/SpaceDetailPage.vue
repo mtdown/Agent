@@ -2,7 +2,7 @@
   <div id="spaceDetailPage">
     <!-- 空间信息 -->
     <a-flex justify="space-between">
-      <h2>{{ space.spaceName }}（{{ SPACE_TYPE_MAP[space.spaceType] }}）</h2>
+      <h2>{{ space.spaceName }}（{{ SPACE_TYPE_MAP[space.spaceType ?? SPACE_TYPE_ENUM.PRIVATE] }}）</h2>
       <a-space size="middle">
         <a-button
           v-if="canUploadPicture"
@@ -36,11 +36,7 @@
         <a-tooltip
           :title="`占用空间 ${formatSize(space.totalSize)} / ${formatSize(space.maxSize)}`"
         >
-          <a-progress
-            type="circle"
-            :percent="((space.totalSize * 100) / space.maxSize).toFixed(1)"
-            :size="42"
-          />
+          <a-progress type="circle" :percent="spaceUsagePercent" :size="42" />
         </a-tooltip>
       </a-space>
     </a-flex>
@@ -73,7 +69,11 @@ import {
 } from '@/api/pictureController.ts'
 import { formatSize } from '@/utils'
 import { TeamOutlined } from '@ant-design/icons-vue'
-import { SPACE_PERMISSION_ENUM, SPACE_TYPE_MAP } from '@/constants/space.ts'
+import {
+  SPACE_PERMISSION_ENUM,
+  SPACE_TYPE_ENUM,
+  SPACE_TYPE_MAP,
+} from '@/constants/space.ts'
 
 interface Props {
   id: string | number
@@ -81,6 +81,16 @@ interface Props {
 
 const props = defineProps<Props>()
 const space = ref<API.SpaceVis>({})
+
+// 空间占用百分比（totalSize/maxSize 为后端 Long，可能以 string 返回）
+const spaceUsagePercent = computed(() => {
+  const totalSize = Number(space.value.totalSize ?? 0)
+  const maxSize = Number(space.value.maxSize ?? 0)
+  if (!maxSize) {
+    return 0
+  }
+  return Number(((totalSize * 100) / maxSize).toFixed(1))
+})
 
 // 通用权限检查函数
 function createPermissionChecker(permission: string) {
@@ -114,7 +124,7 @@ onMounted(() => {
   fetchSpaceDetail()
 })
 
-const dataList = ref([])
+const dataList = ref<API.PictureVis[]>([])
 const total = ref(0)
 const loading = ref(true)
 
@@ -141,7 +151,7 @@ const fetchData = async () => {
   const res = await listPictureVisByPageUsingPost(params)
   if (res.data.code === 0 && res.data.data) {
     dataList.value = res.data.data.records ?? []
-    total.value = res.data.data.total ?? 0
+    total.value = Number(res.data.data.total ?? 0)
   } else {
     message.error('获取数据失败，' + res.data.message)
   }
