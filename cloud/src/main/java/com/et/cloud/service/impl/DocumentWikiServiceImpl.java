@@ -24,8 +24,15 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, DocumentWiki>
@@ -40,6 +47,14 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
     private static final int MAX_CONTENT_LENGTH = 100000;
 
     private static final int SUMMARY_LENGTH = 160;
+
+    private static final int MAX_SOURCE_URL_LENGTH = 1024;
+
+    private static final int MAX_METADATA_LENGTH = 2048;
+
+    private static final List<String> ALLOWED_CONTENT_FORMAT_LIST = Arrays.asList("plain", "markdown");
+
+    private static final List<String> ALLOWED_SOURCE_TYPE_LIST = Arrays.asList("NATIVE", "UPLOAD", "IMPORT", "URL");
 
     @Resource
     private UserService userService;
@@ -58,22 +73,16 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         String summary = documentWikiQueryRequest.getSummary();
         List<String> tags = documentWikiQueryRequest.getTags();
         String searchText = documentWikiQueryRequest.getSearchText();
-        String matchMode = documentWikiQueryRequest.getMatchMode();
         Long spaceId = documentWikiQueryRequest.getSpaceId();
         Long folderId = documentWikiQueryRequest.getFolderId();
         Long userId = documentWikiQueryRequest.getUserId();
         List<Long> visibleSpaceIds = documentWikiQueryRequest.getVisibleSpaceIds();
         String sortField = documentWikiQueryRequest.getSortField();
         String sortOrder = documentWikiQueryRequest.getSortOrder();
+        boolean hasSearchText = StrUtil.isNotBlank(searchText);
 
-        if (StrUtil.isNotBlank(searchText)) {
-            if ("title".equals(matchMode)) {
-                queryWrapper.like("title", searchText);
-            } else if ("content".equals(matchMode)) {
-                queryWrapper.like("content", searchText);
-            } else {
-                queryWrapper.and(qw -> qw.like("title", searchText).or().like("content", searchText));
-            }
+        if (hasSearchText) {
+            queryWrapper.apply("MATCH (title, content) AGAINST ({0} IN NATURAL LANGUAGE MODE)", searchText);
         }
         queryWrapper.eq(ObjUtil.isNotEmpty(id), "id", id);
         queryWrapper.eq(ObjUtil.isNotEmpty(userId), "userId", userId);
@@ -96,8 +105,19 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
                 queryWrapper.like("tags", "\"" + tag + "\"");
             }
         }
-        queryWrapper.orderBy(StringUtils.isNotBlank(sortField), "ascend".equals(sortOrder), sortField);
+        if (hasSearchText) {
+            queryWrapper.orderByDesc("MATCH (title, content) AGAINST ('" + escapeSqlLiteral(searchText)
+                    + "' IN NATURAL LANGUAGE MODE)");
+        } else if (StringUtils.isNotBlank(sortField)) {
+            queryWrapper.orderBy(true, "ascend".equals(sortOrder), sortField);
+        } else {
+            queryWrapper.orderByDesc("editTime");
+        }
         return queryWrapper;
+    }
+
+    private String escapeSqlLiteral(String value) {
+        return value.replace("\\", "\\\\").replace("'", "''");
     }
 
     @Override
@@ -128,10 +148,37 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         }
         List<DocumentWikiVis> documentWikiVisList = new ArrayList<>();
         for (DocumentWiki documentWiki : documentWikiList) {
-            documentWikiVisList.add(this.getDocumentWikiVis(documentWiki, request));
+            documentWikiVisList.add(DocumentWikiVis.objToVis(documentWiki));
         }
+        fillUsers(documentWikiVisList);
         documentWikiVisPage.setRecords(documentWikiVisList);
         return documentWikiVisPage;
+    }
+
+    private void fillUsers(List<DocumentWikiVis> documentWikiVisList) {
+        if (CollUtil.isEmpty(documentWikiVisList) || userService == null) {
+            return;
+        }
+        Set<Long> userIdSet = documentWikiVisList.stream()
+                .map(DocumentWikiVis::getUserId)
+                .filter(userId -> userId != null && userId > 0)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (CollUtil.isEmpty(userIdSet)) {
+            return;
+        }
+        List<User> users = userService.listByIds(new ArrayList<>(userIdSet));
+        if (CollUtil.isEmpty(users)) {
+            return;
+        }
+        Map<Long, User> userIdUserMap = users.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(User::getId, Function.identity(), (left, right) -> left));
+        for (DocumentWikiVis documentWikiVis : documentWikiVisList) {
+            User user = userIdUserMap.get(documentWikiVis.getUserId());
+            if (user != null) {
+                documentWikiVis.setUser(userService.getUserVis(user));
+            }
+        }
     }
 
     @Override
@@ -148,6 +195,16 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         ThrowUtils.throwIf(StrUtil.isNotBlank(summary) && summary.length() > MAX_SUMMARY_LENGTH, ErrorCode.PARAMS_ERROR, "摘要过长");
         ThrowUtils.throwIf(category != null && category.length() > MAX_CATEGORY_LENGTH, ErrorCode.PARAMS_ERROR, "分类过长");
         ThrowUtils.throwIf(documentWiki.getSpaceId() == null || documentWiki.getSpaceId() <= 0, ErrorCode.PARAMS_ERROR, "空间不能为空");
+        String contentFormat = documentWiki.getContentFormat();
+        ThrowUtils.throwIf(StrUtil.isNotBlank(contentFormat) && !ALLOWED_CONTENT_FORMAT_LIST.contains(contentFormat),
+                ErrorCode.PARAMS_ERROR, "内容格式不合法");
+        String sourceType = documentWiki.getSourceType();
+        ThrowUtils.throwIf(StrUtil.isNotBlank(sourceType) && !ALLOWED_SOURCE_TYPE_LIST.contains(sourceType),
+                ErrorCode.PARAMS_ERROR, "来源类型不合法");
+        ThrowUtils.throwIf(StrUtil.isNotBlank(documentWiki.getSourceUrl()) && documentWiki.getSourceUrl().length() > MAX_SOURCE_URL_LENGTH,
+                ErrorCode.PARAMS_ERROR, "来源地址过长");
+        ThrowUtils.throwIf(StrUtil.isNotBlank(documentWiki.getMetadataJson()) && documentWiki.getMetadataJson().length() > MAX_METADATA_LENGTH,
+                ErrorCode.PARAMS_ERROR, "元数据过长");
     }
 
     @Override

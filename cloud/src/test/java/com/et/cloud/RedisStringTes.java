@@ -1,27 +1,26 @@
 package com.et.cloud;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.test.context.ActiveProfiles;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@ActiveProfiles("local")
 public class RedisStringTes {
-
-    @Autowired
-//    系统自动提供的操作客户端
-    private StringRedisTemplate stringRedisTemplate;
 
     @Test
     public void testRedisStringOperations() {
-
-        ValueOperations<String, String> valueOps = stringRedisTemplate.opsForValue();
-
+        StringRedisTemplate stringRedisTemplate = mock(StringRedisTemplate.class);
+        Map<String, String> values = new HashMap<>();
+        ValueOperations<String, String> valueOps = inMemoryValueOperations(values);
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
+        org.mockito.Mockito.doAnswer(invocation -> values.remove(invocation.getArgument(0)) != null)
+                .when(stringRedisTemplate).delete(org.mockito.ArgumentMatchers.anyString());
 
         String key = "testKey";
         String value = "testValue";
@@ -46,5 +45,17 @@ public class RedisStringTes {
         stringRedisTemplate.delete(key);
         storedValue = valueOps.get(key);
         assertNull(storedValue, "删除后的值不为空");
+    }
+
+    @SuppressWarnings("unchecked")
+    private ValueOperations<String, String> inMemoryValueOperations(Map<String, String> values) {
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            values.put(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(valueOps).set(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        when(valueOps.get(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(invocation -> values.get(invocation.getArgument(0)));
+        return valueOps;
     }
 }

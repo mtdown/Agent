@@ -47,23 +47,9 @@ export async function editDocumentWikiUsingPost(
   })
 }
 
-/** moveDocumentWiki POST /api/documentWiki/move */
-export async function moveDocumentWikiUsingPost(
-  body: API.DocumentWikiMoveRequest,
-  options?: { [key: string]: any }
-) {
-  return request<API.BaseResponseBoolean_>('/api/documentWiki/move', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    data: body,
-    ...(options || {}),
-  })
-}
-
 /** getDocumentWikiVisById GET /api/documentWiki/get/vis */
 export async function getDocumentWikiVisByIdUsingGet(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.getDocumentWikiVisByIdUsingGETParams,
   options?: { [key: string]: any }
 ) {
@@ -76,16 +62,42 @@ export async function getDocumentWikiVisByIdUsingGet(
   })
 }
 
-/** listRootDocumentWiki GET /api/documentWiki/root/list */
-export async function listRootDocumentWikiUsingGet(
-  params: API.listRootDocumentWikiUsingGETParams,
+/** uploadWikiImage POST /api/documentWiki/image/upload */
+export async function uploadWikiImageUsingPost(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.uploadWikiImageUsingPOSTParams,
+  body: {},
+  file?: File,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseListDocumentWikiVis_>('/api/documentWiki/root/list', {
-    method: 'GET',
+  const formData = new FormData()
+
+  if (file) {
+    formData.append('file', file)
+  }
+
+  Object.keys(body).forEach((ele) => {
+    const item = (body as any)[ele]
+
+    if (item !== undefined && item !== null) {
+      if (typeof item === 'object' && !(item instanceof File)) {
+        if (item instanceof Array) {
+          item.forEach((f) => formData.append(ele, f || ''))
+        } else {
+          formData.append(ele, new Blob([JSON.stringify(item)], { type: 'application/json' }))
+        }
+      } else {
+        formData.append(ele, item)
+      }
+    }
+  })
+
+  return request<API.BaseResponseString_>('/api/documentWiki/image/upload', {
+    method: 'POST',
     params: {
       ...params,
     },
+    data: formData,
     ...(options || {}),
   })
 }
@@ -116,6 +128,36 @@ export async function listDocumentWikiVisByPageWithCacheUsingPost(
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  })
+}
+
+/** moveDocumentWiki POST /api/documentWiki/move */
+export async function moveDocumentWikiUsingPost(
+  body: API.DocumentWikiMoveRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean_>('/api/documentWiki/move', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
+/** listRootDocumentWiki GET /api/documentWiki/root/list */
+export async function listRootDocumentWikiUsingGet(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.listRootDocumentWikiUsingGETParams,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseListDocumentWikiVis_>('/api/documentWiki/root/list', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   })
 }

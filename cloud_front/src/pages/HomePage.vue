@@ -160,7 +160,7 @@ const doSearch = () => {
 
 const router = useRouter()
 const doClickPicture = (picture: API.PictureVis) => {
-  router.push(`/picture/${picture.id}`)
+  router.push(`/gallery/picture/${picture.id}`)
 }
 
 // 将所有初始化操作合并到一个 onMounted 中

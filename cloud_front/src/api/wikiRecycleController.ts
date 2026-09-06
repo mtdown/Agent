@@ -2,9 +2,10 @@
 /* eslint-disable */
 import request from '@/request'
 
-/** listRecycle GET /api/wikiRecycle/list */
-export async function listRecycleUsingGet(
-  params: API.listRecycleUsingGETParams,
+/** list GET /api/wikiRecycle/list */
+export async function listUsingGet(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.listUsingGETParams,
   options?: { [key: string]: any }
 ) {
   return request<API.BaseResponseListWikiRecycleItemVis_>('/api/wikiRecycle/list', {
@@ -16,12 +17,12 @@ export async function listRecycleUsingGet(
   })
 }
 
-/** restoreRecycleItem POST /api/wikiRecycle/restore */
-export async function restoreRecycleItemUsingPost(
+/** permanentDelete POST /api/wikiRecycle/permanentDelete */
+export async function permanentDeleteUsingPost(
   body: API.WikiRecycleActionRequest,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseBoolean_>('/api/wikiRecycle/restore', {
+  return request<API.BaseResponseBoolean_>('/api/wikiRecycle/permanentDelete', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -31,12 +32,12 @@ export async function restoreRecycleItemUsingPost(
   })
 }
 
-/** permanentDeleteRecycleItem POST /api/wikiRecycle/permanentDelete */
-export async function permanentDeleteRecycleItemUsingPost(
+/** restore POST /api/wikiRecycle/restore */
+export async function restoreUsingPost(
   body: API.WikiRecycleActionRequest,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseBoolean_>('/api/wikiRecycle/permanentDelete', {
+  return request<API.BaseResponseBoolean_>('/api/wikiRecycle/restore', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

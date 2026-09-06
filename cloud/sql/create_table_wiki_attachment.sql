@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS wiki_attachment (
+    id bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
+    wikiSpaceId bigint NOT NULL COMMENT 'wiki space id',
+    documentId bigint NULL COMMENT 'document id, null means not linked yet',
+    fileName varchar(256) NOT NULL COMMENT 'file name',
+    url varchar(1024) NOT NULL COMMENT 'file url',
+    fileSize bigint NOT NULL DEFAULT 0 COMMENT 'file size in bytes',
+    mimeType varchar(64) NULL COMMENT 'mime type',
+    fileHash varchar(64) NULL COMMENT 'file content hash (md5 hex)',
+    userId bigint NOT NULL COMMENT 'uploader user id',
+    deleteTime datetime NULL COMMENT 'logical delete time',
+    deleteBy bigint NULL COMMENT 'logical delete user',
+    createTime datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'create time',
+    updateTime datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'update time',
+    isDelete tinyint NOT NULL DEFAULT 0 COMMENT 'soft delete flag',
+    PRIMARY KEY (id),
+    KEY idx_space_delete (wikiSpaceId, isDelete),
+    KEY idx_document (documentId),
+    KEY idx_user (userId)
+) COMMENT 'wiki attachment';

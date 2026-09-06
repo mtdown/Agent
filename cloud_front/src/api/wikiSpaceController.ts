@@ -2,14 +2,6 @@
 /* eslint-disable */
 import request from '@/request'
 
-/** listVisibleSpace GET /api/wikiSpace/list/visible */
-export async function listVisibleSpaceUsingGet(options?: { [key: string]: any }) {
-  return request<API.BaseResponseListWikiSpaceVis_>('/api/wikiSpace/list/visible', {
-    method: 'GET',
-    ...(options || {}),
-  })
-}
-
 /** addTeamSpace POST /api/wikiSpace/add/team */
 export async function addTeamSpaceUsingPost(
   body: API.WikiTeamSpaceAddRequest,
@@ -25,9 +17,47 @@ export async function addTeamSpaceUsingPost(
   })
 }
 
+/** deleteTeamSpace POST /api/wikiSpace/delete/team */
+export async function deleteTeamSpaceUsingPost(
+  body: API.WikiSpaceConfirmRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean_>('/api/wikiSpace/delete/team', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
+/** exitTeamSpace POST /api/wikiSpace/exit */
+export async function exitTeamSpaceUsingPost(
+  body: API.WikiSpaceConfirmRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean_>('/api/wikiSpace/exit', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
 /** listManageTeamSpaces GET /api/wikiSpace/list/manage/team */
 export async function listManageTeamSpacesUsingGet(options?: { [key: string]: any }) {
   return request<API.BaseResponseListWikiSpaceVis_>('/api/wikiSpace/list/manage/team', {
+    method: 'GET',
+    ...(options || {}),
+  })
+}
+
+/** listVisibleSpace GET /api/wikiSpace/list/visible */
+export async function listVisibleSpaceUsingGet(options?: { [key: string]: any }) {
+  return request<API.BaseResponseListWikiSpaceVis_>('/api/wikiSpace/list/visible', {
     method: 'GET',
     ...(options || {}),
   })
@@ -65,6 +95,7 @@ export async function removeTeamMemberUsingPost(
 
 /** listTeamMembers GET /api/wikiSpace/member/list */
 export async function listTeamMembersUsingGet(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.listTeamMembersUsingGETParams,
   options?: { [key: string]: any }
 ) {
@@ -77,27 +108,12 @@ export async function listTeamMembersUsingGet(
   })
 }
 
-/** exitTeamSpace POST /api/wikiSpace/exit */
-export async function exitTeamSpaceUsingPost(
+/** permanentDeleteTeamSpace POST /api/wikiSpace/permanentDelete/team */
+export async function permanentDeleteTeamSpaceUsingPost(
   body: API.WikiSpaceConfirmRequest,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseBoolean_>('/api/wikiSpace/exit', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    data: body,
-    ...(options || {}),
-  })
-}
-
-/** deleteTeamSpace POST /api/wikiSpace/delete/team */
-export async function deleteTeamSpaceUsingPost(
-  body: API.WikiSpaceConfirmRequest,
-  options?: { [key: string]: any }
-) {
-  return request<API.BaseResponseBoolean_>('/api/wikiSpace/delete/team', {
+  return request<API.BaseResponseBoolean_>('/api/wikiSpace/permanentDelete/team', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -113,21 +129,6 @@ export async function restoreTeamSpaceUsingPost(
   options?: { [key: string]: any }
 ) {
   return request<API.BaseResponseBoolean_>('/api/wikiSpace/restore/team', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    data: body,
-    ...(options || {}),
-  })
-}
-
-/** permanentDeleteTeamSpace POST /api/wikiSpace/permanentDelete/team */
-export async function permanentDeleteTeamSpaceUsingPost(
-  body: API.WikiSpaceConfirmRequest,
-  options?: { [key: string]: any }
-) {
-  return request<API.BaseResponseBoolean_>('/api/wikiSpace/permanentDelete/team', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

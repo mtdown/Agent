@@ -5,21 +5,15 @@ declare namespace API {
     message?: string
   }
 
-  type BaseResponseDocumentWikiVis_ = {
-    code?: number
-    data?: DocumentWikiVis
-    message?: string
-  }
-
-  type BaseResponseListDocumentWikiVis_ = {
-    code?: number
-    data?: DocumentWikiVis[]
-    message?: string
-  }
-
   type BaseResponseCreateOutPaintingTaskResponse_ = {
     code?: number
     data?: CreateOutPaintingTaskResponse
+    message?: string
+  }
+
+  type BaseResponseDocumentWikiVis_ = {
+    code?: number
+    data?: DocumentWikiVis
     message?: string
   }
 
@@ -32,6 +26,12 @@ declare namespace API {
   type BaseResponseInt_ = {
     code?: number
     data?: number
+    message?: string
+  }
+
+  type BaseResponseListDocumentWikiVis_ = {
+    code?: number
+    data?: DocumentWikiVis[]
     message?: string
   }
 
@@ -79,7 +79,13 @@ declare namespace API {
 
   type BaseResponseLong_ = {
     code?: number
-    data?: number
+    data?: string | number
+    message?: string
+  }
+
+  type BaseResponsePageDocumentWikiVis_ = {
+    code?: number
+    data?: PageDocumentWikiVis_
     message?: string
   }
 
@@ -92,12 +98,6 @@ declare namespace API {
   type BaseResponsePagePictureVis_ = {
     code?: number
     data?: PagePictureVis_
-    message?: string
-  }
-
-  type BaseResponsePageDocumentWikiVis_ = {
-    code?: number
-    data?: PageDocumentWikiVis_
     message?: string
   }
 
@@ -182,7 +182,7 @@ declare namespace API {
 
   type CreatePictureOutPaintingTaskRequest = {
     parameters?: Parameters
-    pictureId?: number
+    pictureId?: string | number
   }
 
   type DeleteRequest = {
@@ -191,21 +191,35 @@ declare namespace API {
 
   type DocumentWikiAddRequest = {
     content?: string
+    contentFormat?: string
+    contentHash?: string
+    contentVersion?: number
     folderId?: string | number
+    metadataJson?: string
+    sourceType?: string
+    sourceUrl?: string
     spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
+    visibility?: string
   }
 
   type DocumentWikiEditRequest = {
     content?: string
+    contentFormat?: string
+    contentHash?: string
+    contentVersion?: number
     folderId?: string | number
-    id?: string
+    id?: string | number
+    metadataJson?: string
+    sourceType?: string
+    sourceUrl?: string
     spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
+    visibility?: string
   }
 
   type DocumentWikiMoveRequest = {
@@ -215,9 +229,9 @@ declare namespace API {
   }
 
   type DocumentWikiQueryRequest = {
-    folderId?: string | number
     current?: number
-    id?: string
+    folderId?: string | number
+    id?: string | number
     matchMode?: string
     pageSize?: number
     searchText?: string
@@ -227,25 +241,32 @@ declare namespace API {
     summary?: string
     tags?: string[]
     title?: string
-    userId?: number
+    userId?: string | number
+    visibleSpaceIds?: number[]
   }
 
   type DocumentWikiVis = {
     content?: string
+    contentFormat?: string
     createTime?: string
     deleteBy?: string | number
     deleteTime?: string
     editTime?: string
     folderId?: string | number
-    id?: string
+    id?: string | number
     spaceId?: string | number
     summary?: string
     tags?: string[]
     title?: string
     updateTime?: string
     user?: UserVis
-    userId?: number
-    viewCount?: number
+    userId?: string | number
+    viewCount?: string | number
+  }
+
+  type getDocumentWikiVisByIdUsingGETParams = {
+    /** id */
+    id?: string | number
   }
 
   type GetOutPaintingTaskResponse = {
@@ -255,28 +276,7 @@ declare namespace API {
 
   type getPictureByIdUsingGETParams = {
     /** id */
-    id?: number
-  }
-
-  type getDocumentWikiVisByIdUsingGETParams = {
-    /** id */
-    id?: string
-  }
-
-  type listFolderTreeUsingGETParams = {
-    spaceId?: string | number
-  }
-
-  type listRecycleUsingGETParams = {
-    spaceId?: string | number
-  }
-
-  type listRootDocumentWikiUsingGETParams = {
-    spaceId?: string | number
-  }
-
-  type listTeamMembersUsingGETParams = {
-    spaceId?: string | number
+    id?: string | number
   }
 
   type getPictureOutPaintingTaskUsingGETParams = {
@@ -286,32 +286,52 @@ declare namespace API {
 
   type getPictureVisByIdUsingGETParams = {
     /** id */
-    id?: number
+    id?: string | number
   }
 
   type getSpaceByIdUsingGETParams = {
     /** id */
-    id?: number
+    id?: string | number
   }
 
   type getSpaceVisByIdUsingGETParams = {
     /** id */
-    id?: number
+    id?: string | number
   }
 
   type getUserByIdUsingGETParams = {
     /** id */
-    id?: number
+    id?: string | number
   }
 
   type getUserVisByIdUsingGETParams = {
     /** id */
-    id?: number
+    id?: string | number
+  }
+
+  type listFolderTreeUsingGETParams = {
+    /** spaceId */
+    spaceId?: string | number
+  }
+
+  type listRootDocumentWikiUsingGETParams = {
+    /** spaceId */
+    spaceId?: string | number
+  }
+
+  type listTeamMembersUsingGETParams = {
+    /** spaceId */
+    spaceId?: string | number
+  }
+
+  type listUsingGETParams = {
+    /** spaceId */
+    spaceId?: string | number
   }
 
   type LoginUserVis = {
     createTime?: string
-    id?: number
+    id?: string | number
     updateTime?: string
     userAccount?: string
     userAvatar?: string
@@ -337,52 +357,52 @@ declare namespace API {
     taskStatus?: string
   }
 
-  type PagePicture_ = {
-    current?: number
-    pages?: number
-    records?: Picture[]
-    size?: number
-    total?: number
+  type PageDocumentWikiVis_ = {
+    current?: string | number
+    pages?: string | number
+    records?: DocumentWikiVis[]
+    size?: string | number
+    total?: string | number
   }
 
-  type PageDocumentWikiVis_ = {
-    current?: number
-    pages?: number
-    records?: DocumentWikiVis[]
-    size?: number
-    total?: number
+  type PagePicture_ = {
+    current?: string | number
+    pages?: string | number
+    records?: Picture[]
+    size?: string | number
+    total?: string | number
   }
 
   type PagePictureVis_ = {
-    current?: number
-    pages?: number
+    current?: string | number
+    pages?: string | number
     records?: PictureVis[]
-    size?: number
-    total?: number
+    size?: string | number
+    total?: string | number
   }
 
   type PageSpace_ = {
-    current?: number
-    pages?: number
+    current?: string | number
+    pages?: string | number
     records?: Space[]
-    size?: number
-    total?: number
+    size?: string | number
+    total?: string | number
   }
 
   type PageSpaceVis_ = {
-    current?: number
-    pages?: number
+    current?: string | number
+    pages?: string | number
     records?: SpaceVis[]
-    size?: number
-    total?: number
+    size?: string | number
+    total?: string | number
   }
 
   type PageUserVis_ = {
-    current?: number
-    pages?: number
+    current?: string | number
+    pages?: string | number
     records?: UserVis[]
-    size?: number
-    total?: number
+    size?: string | number
+    total?: string | number
   }
 
   type Parameters = {
@@ -403,39 +423,40 @@ declare namespace API {
     category?: string
     createTime?: string
     editTime?: string
-    id?: number
+    id?: string | number
     introduction?: string
     isDelete?: number
     name?: string
     picFormat?: string
     picHeight?: number
     picScale?: number
-    picSize?: number
+    picSize?: string | number
     picWidth?: number
     reviewMessage?: string
     reviewStatus?: number
     reviewTime?: string
-    reviewerId?: number
-    spaceId?: number
+    reviewerId?: string | number
+    spaceId?: string | number
     tags?: string
     thumbnailUrl?: string
     updateTime?: string
     url?: string
-    userId?: number
+    userId?: string | number
   }
 
   type PictureEditRequest = {
     category?: string
-    id?: number
+    id?: string | number
     introduction?: string
     name?: string
+    spaceId?: string | number
     tags?: string[]
   }
 
   type PictureQueryRequest = {
     category?: string
     current?: number
-    id?: number
+    id?: string | number
     introduction?: string
     name?: string
     nullSpaceId?: boolean
@@ -443,24 +464,25 @@ declare namespace API {
     picFormat?: string
     picHeight?: number
     picScale?: number
-    picSize?: number
+    picSize?: string | number
     picWidth?: number
     reviewMessage?: string
     reviewStatus?: number
-    reviewerId?: number
+    reviewerId?: string | number
     reviewerTime?: string
     searchText?: string
     sortField?: string
     sortOrder?: string
-    spaceId?: number
+    spaceId?: string | number
     tags?: string[]
-    userId?: number
+    userId?: string | number
   }
 
   type PictureReviewRequest = {
-    id?: number
+    id?: string | number
     reviewMessage?: string
     reviewStatus?: number
+    spaceId?: string | number
   }
 
   type PictureTagCategory = {
@@ -470,9 +492,10 @@ declare namespace API {
 
   type PictureUpdateRequest = {
     category?: string
-    id?: number
+    id?: string | number
     introduction?: string
     name?: string
+    spaceId?: string | number
     tags?: string[]
   }
 
@@ -484,47 +507,47 @@ declare namespace API {
 
   type PictureUploadRequest = {
     fileUrl?: string
-    id?: number
+    id?: string | number
     picName?: string
-    spaceId?: number
+    spaceId?: string | number
   }
 
   type PictureVis = {
     category?: string
     createTime?: string
     editTime?: string
-    id?: number
+    id?: string | number
     introduction?: string
     name?: string
     permissionList?: string[]
     picFormat?: string
     picHeight?: number
     picScale?: number
-    picSize?: number
+    picSize?: string | number
     picWidth?: number
-    spaceId?: number
+    spaceId?: string | number
     tags?: string[]
     thumbnailUrl?: string
     updateTime?: string
     url?: string
     user?: UserVis
-    userId?: number
+    userId?: string | number
   }
 
   type Space = {
     createTime?: string
     editTime?: string
-    id?: number
+    id?: string | number
     isDelete?: number
-    maxCount?: number
-    maxSize?: number
+    maxCount?: string | number
+    maxSize?: string | number
     spaceLevel?: number
     spaceName?: string
     spaceType?: number
-    totalCount?: number
-    totalSize?: number
+    totalCount?: string | number
+    totalSize?: string | number
     updateTime?: string
-    userId?: number
+    userId?: string | number
   }
 
   type SpaceAddRequest = {
@@ -534,90 +557,90 @@ declare namespace API {
   }
 
   type SpaceEditRequest = {
-    id?: number
+    id?: string | number
     spaceName?: string
   }
 
   type SpaceLevel = {
-    maxCount?: number
-    maxSize?: number
+    maxCount?: string | number
+    maxSize?: string | number
     text?: string
     value?: number
   }
 
   type SpaceQueryRequest = {
     current?: number
-    id?: number
+    id?: string | number
     pageSize?: number
     sortField?: string
     sortOrder?: string
     spaceLevel?: number
     spaceName?: string
     spaceType?: number
-    userId?: number
+    userId?: string | number
   }
 
   type SpaceUpdateRequest = {
-    id?: number
-    maxCount?: number
-    maxSize?: number
+    id?: string | number
+    maxCount?: string | number
+    maxSize?: string | number
     spaceLevel?: number
     spaceName?: string
   }
 
   type SpaceUser = {
     createTime?: string
-    id?: number
-    spaceId?: number
+    id?: string | number
+    spaceId?: string | number
     spaceRole?: string
     updateTime?: string
-    userId?: number
+    userId?: string | number
   }
 
   type SpaceUserAddRequest = {
-    spaceId?: number
+    spaceId?: string | number
     spaceRole?: string
-    userId?: number
+    userId?: string | number
   }
 
   type SpaceUserEditRequest = {
-    id?: number
+    id?: string | number
     spaceRole?: string
   }
 
   type SpaceUserQueryRequest = {
-    id?: number
-    spaceId?: number
+    id?: string | number
+    spaceId?: string | number
     spaceRole?: string
-    userId?: number
+    userId?: string | number
   }
 
   type SpaceUserVis = {
     createTime?: string
-    id?: number
+    id?: string | number
     space?: SpaceVis
-    spaceId?: number
+    spaceId?: string | number
     spaceRole?: string
     updateTime?: string
     user?: UserVis
-    userId?: number
+    userId?: string | number
   }
 
   type SpaceVis = {
     createTime?: string
     editTime?: string
-    id?: number
-    maxCount?: number
-    maxSize?: number
+    id?: string | number
+    maxCount?: string | number
+    maxSize?: string | number
     permissionList?: string[]
     spaceLevel?: number
     spaceName?: string
     spaceType?: number
-    totalCount?: number
-    totalSize?: number
+    totalCount?: string | number
+    totalSize?: string | number
     updateTime?: string
     user?: UserVis
-    userId?: number
+    userId?: string | number
   }
 
   type TaskMetrics = {
@@ -633,15 +656,22 @@ declare namespace API {
 
   type uploadPictureUsingPOSTParams = {
     fileUrl?: string
-    id?: number
+    id?: string | number
     picName?: string
-    spaceId?: number
+    spaceId?: string | number
+  }
+
+  type uploadWikiImageUsingPOSTParams = {
+    /** documentId */
+    documentId?: string | number
+    /** spaceId */
+    spaceId: string | number
   }
 
   type User = {
     createTime?: string
     editTime?: string
-    id?: number
+    id?: string | number
     isDelete?: number
     updateTime?: string
     userAccount?: string
@@ -667,7 +697,7 @@ declare namespace API {
 
   type UserQueryRequest = {
     current?: number
-    id?: number
+    id?: string | number
     pageSize?: number
     sortField?: string
     sortOrder?: string
@@ -684,7 +714,7 @@ declare namespace API {
   }
 
   type UserUpdateRequest = {
-    id?: number
+    id?: string | number
     userAvatar?: string
     userName?: string
     userProfile?: string
@@ -693,7 +723,7 @@ declare namespace API {
 
   type UserVis = {
     createTime?: string
-    id?: number
+    id?: string | number
     userAccount?: string
     userAvatar?: string
     userName?: string

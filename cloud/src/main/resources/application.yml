@@ -76,7 +76,7 @@ cos:
 
 # 阿里云 AI 配置
 aliYunAi:
-  apiKey: ${ALIYUN_AI_API_KEY}   # 从环境变量读取
+  apiKey: ${ALIYUN_AI_API_KEY:}   # 阿里云 AI 功能已废弃；未配置时不阻塞启动和测试
 
 #server:
 #  port: 8123

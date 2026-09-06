@@ -88,4 +88,40 @@ class WikiSpaceServiceImplTest {
 
         assertFalse(wikiSpaceService.checkSpaceVisible(deletedSpace, user(100L, UserConstant.DEFAULT_ROLE)));
     }
+
+    @Test
+    void personalSpaceEditableOnlyByOwner() {
+        WikiSpace personalSpace = space(WikiSpaceService.TYPE_PERSONAL, 100L);
+
+        assertTrue(wikiSpaceService.checkSpaceEditable(personalSpace, user(100L, UserConstant.DEFAULT_ROLE)));
+        assertFalse(wikiSpaceService.checkSpaceEditable(personalSpace, user(200L, UserConstant.DEFAULT_ROLE)));
+    }
+
+    @Test
+    void teamSpaceEditableOnlyByAdminOrEditorMember() {
+        WikiSpace teamSpace = space(WikiSpaceService.TYPE_TEAM, null);
+        User member = user(100L, UserConstant.DEFAULT_ROLE);
+
+        when(wikiSpaceUserMapper.selectCount(any())).thenReturn(1L);
+        assertTrue(wikiSpaceService.checkSpaceEditable(teamSpace, member));
+
+        when(wikiSpaceUserMapper.selectCount(any())).thenReturn(0L);
+        assertFalse(wikiSpaceService.checkSpaceEditable(teamSpace, member));
+    }
+
+    @Test
+    void publicSpaceIsNotEditableByOrdinaryUser() {
+        WikiSpace publicSpace = space(WikiSpaceService.TYPE_PUBLIC, null);
+
+        assertFalse(wikiSpaceService.checkSpaceEditable(publicSpace, user(100L, UserConstant.DEFAULT_ROLE)));
+    }
+
+    @Test
+    void platformAdminCanEditAnySpace() {
+        User admin = user(1L, UserConstant.ADMIN_ROLE);
+
+        assertTrue(wikiSpaceService.checkSpaceEditable(space(WikiSpaceService.TYPE_PUBLIC, null), admin));
+        assertTrue(wikiSpaceService.checkSpaceEditable(space(WikiSpaceService.TYPE_PERSONAL, 100L), admin));
+        assertTrue(wikiSpaceService.checkSpaceEditable(space(WikiSpaceService.TYPE_TEAM, null), admin));
+    }
 }

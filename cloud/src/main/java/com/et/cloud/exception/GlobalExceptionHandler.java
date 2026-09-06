@@ -2,10 +2,16 @@ package com.et.cloud.exception;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import com.et.cloud.commen.BaseResponse;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.et.cloud.commen.ResultUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+
 /**
  * @author leikooo
  */
@@ -32,6 +38,18 @@ public class GlobalExceptionHandler {
         return ResultUtils.error(e.getCode(), e.getMessage());
     }
 
+    @ExceptionHandler({
+            MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class,
+            MethodArgumentTypeMismatchException.class,
+            HttpRequestMethodNotSupportedException.class,
+            MultipartException.class
+    })
+    public BaseResponse<?> requestBindingExceptionHandler(Exception e) {
+        log.warn("RequestBindingException: {}", e.getMessage());
+        return ResultUtils.error(ErrorCode.PARAMS_ERROR, e.getMessage());
+    }
+
     @ExceptionHandler(NullPointerException.class)
     public BaseResponse<?> nullPointerExceptionHandler(NullPointerException e) {
         log.error("BusinessException", e);
@@ -51,4 +69,3 @@ public class GlobalExceptionHandler {
     }
 
 }
-

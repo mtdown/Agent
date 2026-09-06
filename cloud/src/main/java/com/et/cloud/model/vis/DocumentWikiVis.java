@@ -29,6 +29,11 @@ public class DocumentWikiVis implements Serializable {
     private String content;
 
     /**
+     * Content format: plain / markdown. Copied from entity; plain for old rows.
+     */
+    private String contentFormat;
+
+    /**
      * Short summary.
      */
     private String summary;

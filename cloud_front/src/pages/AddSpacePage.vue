@@ -81,7 +81,7 @@ const handleSubmit = async (values: any) => {
   }
   if (res.data.code === 0 && res.data.data) {
     message.success('操作成功')
-    let path = `/space/${spaceId ?? res.data.data}`
+    let path = `/gallery/space/${spaceId ?? res.data.data}`
     router.push({
       path,
     })

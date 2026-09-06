@@ -132,7 +132,7 @@ const router = useRouter()
 
 const doEdit = () => {
   router.push({
-    path: '/add_picture',
+    path: '/gallery/add_picture',
     query: {
       id: picture.value.id,
       spaceId: picture.value.spaceId,
@@ -163,7 +163,7 @@ const shareModalRef = ref()
 const shareLink = ref<string>()
 // 分享
 const doShare = () => {
-  shareLink.value = `${window.location.protocol}//${window.location.host}/picture/${picture.value.id}`
+  shareLink.value = `${window.location.protocol}//${window.location.host}/gallery/picture/${picture.value.id}`
   if (shareModalRef.value) {
     shareModalRef.value.openModal()
   }

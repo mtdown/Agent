@@ -7,7 +7,7 @@
           <div class="title-bar">
             <!--alt的作用是当别人看到你图片未加载时还有一个文字-->
             <img class="logo" src="../assets/logo.jpg" alt="logo" />
-            <div class="title">憨带图库</div>
+            <div class="title">憨带 Wiki</div>
           </div>
         </router-link>
       </a-col>
@@ -34,9 +34,9 @@
               <template #overlay>
                 <a-menu>
                   <a-menu-item>
-                    <router-link to="/my_space">
+                    <router-link to="/gallery/my_space">
                       <UserOutlined />
-                      我的空间
+                      我的图片空间
                     </router-link>
                   </a-menu-item>
                   <a-menu-item @click="doLogout">
@@ -57,66 +57,39 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, h, ref } from 'vue'
-import { HomeOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { computed, h } from 'vue'
+import { BookOutlined, FolderOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { type MenuProps, message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import router from '@/router'
 import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
 import { userLogoutUsingPost } from '@/api/userController.ts'
-import AddPictureBatchPage from '@/components/AddPictureBatchPage.vue'
 const loginUserStore = useLoginUserStore()
 
-const originItems = [
+const originItems: MenuProps['items'] = [
+  { key: '/documentWiki', icon: () => h(BookOutlined), label: 'Wiki 文档' },
+  { key: '/add_documentWiki', label: '创建文档' },
   {
-    key: '/',
-    icon: () => h(HomeOutlined),
-    label: '主页',
-    title: '主页',
+    key: 'files',
+    icon: () => h(FolderOutlined),
+    label: '文件与图库',
+    children: [
+      { key: '/gallery', label: '公共图库' },
+      { key: '/gallery/add_picture', label: '创建图片' },
+      { key: '/gallery/add_picture/batch', label: '批量创建图片' },
+      { key: '/gallery/my_space', label: '我的图片空间' },
+    ],
   },
-  {
-    key: '/admin/userManage',
-    label: '用户管理',
-    title: '用户管理',
-  },
-  {
-    key: '/admin/pictureManage',
-    label: '图片管理',
-    title: '图片管理',
-  },
-  {
-    key: '/admin/spaceManage',
-    label: '空间管理',
-    title: '空间管理',
-  },
-  {
-    key: '/documentWiki',
-    label: 'Wiki 文档',
-    title: 'Wiki 文档',
-  },
-
-  {
-    key: '/add_picture',
-    label: '创建图片',
-    title: '创建图片',
-  },
-  {
-    key: '/add_picture/batch',
-    label: '批量创建图片',
-    title: '批量创建图片',
-  },
-  {
-    key: '个人博客',
-    label: h('a', { href: 'https://mtdown.top', target: '_blank' }, '个人博客'),
-    title: '个人博客',
-  },
+  { key: '/admin/userManage', label: '用户管理' },
+  { key: '/admin/pictureManage', label: '图片管理' },
+  { key: '/admin/spaceManage', label: '空间管理' },
 ]
 
 // 根据权限过滤菜单项
 const filterMenus = (menus = [] as MenuProps['items']) => {
   return menus?.filter((menu) => {
     // 管理员才能看到 /admin 开头的菜单
-    if (menu?.key?.startsWith('/admin')) {
+    if (String(menu?.key ?? '').startsWith('/admin')) {
       const loginUser = loginUserStore.loginUser
       if (!loginUser || loginUser.userRole !== 'admin') {
         return false
@@ -129,17 +102,13 @@ const filterMenus = (menus = [] as MenuProps['items']) => {
 // 展示在菜单的路由数组
 const items = computed(() => filterMenus(originItems))
 
-const route = useRouter()
-const doMenuClick = ({ key }) => {
-  router.push({
-    path: key,
-  })
-}
-
-const current = ref<string[]>([''])
-router.afterEach((to) => {
-  current.value = [to.path]
-})
+const route = useRoute()
+const doMenuClick: MenuProps['onClick'] = ({ key }) => router.push(String(key))
+const current = computed(() => [
+  route.path.startsWith('/documentWiki') || route.path.startsWith('/edit_documentWiki')
+    ? '/documentWiki'
+    : route.path,
+])
 
 // 用户注销
 const doLogout = async () => {

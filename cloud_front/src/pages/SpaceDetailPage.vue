@@ -7,7 +7,7 @@
         <a-button
           v-if="canUploadPicture"
           type="primary"
-          :href="`/add_picture?spaceId=${id}`"
+          :href="`/gallery/add_picture?spaceId=${id}`"
           target="_blank"
         >
           + 创建图片
@@ -18,7 +18,7 @@
           type="primary"
           ghost
           :icon="h(TeamOutlined)"
-          :href="`/spaceUserManage/${id}`"
+          :href="`/gallery/spaceUserManage/${id}`"
           target="_blank"
         >
           成员管理

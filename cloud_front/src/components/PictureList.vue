@@ -64,7 +64,7 @@ const props = withDefaults(defineProps<Props>(), {
 const router = useRouter()
 const doClickPicture = (picture: API.PictureVis) => {
   router.push({
-    path: `/picture/${picture.id}`,
+    path: `/gallery/picture/${picture.id}`,
   })
 }
 // 编辑
@@ -73,7 +73,7 @@ const doEdit = (picture, e) => {
   e.stopPropagation()
   // 跳转时一定要携带 spaceId
   router.push({
-    path: '/add_picture',
+    path: '/gallery/add_picture',
     query: {
       id: picture.id,
       spaceId: picture.spaceId,

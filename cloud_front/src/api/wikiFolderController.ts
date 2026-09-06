@@ -17,12 +17,12 @@ export async function addFolderUsingPost(
   })
 }
 
-/** renameFolder POST /api/wikiFolder/rename */
-export async function renameFolderUsingPost(
-  body: API.WikiFolderRenameRequest,
+/** deleteFolder POST /api/wikiFolder/delete */
+export async function deleteFolderUsingPost(
+  body: API.DeleteRequest,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseBoolean_>('/api/wikiFolder/rename', {
+  return request<API.BaseResponseBoolean_>('/api/wikiFolder/delete', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -47,12 +47,12 @@ export async function moveFolderUsingPost(
   })
 }
 
-/** deleteFolder POST /api/wikiFolder/delete */
-export async function deleteFolderUsingPost(
-  body: API.DeleteRequest,
+/** renameFolder POST /api/wikiFolder/rename */
+export async function renameFolderUsingPost(
+  body: API.WikiFolderRenameRequest,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseBoolean_>('/api/wikiFolder/delete', {
+  return request<API.BaseResponseBoolean_>('/api/wikiFolder/rename', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -64,6 +64,7 @@ export async function deleteFolderUsingPost(
 
 /** listFolderTree GET /api/wikiFolder/tree/list */
 export async function listFolderTreeUsingGet(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.listFolderTreeUsingGETParams,
   options?: { [key: string]: any }
 ) {
