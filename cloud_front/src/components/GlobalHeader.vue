@@ -1,64 +1,62 @@
 <template>
   <div id="globalHeader">
-    <!--    自动换行取消-->
-    <a-row :wrap="false">
-      <a-col flex="200px">
-        <router-link to="/">
-          <div class="title-bar">
-            <!--alt的作用是当别人看到你图片未加载时还有一个文字-->
-            <img class="logo" src="../assets/logo.jpg" alt="logo" />
-            <div class="title">憨带 Wiki</div>
-          </div>
-        </router-link>
-      </a-col>
+    <router-link to="/" class="title-bar">
+      <img class="logo" src="../assets/logo.jpg" alt="logo" />
+      <div class="title">憨带 Wiki</div>
+    </router-link>
 
-      <a-col flex="auto">
-        <a-menu
-          v-model:selectedKeys="current"
-          mode="horizontal"
-          @click="doMenuClick"
-          :items="items"
-        />
-      </a-col>
-      <!-- @click="onMenuClick"这行是点击函数的意思，这个内容可以在文档查询到-->
+    <a-menu
+      v-model:selectedKeys="current"
+      mode="horizontal"
+      class="top-menu"
+      @click="doMenuClick"
+      :items="items"
+    />
 
-      <!--      这一行表示登录菜单-->
-      <a-col flex="120px">
-        <div class="user-login-status">
-          <div v-if="loginUserStore.loginUser.id">
-            <a-dropdown>
-              <a-space
-                ><a-avatar :src="loginUserStore.loginUser.userAvatar" />
-                {{ loginUserStore.loginUser.userName ?? '无名' }}</a-space
-              >
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item>
-                    <router-link to="/gallery/my_space">
-                      <UserOutlined />
-                      我的图片空间
-                    </router-link>
-                  </a-menu-item>
-                  <a-menu-item @click="doLogout">
-                    <LogoutOutlined />
-                    退出登录
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-          </div>
-          <div v-else>
-            <a-button type="primary" href="/user/login">登录</a-button>
-          </div>
+    <div class="user-login-status">
+      <div v-if="loginUserStore.loginUser.id">
+        <a-dropdown>
+          <a-space class="user-entry"
+            ><a-avatar :src="loginUserStore.loginUser.userAvatar" />
+            {{ loginUserStore.loginUser.userName ?? '无名' }}</a-space
+          >
+            <template #overlay>
+              <a-menu>
+                <a-menu-item>
+                  <router-link to="/gallery/my_space">
+                    <UserOutlined />
+                    我的图片空间
+                  </router-link>
+                </a-menu-item>
+                <a-menu-item @click="doLogout">
+                  <LogoutOutlined />
+                  退出登录
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
         </div>
-      </a-col>
-    </a-row>
+      <div v-else>
+        <a-button type="primary" href="/user/login">登录</a-button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, h } from 'vue'
-import { BookOutlined, FolderOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { computed, h, type VNode } from 'vue'
+import {
+  BookOutlined,
+  DeleteOutlined,
+  FileAddOutlined,
+  FileSearchOutlined,
+  FolderOpenOutlined,
+  FolderOutlined,
+  LogoutOutlined,
+  PictureOutlined,
+  SettingOutlined,
+  UserOutlined,
+} from '@ant-design/icons-vue'
 import { type MenuProps, message } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import router from '@/router'
@@ -66,30 +64,52 @@ import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
 import { userLogoutUsingPost } from '@/api/userController.ts'
 const loginUserStore = useLoginUserStore()
 
-const originItems: MenuProps['items'] = [
-  { key: '/documentWiki', icon: () => h(BookOutlined), label: 'Wiki 文档' },
-  { key: '/add_documentWiki', label: '创建文档' },
+type RawNavItem = {
+  key: string
+  label: string
+  icon?: () => VNode
+  adminOnly?: boolean
+}
+
+const originItems: RawNavItem[] = [
+  { key: '/documentWiki', icon: () => h(BookOutlined), label: 'WIKI文档' },
+  { key: '/add_documentWiki', icon: () => h(FileAddOutlined), label: '文档创建' },
   {
-    key: 'files',
-    icon: () => h(FolderOutlined),
-    label: '文件与图库',
-    children: [
-      { key: '/gallery', label: '公共图库' },
-      { key: '/gallery/add_picture', label: '创建图片' },
-      { key: '/gallery/add_picture/batch', label: '批量创建图片' },
-      { key: '/gallery/my_space', label: '我的图片空间' },
-    ],
+    key: '/documentWiki?region=manage',
+    icon: () => h(FolderOpenOutlined),
+    label: '文档空间管理',
+    adminOnly: true,
   },
-  { key: '/admin/userManage', label: '用户管理' },
-  { key: '/admin/pictureManage', label: '图片管理' },
-  { key: '/admin/spaceManage', label: '空间管理' },
+  {
+    key: '/documentWiki?region=recycle',
+    icon: () => h(DeleteOutlined),
+    label: '回收站',
+  },
+  { key: '/gallery', icon: () => h(PictureOutlined), label: '图库功能' },
+  {
+    key: '/admin/pictureManage',
+    icon: () => h(SettingOutlined),
+    label: '图片管理',
+    adminOnly: true,
+  },
+  {
+    key: '/documentWiki?region=docs&manage=1',
+    icon: () => h(FileSearchOutlined),
+    label: '文档管理',
+    adminOnly: true,
+  },
+  {
+    key: '/admin/spaceManage',
+    icon: () => h(FolderOutlined),
+    label: '图片空间管理',
+    adminOnly: true,
+  },
+  { key: '/admin/userManage', icon: () => h(UserOutlined), label: '用户管理', adminOnly: true },
 ]
 
-// 根据权限过滤菜单项
-const filterMenus = (menus = [] as MenuProps['items']) => {
+const filterMenus = (menus: RawNavItem[]) => {
   return menus?.filter((menu) => {
-    // 管理员才能看到 /admin 开头的菜单
-    if (String(menu?.key ?? '').startsWith('/admin')) {
+    if (menu.adminOnly) {
       const loginUser = loginUserStore.loginUser
       if (!loginUser || loginUser.userRole !== 'admin') {
         return false
@@ -99,18 +119,31 @@ const filterMenus = (menus = [] as MenuProps['items']) => {
   })
 }
 
-// 展示在菜单的路由数组
-const items = computed(() => filterMenus(originItems))
+const items = computed<MenuProps['items']>(() =>
+  filterMenus(originItems).map(({ adminOnly: _adminOnly, ...menu }) => menu),
+)
 
 const route = useRoute()
 const doMenuClick: MenuProps['onClick'] = ({ key }) => router.push(String(key))
-const current = computed(() => [
-  route.path.startsWith('/documentWiki') || route.path.startsWith('/edit_documentWiki')
-    ? '/documentWiki'
-    : route.path,
-])
+const current = computed(() => {
+  if (route.path === '/documentWiki' && route.query.region === 'manage') {
+    return ['/documentWiki?region=manage']
+  }
+  if (route.path === '/documentWiki' && route.query.region === 'recycle') {
+    return ['/documentWiki?region=recycle']
+  }
+  if (route.path === '/documentWiki' && route.query.manage === '1') {
+    return ['/documentWiki?region=docs&manage=1']
+  }
+  if (route.path.startsWith('/documentWiki') || route.path.startsWith('/edit_documentWiki')) {
+    return ['/documentWiki']
+  }
+  if (route.path === '/add_documentWiki') {
+    return ['/add_documentWiki']
+  }
+  return [route.path]
+})
 
-// 用户注销
 const doLogout = async () => {
   const res = await userLogoutUsingPost()
   if (res.data.code === 0) {
@@ -126,18 +159,103 @@ const doLogout = async () => {
 </script>
 
 <style scoped>
+#globalHeader {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 22px;
+  background: #111111;
+  border-bottom: 3px solid #e07a2d;
+}
+
 .title-bar {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+  gap: 10px;
+  min-width: 150px;
+  text-decoration: none;
 }
 
 .title {
-  color: blue;
-  font-size: 28px;
-  margin-left: 16px;
+  color: #fffaf1;
+  font-size: 18px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .logo {
-  height: 48px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.top-menu {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: transparent;
+  border-bottom: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #e07a2d transparent;
+}
+
+.top-menu::-webkit-scrollbar {
+  height: 8px;
+}
+
+.top-menu::-webkit-scrollbar-thumb {
+  background: #e07a2d;
+  border-radius: 999px;
+}
+
+:deep(.top-menu.ant-menu-horizontal) {
+  line-height: 55px;
+}
+
+:deep(.top-menu.ant-menu-horizontal > .ant-menu-item),
+:deep(.top-menu.ant-menu-horizontal > .ant-menu-submenu) {
+  color: #e8ded1;
+}
+
+:deep(.top-menu.ant-menu-horizontal > .ant-menu-item:hover),
+:deep(.top-menu.ant-menu-horizontal > .ant-menu-item-selected) {
+  color: #ffffff;
+  background: #2b2520;
+}
+
+:deep(.top-menu.ant-menu-horizontal > .ant-menu-item-selected::after),
+:deep(.top-menu.ant-menu-horizontal > .ant-menu-item:hover::after) {
+  border-bottom-color: #e07a2d;
+}
+
+.user-login-status {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.user-entry {
+  color: #e8ded1;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  #globalHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .top-menu {
+    width: 100%;
+  }
+
+  .user-login-status {
+    display: none;
+  }
 }
 </style>

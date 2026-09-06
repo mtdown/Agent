@@ -17,7 +17,22 @@
     <a-typography-paragraph v-if="selectedDocument.summary" type="secondary">
       {{ selectedDocument.summary }}
     </a-typography-paragraph>
-    <div class="content">{{ selectedDocument.content }}</div>
+    <div class="content">
+      <template v-if="contentBlocks.length">
+        <template v-for="block in contentBlocks" :key="block.key">
+          <component
+            :is="block.tag"
+            v-if="block.type === 'heading'"
+            :id="block.id"
+            class="document-heading"
+          >
+            {{ block.text }}
+          </component>
+          <p v-else class="document-paragraph">{{ block.text }}</p>
+        </template>
+      </template>
+      <template v-else>{{ selectedDocument.content }}</template>
+    </div>
   </article>
 
   <template v-else>
@@ -107,12 +122,13 @@
   </template>
 </template>
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { PaginationProps } from 'ant-design-vue'
 import { formatTime, type IdValue } from './wikiShared'
 
 const router = useRouter()
-defineProps<{
+const props = defineProps<{
   selectedDocument: API.DocumentWikiVis
   isSearchMode: boolean
   currentSpaceName?: string
@@ -127,6 +143,38 @@ const emit = defineEmits<{
   move: [document: API.DocumentWikiVis]
   delete: [document: API.DocumentWikiVis]
 }>()
+
+const contentBlocks = computed(() => {
+  const content = props.selectedDocument.content ?? ''
+  const lines = content.split(/\r?\n/)
+  const headingIndexes = new Map<number, string>()
+  let headingIndex = 0
+  return lines
+    .map((line, index) => {
+      const heading = /^(#{1,4})\s+(.+)$/.exec(line)
+      if (heading) {
+        const id = `wiki-heading-${headingIndex}`
+        headingIndexes.set(index, id)
+        headingIndex += 1
+        const level = Math.min(heading[1].length + 1, 4)
+        return {
+          key: `${index}-${id}`,
+          type: 'heading',
+          tag: `h${level}`,
+          id,
+          text: heading[2].trim(),
+        }
+      }
+      return {
+        key: `${index}-p`,
+        type: 'paragraph',
+        tag: 'p',
+        id: undefined,
+        text: line.trim(),
+      }
+    })
+    .filter((block) => block.text)
+})
 </script>
 <style scoped>
 .location-bar {
@@ -147,8 +195,7 @@ const emit = defineEmits<{
   color: #1677ff;
 }
 .document-preview {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 16px;
+  padding-top: 4px;
 }
 .meta {
   margin-bottom: 14px;
@@ -160,5 +207,18 @@ const emit = defineEmits<{
 .content {
   line-height: 1.8;
   white-space: pre-wrap;
+}
+
+.document-heading {
+  scroll-margin-top: 18px;
+  margin: 22px 0 10px;
+  color: #251f18;
+  font-weight: 600;
+}
+
+.document-paragraph {
+  margin: 0 0 12px;
+  color: #3f3429;
+  line-height: 1.8;
 }
 </style>
