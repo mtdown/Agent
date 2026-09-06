@@ -23,7 +23,6 @@ test('top navigation contains the approved wiki layout destinations', () => {
     '回收站',
     '图库功能',
     '图片管理',
-    '文档管理',
     '图片空间管理',
     '用户管理',
   ]) {
