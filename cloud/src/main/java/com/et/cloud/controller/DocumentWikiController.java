@@ -21,6 +21,7 @@ import com.et.cloud.model.entity.WikiSpace;
 import com.et.cloud.model.vis.DocumentWikiVis;
 import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
+import com.et.cloud.service.WikiAttachmentService;
 import com.et.cloud.service.WikiCacheManager;
 import com.et.cloud.service.WikiFolderService;
 import com.et.cloud.service.WikiSpaceService;
@@ -30,6 +31,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -61,6 +63,9 @@ public class DocumentWikiController {
     private WikiFolderService wikiFolderService;
 
     @Resource
+    private WikiAttachmentService wikiAttachmentService;
+
+    @Resource
     private WikiCacheManager wikiCacheManager;
 
     @Resource
@@ -86,11 +91,26 @@ public class DocumentWikiController {
         documentWiki.setUserId(loginUser.getId());
         documentWiki.setViewCount(0L);
         documentWiki.setEditTime(new Date());
+        if (StrUtil.isBlank(documentWiki.getContentFormat())) {
+            documentWiki.setContentFormat("markdown");
+        }
         documentWikiService.validDocumentWiki(documentWiki);
         boolean result = documentWikiService.save(documentWiki);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         wikiCacheManager.clearSpace(documentWiki.getSpaceId());
         return ResultUtils.success(documentWiki.getId());
+    }
+
+    @PostMapping("/image/upload")
+    public BaseResponse<String> uploadWikiImage(@RequestParam("file") MultipartFile multipartFile,
+                                                @RequestParam("spaceId") Long spaceId,
+                                                @RequestParam(value = "documentId", required = false) Long documentId,
+                                                HttpServletRequest request) {
+        ThrowUtils.throwIf(multipartFile == null || multipartFile.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR, "空间不能为空");
+        User loginUser = userService.getLoginUser(request);
+        String url = wikiAttachmentService.uploadImage(multipartFile, spaceId, documentId, loginUser);
+        return ResultUtils.success(url);
     }
 
     @PostMapping("/delete")

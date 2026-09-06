@@ -49,6 +49,41 @@ public class DocumentWiki {
     private String tags;
 
     /**
+     * Content format: plain / markdown. Old rows keep plain.
+     */
+    private String contentFormat;
+
+    /**
+     * Source type: NATIVE / UPLOAD / IMPORT / URL.
+     */
+    private String sourceType;
+
+    /**
+     * Original source url for tracing.
+     */
+    private String sourceUrl;
+
+    /**
+     * Content fingerprint (md5 hex). RAG reserved, server-managed later.
+     */
+    private String contentHash;
+
+    /**
+     * Content version, +1 per edit. RAG reserved, server-managed later.
+     */
+    private Integer contentVersion;
+
+    /**
+     * Visibility: PRIVATE / SPACE / PUBLIC. RAG reserved, server-managed later.
+     */
+    private String visibility;
+
+    /**
+     * Extensible metadata JSON. RAG reserved.
+     */
+    private String metadataJson;
+
+    /**
      * Creator user id.
      */
     private Long userId;

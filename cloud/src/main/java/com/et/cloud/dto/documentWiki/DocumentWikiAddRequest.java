@@ -38,5 +38,40 @@ public class DocumentWikiAddRequest implements Serializable {
      */
     private Long folderId;
 
+    /**
+     * Content format: plain / markdown. Defaults to markdown server-side.
+     */
+    private String contentFormat;
+
+    /**
+     * Source type: NATIVE / UPLOAD / IMPORT / URL.
+     */
+    private String sourceType;
+
+    /**
+     * Original source url for tracing.
+     */
+    private String sourceUrl;
+
+    /**
+     * Content fingerprint. Reserved for later RAG workflows.
+     */
+    private String contentHash;
+
+    /**
+     * Content version. Reserved for later RAG workflows.
+     */
+    private Integer contentVersion;
+
+    /**
+     * Visibility marker. Reserved for later RAG workflows.
+     */
+    private String visibility;
+
+    /**
+     * Extensible metadata JSON.
+     */
+    private String metadataJson;
+
     private static final long serialVersionUID = 1L;
 }
