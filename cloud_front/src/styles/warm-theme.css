@@ -1,0 +1,250 @@
+/*
+ * Shared warm theme for the Wiki workspace and adjacent pages.
+ * Declares the warm palette as CSS variables and overrides the Ant Design
+ * Vue surfaces that would otherwise render pure white or default antd blue.
+ *
+ * Scope is intentionally limited to pages whose root element opts in via the
+ * `data-warm-page` attribute (see the small per-page wrappers added by the
+ * unify-wiki-theme-and-layout change). The black global header is excluded.
+ */
+
+:root {
+  --wiki-bg: #f5eddf;
+  --wiki-panel: #fffaf1;
+  --wiki-panel-head: #fbf3e7;
+  --wiki-border: #ded0bc;
+  --wiki-muted: #f1eadf;
+  --wiki-text: #251f18;
+  --wiki-text-muted: #7b6c5d;
+  --wiki-accent: #e07a2d;
+  --wiki-accent-soft: #fff0df;
+  --wiki-accent-hover: #fde6c8;
+  --wiki-shadow: 0 1px 0 rgba(82, 56, 28, 0.04);
+}
+
+/* When a page opts in via [data-warm-page] we tint the page surface. */
+[data-warm-page] {
+  background: var(--wiki-bg);
+  color: var(--wiki-text);
+}
+
+/* ---- Panels, lists, empties, layout shells ------------------------- */
+[data-warm-page] .ant-card,
+[data-warm-page] .ant-list,
+[data-warm-page] .ant-empty,
+[data-warm-page] .wiki-panel {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  box-shadow: var(--wiki-shadow);
+}
+
+[data-warm-page] .ant-card-head,
+[data-warm-page] .panel-head {
+  background: var(--wiki-panel-head);
+  border-bottom-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-list-item {
+  border-bottom-color: var(--wiki-border);
+}
+
+[data-warm-page] .ant-list-bordered {
+  border-color: var(--wiki-border);
+}
+
+/* ---- Tables ------------------------------------------------------- */
+[data-warm-page] .ant-table,
+[data-warm-page] .ant-table-thead > tr > th,
+[data-warm-page] .ant-table-tbody > tr > td {
+  background: var(--wiki-panel) !important;
+  border-bottom-color: var(--wiki-border) !important;
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-table-thead > tr > th {
+  background: var(--wiki-panel-head) !important;
+  font-weight: 600;
+}
+
+[data-warm-page] .ant-table-tbody > tr:hover > td,
+[data-warm-page] .ant-table-tbody > tr.ant-table-row-hover > td {
+  background: var(--wiki-accent-soft) !important;
+}
+
+[data-warm-page] .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: var(--wiki-accent-hover) !important;
+}
+
+/* ---- Pagination ---------------------------------------------------- */
+[data-warm-page] .ant-pagination .ant-pagination-item,
+[data-warm-page] .ant-pagination .ant-pagination-item a {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-pagination .ant-pagination-item:hover {
+  border-color: var(--wiki-accent);
+  color: var(--wiki-accent);
+}
+
+[data-warm-page] .ant-pagination .ant-pagination-item-active,
+[data-warm-page] .ant-pagination .ant-pagination-item-active a {
+  background: var(--wiki-accent);
+  border-color: var(--wiki-accent);
+  color: #fff;
+}
+
+/* ---- Form controls ------------------------------------------------ */
+[data-warm-page] .ant-input,
+[data-warm-page] .ant-input-affix-wrapper,
+[data-warm-page] .ant-select-selector,
+[data-warm-page] .ant-input-number,
+[data-warm-page] .ant-picker {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-input:hover,
+[data-warm-page] .ant-input-affix-wrapper:hover,
+[data-warm-page] .ant-select:hover .ant-select-selector,
+[data-warm-page] .ant-input-number:hover {
+  border-color: var(--wiki-accent);
+}
+
+[data-warm-page] .ant-input:focus,
+[data-warm-page] .ant-input-affix-wrapper-focused,
+[data-warm-page] .ant-select-focused .ant-select-selector {
+  border-color: var(--wiki-accent);
+  box-shadow: 0 0 0 2px var(--wiki-accent-hover);
+}
+
+[data-warm-page] .ant-radio-button-wrapper {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-radio-button-wrapper:hover {
+  color: var(--wiki-accent);
+}
+
+[data-warm-page] .ant-radio-button-wrapper-checked {
+  background: var(--wiki-accent);
+  border-color: var(--wiki-accent);
+  color: #fff;
+}
+
+[data-warm-page] .ant-radio-button-wrapper-checked::before {
+  background-color: var(--wiki-accent) !important;
+}
+
+/* ---- Tree --------------------------------------------------------- */
+[data-warm-page] .ant-tree {
+  background: transparent;
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-tree-node-content-wrapper {
+  background: transparent !important;
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-tree-node-content-wrapper:hover {
+  background: var(--wiki-accent-soft) !important;
+}
+
+[data-warm-page] .ant-tree-node-selected,
+[data-warm-page] .ant-tree-node-selected:hover {
+  background: var(--wiki-accent-hover) !important;
+}
+
+[data-warm-page] .ant-tree-switcher,
+[data-warm-page] .ant-tree-switcher:hover,
+[data-warm-page] .ant-tree-checkbox-checked .ant-tree-checkbox-inner {
+  color: var(--wiki-accent);
+}
+
+/* ---- Modal / Drawer ------------------------------------------------ */
+[data-warm-page] .ant-modal-content,
+[data-warm-page] .ant-drawer-content {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-modal-header,
+[data-warm-page] .ant-drawer-header {
+  background: var(--wiki-panel-head);
+  border-bottom-color: var(--wiki-border);
+}
+
+[data-warm-page] .ant-modal-footer,
+[data-warm-page] .ant-drawer-footer {
+  background: var(--wiki-panel);
+  border-top-color: var(--wiki-border);
+}
+
+/* ---- Tabs --------------------------------------------------------- */
+[data-warm-page] .ant-tabs-tab {
+  color: var(--wiki-text-muted);
+}
+
+[data-warm-page] .ant-tabs-tab:hover {
+  color: var(--wiki-accent);
+}
+
+[data-warm-page] .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--wiki-accent);
+}
+
+[data-warm-page] .ant-tabs-ink-bar {
+  background: var(--wiki-accent);
+}
+
+/* ---- Dropdown / Select popup -------------------------------------- */
+[data-warm-page] .ant-select-dropdown,
+[data-warm-page] .ant-dropdown-menu,
+[data-warm-page] .ant-picker-dropdown {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-select-item-option-selected,
+[data-warm-page] .ant-dropdown-menu-item:hover {
+  background: var(--wiki-accent-soft);
+  color: var(--wiki-accent);
+}
+
+/* ---- Buttons (secondary only; primary keeps the antd primary blue) -- */
+[data-warm-page] .ant-btn-default {
+  background: var(--wiki-panel);
+  border-color: var(--wiki-border);
+  color: var(--wiki-text);
+}
+
+[data-warm-page] .ant-btn-default:hover {
+  border-color: var(--wiki-accent);
+  color: var(--wiki-accent);
+}
+
+/* ---- Toolbar (page header actions on warm pages) ------------------ */
+[data-warm-page] .ant-page-header,
+[data-warm-page] .ant-page-header-heading-title {
+  color: var(--wiki-text);
+}
+
+/* ---- A-spin / skeleton placeholders -------------------------------- */
+[data-warm-page] .ant-spin-dot-item,
+[data-warm-page] .ant-skeleton-content .ant-skeleton-title,
+[data-warm-page] .ant-skeleton-content .ant-skeleton-paragraph > li {
+  background: var(--wiki-accent-hover) !important;
+}
+
+/* ---- Image / avatar placeholders ---------------------------------- */
+[data-warm-page] .ant-image-mask {
+  background: rgba(82, 56, 28, 0.35);
+}
