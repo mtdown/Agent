@@ -37,3 +37,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local runtime and diagnostics ###
+.workbuddy/
+tmp/
+*.inspect.ndjson
+diag.txt
+cloud/project.txt
