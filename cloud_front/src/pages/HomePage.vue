@@ -1,5 +1,5 @@
 <template>
-  <div id="homePage">
+  <div id="homePage" data-warm-page>
     <div class="search-bar">
       <div class="filter-section">
         <a-tabs v-model:activeKey="selectedCategory" @change="doSearch">
@@ -172,7 +172,7 @@ onMounted(() => {
 
 <style scoped>
 #homePage {
-  padding: 0 24px;
+  padding: 16px 24px;
 }
 
 .search-bar {

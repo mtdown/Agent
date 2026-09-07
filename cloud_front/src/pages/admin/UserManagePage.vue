@@ -1,5 +1,5 @@
 <template>
-  <div id="UserManagePage">
+  <div id="UserManagePage" data-warm-page>
     <!-- 搜索表单 -->
     <a-form layout="inline" :model="searchParams" @finish="doSearch">
       <a-form-item label="账号">
@@ -163,4 +163,8 @@ onMounted(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+#UserManagePage {
+  padding: 16px;
+}
+</style>

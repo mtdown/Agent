@@ -1,5 +1,5 @@
 <template>
-  <div id="spaceDetailPage">
+  <div id="spaceDetailPage" data-warm-page>
     <!-- 空间信息 -->
     <a-flex justify="space-between">
       <h2>{{ space.spaceName }}（{{ SPACE_TYPE_MAP[space.spaceType ?? SPACE_TYPE_ENUM.PRIVATE] }}）</h2>
@@ -175,6 +175,7 @@ watch(
 <style scoped>
 #spaceDetailPage {
   margin-bottom: 16px;
+  padding: 16px;
 }
 :deep(.preview-image) {
   width: 500px; /* 固定宽度为 500px */

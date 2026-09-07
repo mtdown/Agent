@@ -1,5 +1,5 @@
 <template>
-  <div id="pictureDetailPage">
+  <div id="pictureDetailPage" data-warm-page>
     <a-row :gutter="[16, 16]">
       <!-- 图片预览 -->
       <a-col :sm="24" :md="16" :xl="18">
@@ -173,6 +173,7 @@ const doShare = () => {
 <style scoped>
 #pictureDetailPage {
   margin-bottom: 16px;
+  padding: 16px;
 }
 :deep(.preview-image) {
   width: 500px; /* 固定宽度为 500px */
