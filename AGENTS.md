@@ -9,6 +9,7 @@ Agent 开发规范
 5. 未经用户确认，不进入下一轮修复-测试循环。
 6. 未经用户明确授权，不合并到 main。
 7. 启动或关闭本地开发服务时，复用项目根目录的 `stop-dev.ps1` 和 `start-dev.ps1`。
+8. 新任务分支创建与上传必须使用项目根目录的 `start-task.ps1` 和 `upload.ps1`。
 
 ## 1. 需求文档与执行流程（OpenSpec）
 
@@ -59,6 +60,39 @@ OpenSpec 工件职责如下：
 
 AI 编码助手不得自行合并到 `main`，除非用户明确授权。
 
+## 2.1 分支创建与上传脚本
+
+新开发或修复任务必须通过项目根目录脚本创建任务分支：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-task.ps1 -Type feature -Name wiki-document
+powershell -ExecutionPolicy Bypass -File .\start-task.ps1 -Type fix -Name login-session
+```
+
+脚本固定先从远程最新 `origin/main` 创建远程任务分支，再在本地创建跟踪该远程分支的分支。分支名仍按本文件规则生成：`feature/xxx开发` 或 `fix/xxx修复`。不得在 `main` 上直接编辑并上传任务代码。
+
+任务完成并通过测试后，必须通过项目根目录脚本上传当前任务分支：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\upload.ps1 -Message "feat: describe change"
+```
+
+上传脚本只允许在非 `main` / `master` 且已跟踪 `origin/*` 的任务分支执行，负责显示待上传文件、提交当前分支改动、推送当前分支到远程，并提示发起 merge request / pull request。上传脚本不得合并到 `main`，合并仍必须由负责人检查后人工执行。
+
+## 2.2 文件追踪原则
+
+Git 只追踪能让项目构建、运行、测试、协作所必需的文件，以及正式需求与项目文档。
+
+以下内容不得作为普通项目文件追踪：
+
+- IDE 个人状态。
+- 本地诊断文件。
+- 临时日志。
+- 工具缓存。
+- 一次性调试产物。
+
+如果某个文件仅服务于当前机器或一次性排查，应加入 `.gitignore` 或移出 Git 索引；如果某个脚本或文档被 `AGENTS.md`、README 或 OpenSpec 明确要求使用，则必须提交到仓库。
+
 ## 3. 问题日志（IssueLog.xlsx）
 
 每次任务中遇到的报错、异常、阻塞问题，必须记录到项目根目录下的 `IssueLog.xlsx`。
@@ -104,7 +138,7 @@ AI 编码助手不得在未汇报、未确认的情况下自行反复执行多�
 
 ## 6. 本地开发服务启停
 
-需要启动前后端本地开发服务、重启服务、释放端口或进行页面手测时，必须优先复用项目根目录下已有脚本：
+AI 编码助手开发和测试当前任务时，仍必须使用当前任务分支目录下的 `stop-dev.ps1` 和 `start-dev.ps1`。需要启动前后端本地开发服务、重启服务、释放端口或进行页面手测时，必须优先复用项目根目录下已有脚本：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
@@ -118,3 +152,23 @@ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 - 后端服务端口：`127.0.0.1:8123`
 - 前端服务端口：`127.0.0.1:3000`
 - 日志目录：`tmp/`
+
+## 7. main 效果手动验收
+
+`start-main-dev.ps1` 和 `stop-main-dev.ps1` 仅用于负责人手动验收 `main` 分支效果。AI 编码助手不得用这两个脚本替代当前任务分支的开发测试脚本。
+
+负责人需要查看远程最新 `main` 效果时，使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-main-dev.ps1
+```
+
+该脚本会进入 main 专用工作目录，执行 `git fetch origin` 和 `git pull --ff-only origin main`，再调用该目录下的 `stop-dev.ps1` 和 `start-dev.ps1` 启动 main 分支前后端。
+
+验收结束需要关闭 main 分支服务时，使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\stop-main-dev.ps1
+```
+
+main 验收脚本不得提交、推送、合并或切换当前任务分支。
