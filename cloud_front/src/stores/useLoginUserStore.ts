@@ -15,9 +15,15 @@ export const useLoginUserStore = defineStore('loginUser', () => {
    * 远程获取登录用户信息
    */
   async function fetchLoginUser() {
-    const res = await getUserLoginUsingGet()
-    if (res.data.code === 0 && res.data.data) {
-      loginUser.value = res.data.data
+    try {
+      const res = await getUserLoginUsingGet()
+      if (res.data.code === 0 && res.data.data) {
+        loginUser.value = res.data.data
+      }
+    } catch {
+      loginUser.value = {
+        userName: '未登录',
+      }
     }
     // // 测试用户登录，3 秒后自动登录
     // setTimeout(() => {
