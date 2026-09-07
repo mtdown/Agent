@@ -83,6 +83,16 @@ const checks = [
     assertContains(agents, 'upload.ps1', 'AGENTS.md should mention upload.ps1');
     assertContains(agents, '远程', 'AGENTS.md should describe remote-first branch flow');
     assertContains(agents, 'merge request', 'AGENTS.md should preserve review flow');
+    assertContains(
+      agents,
+      '开发流程到“远程任务分支已推送并可发起 merge request / pull request”为止',
+      'AGENTS.md should end development at pushed remote task branch',
+    );
+    assertContains(
+      agents,
+      'AI 编码助手不得在本地 `main` 上合并任务分支',
+      'AGENTS.md should forbid local main merges by the coding assistant',
+    );
   }],
 
   ['main preview scripts are manual acceptance only', () => {

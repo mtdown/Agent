@@ -37,12 +37,12 @@ The system SHALL exclude personal IDE state, local diagnostics, temporary logs, 
 - **WHEN** local-only files were previously tracked
 - **THEN** they are removed from Git tracking while remaining available on the local machine
 
-### Requirement: Merge remains manual
-The system SHALL keep merge into `main` outside automated upload.
+### Requirement: Merge remains remote review
+The system SHALL end the development upload flow at the pushed remote task branch and leave merge into remote `main` to the project owner through a merge request or pull request.
 
 #### Scenario: Upload prompts review
 - **WHEN** a branch upload completes
-- **THEN** the command prints merge request or pull request guidance and does not merge into `main`
+- **THEN** the command prints merge request or pull request guidance and does not merge into local or remote `main`
 
 ### Requirement: Main preview is manual acceptance only
 The system SHALL provide dedicated main preview commands for the project owner to manually inspect the latest remote `main` without changing the current task branch.

@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for motivation. The repository already requires branch-based work and manual review before merging to `main`; the missing rule is a reusable command path that creates remote branches first and then uploads only the tracked task branch.
+See `proposal.md` for motivation. The repository already requires branch-based work and manual review before merging to `main`; the missing rule is a reusable command path that creates remote branches first and then uploads only the tracked task branch. Development is complete once the remote task branch is pushed and ready for a merge request or pull request.
 
 ## Goals / Non-Goals
 
@@ -26,7 +26,7 @@ See `proposal.md` for motivation. The repository already requires branch-based w
 
 ### Upload requires a tracked non-main branch
 
-`upload.ps1` will refuse `main` / `master`, require an upstream branch, display pending changes, commit with an explicit message when changes exist, push to upstream, and print merge request guidance. It will not merge.
+`upload.ps1` will refuse `main` / `master`, require an upstream branch, display pending changes, commit with an explicit message when changes exist, push to upstream, and print merge request guidance. It will not merge locally or remotely; the project owner handles remote `main` integration through the hosting platform.
 
 ### Remove tracking for local-only files
 
