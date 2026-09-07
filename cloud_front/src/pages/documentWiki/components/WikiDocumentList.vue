@@ -16,7 +16,13 @@
     <a-typography-paragraph v-if="selectedDocument.summary" type="secondary">
       {{ selectedDocument.summary }}
     </a-typography-paragraph>
-    <div class="content">
+    <div v-if="selectedDocument.contentFormat === 'html'" class="rich-content" v-html="renderedHtmlContent"></div>
+    <MdPreview
+      v-else-if="selectedDocument.contentFormat === 'markdown'"
+      :model-value="selectedDocument.content ?? ''"
+      language="zh-CN"
+    />
+    <div v-else class="content">
       <template v-if="contentBlocks.length">
         <template v-for="block in contentBlocks" :key="block.key">
           <component
@@ -124,6 +130,9 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { PaginationProps } from 'ant-design-vue'
+import { MdPreview } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
+import { renderHtmlContent } from './wikiContentRender'
 import { formatTime, type IdValue } from './wikiShared'
 
 const router = useRouter()
@@ -142,6 +151,8 @@ const emit = defineEmits<{
   move: [document: API.DocumentWikiVis]
   delete: [document: API.DocumentWikiVis]
 }>()
+
+const renderedHtmlContent = computed(() => renderHtmlContent(props.selectedDocument.content ?? ''))
 
 const contentBlocks = computed(() => {
   const content = props.selectedDocument.content ?? ''
@@ -206,6 +217,34 @@ const contentBlocks = computed(() => {
 .content {
   line-height: 1.8;
   white-space: pre-wrap;
+}
+
+.rich-content {
+  line-height: 1.8;
+}
+
+.rich-content :deep(h1),
+.rich-content :deep(h2),
+.rich-content :deep(h3) {
+  margin: 20px 0 12px;
+  font-weight: 600;
+}
+
+.rich-content :deep(p) {
+  margin: 0 0 12px;
+}
+
+.rich-content :deep(blockquote) {
+  margin: 14px 0;
+  padding: 8px 12px;
+  border-left: 3px solid #e07a2d;
+  background: #fff7e6;
+  color: #7b6c5d;
+}
+
+.rich-content :deep(img) {
+  max-width: 100%;
+  border-radius: 4px;
 }
 
 .document-heading {

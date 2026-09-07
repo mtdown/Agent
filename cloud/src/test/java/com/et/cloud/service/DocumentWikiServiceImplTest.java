@@ -45,12 +45,23 @@ class DocumentWikiServiceImplTest {
     }
 
     @Test
+    void validDocumentWikiAcceptsHtmlFormat() {
+        DocumentWiki documentWiki = new DocumentWiki();
+        documentWiki.setTitle("Valid title");
+        documentWiki.setContent("<p><strong>valid content</strong></p>");
+        documentWiki.setSpaceId(1L);
+        documentWiki.setContentFormat("html");
+
+        assertDoesNotThrow(() -> documentWikiService.validDocumentWiki(documentWiki));
+    }
+
+    @Test
     void validDocumentWikiRejectsIllegalContentFormat() {
         DocumentWiki documentWiki = new DocumentWiki();
         documentWiki.setTitle("Valid title");
         documentWiki.setContent("valid content");
         documentWiki.setSpaceId(1L);
-        documentWiki.setContentFormat("html");
+        documentWiki.setContentFormat("weird");
 
         BusinessException exception = assertThrows(
                 BusinessException.class,

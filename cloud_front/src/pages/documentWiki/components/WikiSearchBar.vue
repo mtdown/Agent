@@ -25,7 +25,10 @@
       />
     </a-form-item>
     <a-form-item>
-      <a-button type="primary" html-type="submit">搜索</a-button>
+      <a-space>
+        <a-button type="primary" html-type="submit">搜索</a-button>
+        <a-button html-type="button" @click="emit('create')">创建文档</a-button>
+      </a-space>
     </a-form-item>
   </a-form>
 </template>
@@ -33,7 +36,7 @@
 import type { IdValue } from './wikiShared'
 const searchParams = defineModel<API.DocumentWikiQueryRequest>({ required: true })
 defineProps<{ allSpaceOptions: { label: string; value: IdValue }[] }>()
-const emit = defineEmits<{ search: []; 'text-change': [] }>()
+const emit = defineEmits<{ search: []; 'text-change': []; create: [] }>()
 </script>
 <style scoped>
 .search-form {

@@ -71,7 +71,7 @@ const router = createRouter({
     {
       path: '/add_documentWiki',
       name: '创建文档',
-      component: () => import('@/pages/documentWiki/AddDocumentWikiPage.vue'),
+      redirect: { path: '/documentWiki', query: { mode: 'create' } },
     },
     {
       path: '/edit_documentWiki/:id',

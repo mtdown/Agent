@@ -52,7 +52,7 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
 
     private static final int MAX_METADATA_LENGTH = 2048;
 
-    private static final List<String> ALLOWED_CONTENT_FORMAT_LIST = Arrays.asList("plain", "markdown");
+    private static final List<String> ALLOWED_CONTENT_FORMAT_LIST = Arrays.asList("plain", "markdown", "html");
 
     private static final List<String> ALLOWED_SOURCE_TYPE_LIST = Arrays.asList("NATIVE", "UPLOAD", "IMPORT", "URL");
 

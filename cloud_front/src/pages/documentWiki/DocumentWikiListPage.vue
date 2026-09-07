@@ -12,8 +12,18 @@
             :all-space-options="allSpaceOptions"
             @search="doSearch"
             @text-change="onSearchTextChange"
+            @create="startCreate"
+          />
+          <DocumentWikiEditor
+            v-if="centerMode === 'create'"
+            submit-text="创建"
+            :loading="createLoading"
+            :initial-location="createInitialLocation"
+            @submit="handleCreateSubmit"
+            @cancel="cancelCreate"
           />
           <WikiDocumentList
+            v-else
             :selected-document="selectedDocument"
             :is-search-mode="isSearchMode"
             :current-space-name="currentSpaceName"
@@ -55,7 +65,7 @@
         @restored="refreshAll"
       />
     </section>
-    <section v-if="isAdmin && activeRegion === 'manage'" class="wiki-panel page-panel">
+    <section v-else-if="isAdmin && activeRegion === 'manage'" class="wiki-panel page-panel">
       <WikiSpaceManagePanel
         :active="activeRegion === 'manage'"
         ref="managePanelRef"
@@ -75,6 +85,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
+  addDocumentWikiUsingPost,
   deleteDocumentWikiUsingPost,
   getDocumentWikiVisByIdUsingGet,
   listRootDocumentWikiUsingGet,
@@ -87,11 +98,13 @@ import WikiDocumentList from './components/WikiDocumentList.vue'
 import WikiRecyclePanel from './components/WikiRecyclePanel.vue'
 import WikiSpaceManagePanel from './components/WikiSpaceManagePanel.vue'
 import WikiDocumentMoveDialog from './components/WikiDocumentMoveDialog.vue'
+import DocumentWikiEditor from '@/components/DocumentWikiEditor.vue'
 import { regionTitle, type IdValue } from './components/wikiShared'
 import { useWikiSearch } from './components/useWikiSearch'
 const { searchParams, searchResults, isSearchMode, pagination, fetchSearchResults } =
   useWikiSearch()
 type RegionKey = 'docs' | 'recycle' | 'manage'
+type CenterMode = 'browse' | 'create'
 const recyclePanelRef = ref<InstanceType<typeof WikiRecyclePanel>>()
 const managePanelRef = ref<InstanceType<typeof WikiSpaceManagePanel>>()
 const moveDialogRef = ref<InstanceType<typeof WikiDocumentMoveDialog>>()
@@ -99,7 +112,9 @@ const route = useRoute()
 const loginUserStore = useLoginUserStore()
 
 const loading = ref(false)
+const createLoading = ref(false)
 const activeRegion = ref<RegionKey>('docs')
+const centerMode = ref<CenterMode>('browse')
 const spaces = ref<API.WikiSpaceVis[]>([])
 const browseDocuments = ref<API.DocumentWikiVis[]>([])
 const selectedDocument = ref<API.DocumentWikiVis>({})
@@ -127,14 +142,26 @@ const currentFolderName = computed(() => {
   const name = currentSelection.value.folder?.name
   return name ? String(name) : ''
 })
+const createInitialLocation = computed(() => ({
+  spaceId: currentSelection.value.spaceId,
+  folderId: currentSelection.value.folderId ?? '',
+}))
 const documentOutline = computed(() =>
-  extractDocumentOutline(selectedDocument.value.content ?? '').map((item, index) => ({
+  centerMode.value === 'create'
+    ? []
+    : extractDocumentOutline(
+        selectedDocument.value.content ?? '',
+        selectedDocument.value.contentFormat,
+      ).map((item, index) => ({
     ...item,
     id: `wiki-heading-${index}`,
-  })),
+      })),
 )
 
-const extractDocumentOutline = (content: string) => {
+const extractDocumentOutline = (content: string, contentFormat?: string) => {
+  if (contentFormat === 'html') {
+    return extractHtmlOutline(content)
+  }
   const outline: { level: number; title: string }[] = []
   const headingPattern = /^(#{1,4})\s+(.+)$/gm
   let match: RegExpExecArray | null
@@ -147,11 +174,40 @@ const extractDocumentOutline = (content: string) => {
   return outline
 }
 
+const extractHtmlOutline = (content: string) => {
+  const outline: { level: number; title: string }[] = []
+  const headingPattern = /<h([1-4])[^>]*>(.*?)<\/h\1>/gis
+  let match: RegExpExecArray | null
+  while ((match = headingPattern.exec(content))) {
+    outline.push({
+      level: Math.min(Number(match[1]), 3),
+      title: stripHtml(match[2]).trim(),
+    })
+  }
+  return outline
+}
+
+const stripHtml = (content: string) =>
+  content
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+
 watch(
   () => route.query.open,
   (id) => {
     if (id) {
       openDocument(id as string)
+    }
+  },
+)
+watch(
+  () => route.query.mode,
+  (mode) => {
+    if (mode === 'create') {
+      startCreate()
     }
   },
 )
@@ -201,6 +257,23 @@ const fetchSpaces = async () => {
     return
   }
   spaces.value = res.data.data ?? []
+  ensureCurrentSelection()
+}
+
+const ensureCurrentSelection = () => {
+  if (currentSelection.value.spaceId) {
+    return true
+  }
+  const firstSpace = spaces.value[0]
+  if (!firstSpace?.id) {
+    return false
+  }
+  currentSelection.value = {
+    spaceId: firstSpace.id,
+    folderId: null,
+    folder: null,
+  }
+  return true
 }
 
 const handleTreeSelect = async (selection: WikiTreeSelection) => {
@@ -236,6 +309,7 @@ const onSearchTextChange = () => {
 }
 
 const doSearch = () => {
+  centerMode.value = 'browse'
   selectedDocument.value = {}
   if (!isSearchMode.value) {
     refreshBrowseDocuments()
@@ -253,9 +327,43 @@ const openDocument = async (id: IdValue) => {
   if (!id) return
   const res = await getDocumentWikiVisByIdUsingGet({ id: String(id) })
   if (res.data.code === 0 && res.data.data) {
+    centerMode.value = 'browse'
     selectedDocument.value = res.data.data
   } else {
     message.error('打开文档失败，' + res.data.message)
+  }
+}
+
+const startCreate = () => {
+  if (!ensureCurrentSelection()) {
+    message.warning('请先选择文档空间')
+    return
+  }
+  selectedDocument.value = {}
+  centerMode.value = 'create'
+}
+
+const cancelCreate = () => {
+  centerMode.value = 'browse'
+}
+
+const handleCreateSubmit = async (values: API.DocumentWikiAddRequest) => {
+  createLoading.value = true
+  try {
+    const res = await addDocumentWikiUsingPost(values)
+    if (res.data.code === 0 && res.data.data) {
+      message.success('创建成功')
+      centerMode.value = 'browse'
+      await spaceTreeRef.value?.refresh(values.spaceId)
+      await refreshBrowseDocuments()
+      await openDocument(res.data.data)
+    } else {
+      message.error('创建失败，' + res.data.message)
+    }
+  } catch (e: any) {
+    message.error('创建失败，' + e.message)
+  } finally {
+    createLoading.value = false
   }
 }
 
@@ -278,6 +386,10 @@ const deleteDocument = async (documentWiki: API.DocumentWikiVis) => {
 
 onMounted(async () => {
   await fetchSpaces()
+  if (route.query.mode === 'create') {
+    startCreate()
+    return
+  }
   if (route.query.open) {
     await openDocument(route.query.open as string)
   }
