@@ -50,6 +50,7 @@ import {
   DeleteOutlined,
   FolderOpenOutlined,
   FolderOutlined,
+  ImportOutlined,
   LogoutOutlined,
   PictureOutlined,
   SettingOutlined,
@@ -67,10 +68,17 @@ type RawNavItem = {
   label: string
   icon?: () => VNode
   adminOnly?: boolean
+  loginOnly?: boolean
 }
 
 const originItems: RawNavItem[] = [
   { key: '/documentWiki', icon: () => h(BookOutlined), label: 'WIKI文档' },
+  {
+    key: '/documentWiki/batch',
+    icon: () => h(ImportOutlined),
+    label: '批量文档',
+    loginOnly: true,
+  },
   {
     key: '/documentWiki?region=manage',
     icon: () => h(FolderOpenOutlined),
@@ -100,8 +108,12 @@ const originItems: RawNavItem[] = [
 
 const filterMenus = (menus: RawNavItem[]) => {
   return menus?.filter((menu) => {
+    const loginUser = loginUserStore.loginUser
+    // Batch import writes into a Wiki space, so it is offered to authenticated users only.
+    if (menu.loginOnly && !loginUser?.id) {
+      return false
+    }
     if (menu.adminOnly) {
-      const loginUser = loginUserStore.loginUser
       if (!loginUser || loginUser.userRole !== 'admin') {
         return false
       }
@@ -117,6 +129,9 @@ const items = computed<MenuProps['items']>(() =>
 const route = useRoute()
 const doMenuClick: MenuProps['onClick'] = ({ key }) => router.push(String(key))
 const current = computed(() => {
+  if (route.path === '/documentWiki/batch') {
+    return ['/documentWiki/batch']
+  }
   if (route.path === '/documentWiki' && route.query.region === 'manage') {
     return ['/documentWiki?region=manage']
   }

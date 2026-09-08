@@ -69,6 +69,11 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/documentWiki/batch',
+      name: '批量文档',
+      component: () => import('@/pages/documentWiki/DocumentWikiBatchImportPage.vue'),
+    },
+    {
       path: '/add_documentWiki',
       name: '创建文档',
       component: () => import('@/pages/documentWiki/AddDocumentWikiPage.vue'),
