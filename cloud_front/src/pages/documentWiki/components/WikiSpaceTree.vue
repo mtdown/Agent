@@ -2,8 +2,8 @@
   <div class="wiki-space-tree">
     <a-flex justify="space-between" align="center" class="tree-toolbar">
       <span class="tree-title">空间导航</span>
-      <a-button v-if="selectedSpaceId" size="small" @click="openFolderEditor()"
-        >新建文件夹</a-button
+      <a-button v-if="selectedSpaceId" size="small" @click="openDocumentCreator()"
+        >新建文档</a-button
       >
     </a-flex>
 
@@ -80,7 +80,10 @@ export type WikiTreeSelection = {
 // Unified navigation tree: region groups -> spaces -> nested folders.
 const props = defineProps<{ spaces: API.WikiSpaceVis[] }>()
 
-const emit = defineEmits<{ select: [selection: WikiTreeSelection] }>()
+const emit = defineEmits<{
+  select: [selection: WikiTreeSelection]
+  createDocument: [selection: WikiTreeSelection]
+}>()
 
 const loading = ref(false)
 const folderTrees = ref<Record<string, API.WikiFolderVis[]>>({})
@@ -214,13 +217,18 @@ const onNodeMenu = (action: string, node: TreeNodePayload) =>
   folderDialogsRef.value?.open(action, node)
 const onMenuClick = (node: TreeNodePayload, info: { key: string | number }) =>
   onNodeMenu(String(info.key), node)
-const openFolderEditor = () =>
-  onNodeMenu('create', {
-    key: currentSelectedKey(),
-    label: '',
-    nodeType: 'space',
-    space: { id: selectedSpaceId.value },
-  })
+const currentSelectionPayload = (): WikiTreeSelection => {
+  if (selectedFolderId.value) {
+    const node = findFolderNode(treeData.value, selectedFolderId.value)
+    return {
+      spaceId: selectedSpaceId.value,
+      folderId: selectedFolderId.value,
+      folder: node?.folder ?? null,
+    }
+  }
+  return { spaceId: selectedSpaceId.value, folderId: null, folder: null }
+}
+const openDocumentCreator = () => emit('createDocument', currentSelectionPayload())
 const handleFolderChanged = async (spaceId: IdValue, parentId?: IdValue) => {
   const parentKey = parentId ? `folder:${parentId}` : `space:${spaceId}`
   if (!expandedKeys.value.includes(parentKey))

@@ -18,7 +18,6 @@ test('global layout no longer renders the global sidebar', () => {
 test('top navigation contains the approved wiki layout destinations', () => {
   for (const label of [
     'WIKI文档',
-    '文档创建',
     '文档空间管理',
     '回收站',
     '图库功能',
@@ -28,6 +27,7 @@ test('top navigation contains the approved wiki layout destinations', () => {
   ]) {
     assert.match(headerSource, new RegExp(label))
   }
+  assert.doesNotMatch(headerSource, /文档创建/)
   assert.match(headerSource, /background:\s*#111111/)
 })
 

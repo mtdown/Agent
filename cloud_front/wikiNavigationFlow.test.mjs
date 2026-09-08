@@ -4,11 +4,14 @@ import test from 'node:test'
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), 'utf8')
 
-const [headerSource, pageSource, documentListSource, routerSource] = await Promise.all([
+const [headerSource, pageSource, documentListSource, routerSource, treeSource, editorSource] =
+  await Promise.all([
   readSource('./src/components/GlobalHeader.vue'),
   readSource('./src/pages/documentWiki/DocumentWikiListPage.vue'),
   readSource('./src/pages/documentWiki/components/WikiDocumentList.vue'),
   readSource('./src/router/index.ts'),
+  readSource('./src/pages/documentWiki/components/WikiSpaceTree.vue'),
+  readSource('./src/components/DocumentWikiEditor.vue'),
 ])
 
 test('top navigation is the only wiki page-level navigation surface', () => {
@@ -39,9 +42,33 @@ test('top navigation routes directly to wiki sub-interfaces', () => {
   assert.match(headerSource, /key:\s*'\/documentWiki\?region=manage'/)
 })
 
+test('top navigation does not expose standalone document creation', () => {
+  assert.doesNotMatch(headerSource, /label:\s*'文档创建'/)
+  assert.doesNotMatch(headerSource, /key:\s*'\/add_documentWiki'/)
+  assert.match(routerSource, /path:\s*'\/add_documentWiki'/)
+  assert.match(routerSource, /path:\s*'\/edit_documentWiki\/:id'/)
+})
+
 test('normal document list reading stays inside the wiki workspace', () => {
   assert.doesNotMatch(documentListSource, /router\.push\(`\/documentWiki\/\$\{(?:item|selectedDocument)\.id\}`\)/)
   assert.match(documentListSource, /emit\('open',\s*item\.id\)/)
-  assert.match(documentListSource, /router\.push\(`\/edit_documentWiki\/\$\{item\.id\}`\)/)
+  assert.doesNotMatch(documentListSource, /router\.push\(`\/edit_documentWiki\/\$\{(?:item|selectedDocument)\.id\}`\)/)
+  assert.match(documentListSource, /edit:\s*\[document:\s*API\.DocumentWikiVis\]/)
   assert.match(routerSource, /path:\s*'\/documentWiki\/:id'/)
+})
+
+test('space tree primary action creates documents while folder menu remains', () => {
+  assert.match(treeSource, />\s*新建文档\s*<\/a-button/)
+  assert.doesNotMatch(treeSource, /@click="openFolderEditor\(\)"\s*>\s*新建文件夹<\/a-button>/)
+  assert.match(treeSource, /createDocument:\s*\[selection:\s*WikiTreeSelection\]/)
+  assert.match(treeSource, /dataRef\.nodeType === 'folder' \? '新建子文件夹' : '新建文件夹'/)
+})
+
+test('wiki center column can render the shared editor inline', () => {
+  assert.match(pageSource, /<DocumentWikiEditor\b/)
+  assert.match(pageSource, /centerMode\s*=\s*ref<CenterMode>/)
+  assert.match(pageSource, /addDocumentWikiUsingPost/)
+  assert.match(pageSource, /editDocumentWikiUsingPost/)
+  assert.match(editorSource, /initialSpaceId/)
+  assert.match(editorSource, /initialFolderId/)
 })
