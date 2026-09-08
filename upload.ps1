@@ -23,9 +23,39 @@ function Run-Git {
     }
 }
 
-$branchName = (& git branch --show-current).Trim()
-if (-not $branchName) {
-    throw 'Current checkout is detached. Switch to a tracked task branch before upload.'
+function Get-GitText {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+    $output = & git @Arguments
+    if ($null -eq $output) {
+        return ''
+    }
+    return (($output | Out-String).Trim())
+}
+
+function Assert-GitAvailable {
+    if ($DryRun) {
+        Write-Host '[dry-run] git --version'
+        return
+    }
+
+    $version = & git --version 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
+        throw 'git is not available in this session. Run upload.ps1 from a terminal where git works, or upload manually.'
+    }
+    Write-Host "git: $version"
+}
+
+Assert-GitAvailable
+
+if ($DryRun) {
+    Write-Host '[dry-run] git branch --show-current'
+    $branchName = ''
+} else {
+    $branchName = Get-GitText @('branch', '--show-current')
+}
+if ([string]::IsNullOrWhiteSpace($branchName)) {
+    throw 'Unable to determine the current branch. This usually means git produced no output (blocked or not on PATH).'
 }
 
 Write-Host "Current branch: $branchName"
@@ -35,7 +65,7 @@ if ($branchName -in @('main', 'master')) {
 
 $upstream = ''
 try {
-    $upstream = (& git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null).Trim()
+    $upstream = (Get-GitText @('rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}')).Trim()
 } catch {
     $upstream = ''
 }
@@ -65,6 +95,16 @@ if ($hasChanges) {
 }
 
 Run-Git @('push')
+
+# Verify the push really landed: the upstream must contain HEAD.
+if (-not $DryRun) {
+    Run-Git @('fetch', 'origin')
+    $ahead = Get-GitText @('rev-list', '--count', "$upstream..HEAD")
+    if ($ahead -ne '0') {
+        throw "Push did not take effect: $ahead commit(s) still missing on $upstream."
+    }
+    Write-Host "Verified: $upstream is up to date with HEAD."
+}
 
 Write-Host ''
 Write-Host "Upload complete: $upstream"

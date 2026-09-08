@@ -1,28 +1,102 @@
 # ============================================================
 #  stop-dev.ps1 - stop backend (8123) and frontend (3000) started
-#  by start-dev.ps1. Uses netstat to find the listening PIDs and
-#  taskkill to stop them, so it also works when the processes were
-#  started another way.
+#  by start-dev.ps1. Uses PowerShell native cmdlets
+#  (Get-NetTCPConnection / Stop-Process) instead of external
+#  port-query and process-kill utilities, and re-checks every
+#  port after stopping it.
+#
+#  All output is ASCII-only on purpose: Windows PowerShell 5.1
+#  decodes a BOM-less .ps1 with the system ANSI code page, so
+#  non-ASCII message text can be misdecoded at parse time.
+#
+#  Exit codes:
+#    0 - every port is free (nothing was listening, or all
+#        listeners were stopped and verified free)
+#    1 - a port could not be released, or the port state could
+#        not be determined at all
+#
+#  A port that is still occupied is NEVER reported as success.
 # ============================================================
 $ports = @(8123, 3000)
-$stopped = $false
+$failures = New-Object System.Collections.Generic.List[string]
+$stoppedAny = $false
 
-foreach ($port in $ports) {
-    $pids = @(netstat -ano | Select-String -Pattern ":$port\s.*LISTENING" | ForEach-Object {
-        ($_ -split '\s+')[-1]
-    } | Sort-Object -Unique)
-    foreach ($procId in $pids) {
-        if ($procId -and $procId -match '^\d+$' -and [int]$procId -gt 0) {
-            $name = (Get-Process -Id ([int]$procId) -ErrorAction SilentlyContinue).ProcessName
-            Write-Host "Stopping $name (PID $procId) on port $port"
-            taskkill /PID $procId /F /T 2>$null | Out-Null
-            $stopped = $true
+# Get-NetTCPConnection raises CmdletizationQuery_NotFound when the port simply
+# has no listener. That is not a query failure, and it must not be reported as
+# one - otherwise a clean machine would always look broken. Any other error id
+# means the port state really is unknown, which is a failure.
+function Test-NoListenerError($errorRecord) {
+    return $errorRecord.FullyQualifiedErrorId -like 'CmdletizationQuery_NotFound*'
+}
+
+function Get-ListeningPids {
+    param([Parameter(Mandatory = $true)][int]$Port)
+
+    try {
+        $conns = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop)
+    } catch {
+        if (Test-NoListenerError $_) {
+            return @()
         }
+        $failures.Add("Unable to query port ${Port}: $($_.Exception.Message)")
+        return @()
+    }
+    return @($conns | ForEach-Object { $_.OwningProcess } | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+}
+
+function Test-PortListening {
+    param([Parameter(Mandatory = $true)][int]$Port)
+
+    try {
+        return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -First 1)
+    } catch {
+        if (Test-NoListenerError $_) {
+            return $false
+        }
+        $failures.Add("Unable to re-check port ${Port}: $($_.Exception.Message)")
+        return $true
     }
 }
 
-if ($stopped) {
+foreach ($port in $ports) {
+    $pids = Get-ListeningPids -Port $port
+    if ($pids.Count -eq 0) {
+        Write-Host "Port $port has no listener"
+        continue
+    }
+
+    foreach ($procId in $pids) {
+        $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+        $procName = if ($proc) { $proc.ProcessName } else { '<unknown>' }
+        Write-Host "Stopping $procName (PID $procId) on port $port"
+        try {
+            Stop-Process -Id $procId -Force -ErrorAction Stop
+            $stoppedAny = $true
+        } catch {
+            $failures.Add("Failed to stop $procName (PID $procId) on port ${port}: $($_.Exception.Message)")
+        }
+    }
+
+    Start-Sleep -Seconds 2
+    if (Test-PortListening -Port $port) {
+        $failures.Add("Port $port is still listening and could not be released")
+    } else {
+        Write-Host "Port $port released"
+    }
+}
+
+if ($failures.Count -gt 0) {
+    Write-Host ''
+    Write-Host 'The following ports could not be stopped - handle them manually and retry:'
+    foreach ($failure in $failures) {
+        Write-Host "  - $failure"
+    }
+    exit 1
+}
+
+if ($stoppedAny) {
     Write-Host 'All dev services stopped.'
 } else {
     Write-Host 'No dev services are listening on ports 8123/3000 - nothing to stop.'
 }
+exit 0

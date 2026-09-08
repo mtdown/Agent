@@ -33,13 +33,20 @@ function Port-InUse($port) {
 Write-Host "==> [1/4] Checking prerequisites ..."
 if (-not (Port-InUse 3307)) { Write-Host '    WARN: MySQL (3307) not listening. Start the Docker MySQL container first.' }
 if (-not (Port-InUse 6379)) { Write-Host '    WARN: Redis (6379) not listening. Start the Docker Redis container first.' }
-if (Port-InUse $backendPort) {
-    $owner = Get-NetTCPConnection -LocalPort $backendPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-    $proc = if ($owner) { Get-Process -Id $owner.OwningProcess -ErrorAction SilentlyContinue } else { $null }
-    Write-Host "    ERROR: port $backendPort already in use by $($proc.ProcessName) (PID $($owner.OwningProcess))."
-    Write-Host "           If it is Clash/verge-mihomo, change its mixed-port or stop it, then rerun. Aborting."
+function Assert-PortFree($port) {
+    $owner = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $owner) {
+        return
+    }
+    $proc = Get-Process -Id $owner.OwningProcess -ErrorAction SilentlyContinue
+    $procName = if ($proc) { $proc.ProcessName } else { '<unknown>' }
+    Write-Host "    ERROR: port $port already in use by $procName (PID $($owner.OwningProcess))."
+    Write-Host '           Run .\stop-dev.ps1 first, or stop that process manually, then rerun. Aborting.'
     exit 1
 }
+
+Assert-PortFree $backendPort
+Assert-PortFree $frontPort
 $javaExe = Find-Java
 if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
 
