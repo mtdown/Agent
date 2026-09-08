@@ -35,6 +35,33 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseListBatchImportItemResult_ = {
+    code?: number
+    data?: BatchImportItemResult[]
+    message?: string
+  }
+
+  type BatchImportItemResult = {
+    documentId?: string | number
+    input?: string
+    message?: string
+    status?: string
+    title?: string
+  }
+
+  type DocumentWikiBatchUrlImportRequest = {
+    folderId?: string | number
+    spaceId?: string | number
+    urls?: string[]
+  }
+
+  type batchImportFilesUsingPOSTParams = {
+    /** folderId */
+    folderId?: string | number
+    /** spaceId */
+    spaceId: string | number
+  }
+
   type BaseResponseListSpaceLevel_ = {
     code?: number
     data?: SpaceLevel[]

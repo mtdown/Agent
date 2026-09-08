@@ -200,3 +200,40 @@ export async function listRootDocumentWikiUsingGet(
     ...(options || {}),
   })
 }
+
+/** batchImportUrls POST /api/documentWiki/batch/url */
+export async function batchImportUrlsUsingPost(
+  body: API.DocumentWikiBatchUrlImportRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseListBatchImportItemResult_>('/api/documentWiki/batch/url', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
+/** batchImportFiles POST /api/documentWiki/batch/file */
+export async function batchImportFilesUsingPost(
+  params: API.batchImportFilesUsingPOSTParams,
+  files?: File[],
+  options?: { [key: string]: any }
+) {
+  const formData = new FormData()
+
+  files?.forEach((file) => {
+    formData.append('files', file)
+  })
+
+  return request<API.BaseResponseListBatchImportItemResult_>('/api/documentWiki/batch/file', {
+    method: 'POST',
+    params: {
+      ...params,
+    },
+    data: formData,
+    ...(options || {}),
+  })
+}

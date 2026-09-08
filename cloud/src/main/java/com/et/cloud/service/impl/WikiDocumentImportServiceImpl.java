@@ -43,10 +43,11 @@ public class WikiDocumentImportServiceImpl implements WikiDocumentImportService 
         } else {
             // Uploaded HTML pages are cleaned into structured Markdown instead of being stored
             // raw: downloaded pages reference sibling CSS/JS/image resources that a single-file
-            // import cannot bring along, so faithful rendering is not achievable. The cleaner
-            // keeps h1-h6 headings and plain text blocks; images and page chrome are dropped.
+            // import cannot bring along, so faithful rendering is not achievable. The shared
+            // cleaner selects the article container, drops scripts/overlays/sharing controls and
+            // UI-only lines, then keeps h1-h6 headings and plain text blocks.
             contentFormat = "markdown";
-            content = HtmlToMarkdownConverter.convert(readText(multipartFile));
+            content = WebPageMarkdownCleaner.toMarkdown(readText(multipartFile));
             ThrowUtils.throwIf(StrUtil.isBlank(content), ErrorCode.PARAMS_ERROR, "未能从 HTML 中提取有效文本内容");
         }
         ThrowUtils.throwIf(StrUtil.isBlank(content), ErrorCode.PARAMS_ERROR, "文件内容不能为空");

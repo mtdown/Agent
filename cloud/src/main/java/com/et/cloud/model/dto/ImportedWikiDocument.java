@@ -13,5 +13,10 @@ public class ImportedWikiDocument {
 
     private String sourceType;
 
+    /**
+     * Original url for webpage imports, blank for local uploads.
+     */
+    private String sourceUrl;
+
     private String metadataJson;
 }
