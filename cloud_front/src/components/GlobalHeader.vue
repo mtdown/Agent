@@ -48,7 +48,6 @@ import { computed, h, type VNode } from 'vue'
 import {
   BookOutlined,
   DeleteOutlined,
-  FileAddOutlined,
   FolderOpenOutlined,
   FolderOutlined,
   LogoutOutlined,
@@ -72,7 +71,6 @@ type RawNavItem = {
 
 const originItems: RawNavItem[] = [
   { key: '/documentWiki', icon: () => h(BookOutlined), label: 'WIKI文档' },
-  { key: '/add_documentWiki', icon: () => h(FileAddOutlined), label: '文档创建' },
   {
     key: '/documentWiki?region=manage',
     icon: () => h(FolderOpenOutlined),
@@ -125,11 +123,12 @@ const current = computed(() => {
   if (route.path === '/documentWiki' && route.query.region === 'recycle') {
     return ['/documentWiki?region=recycle']
   }
-  if (route.path.startsWith('/documentWiki') || route.path.startsWith('/edit_documentWiki')) {
+  if (
+    route.path.startsWith('/documentWiki') ||
+    route.path.startsWith('/add_documentWiki') ||
+    route.path.startsWith('/edit_documentWiki')
+  ) {
     return ['/documentWiki']
-  }
-  if (route.path === '/add_documentWiki') {
-    return ['/add_documentWiki']
   }
   return [route.path]
 })

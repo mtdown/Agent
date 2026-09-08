@@ -67,6 +67,8 @@ type SelectValue = string | number | undefined
 const props = withDefaults(
   defineProps<{
     documentWiki?: API.DocumentWikiVis
+    initialSpaceId?: SelectValue
+    initialFolderId?: SelectValue | null
     submitText?: string
     loading?: boolean
   }>(),
@@ -106,6 +108,15 @@ const folderOptions = computed(() => [
   ...flattenFolders(folders.value),
 ])
 
+const applyInitialLocation = async () => {
+  if (props.documentWiki?.id) return
+  formState.spaceId = props.initialSpaceId ?? formState.spaceId
+  formState.folderId = props.initialFolderId ?? ''
+  if (formState.spaceId) {
+    await fetchFolders(formState.spaceId)
+  }
+}
+
 watch(
   () => props.documentWiki,
   (documentWiki) => {
@@ -122,12 +133,22 @@ watch(
   },
   { immediate: true },
 )
+watch(
+  () => [props.initialSpaceId, props.initialFolderId] as const,
+  () => {
+    applyInitialLocation()
+  },
+)
 
 const fetchSpaces = async () => {
   const res = await listVisibleSpaceUsingGet()
   if (res.data.code === 0 && res.data.data) {
     spaces.value = res.data.data
-    if (!formState.spaceId && spaces.value.length > 0) {
+    if (!props.documentWiki?.id && props.initialSpaceId) {
+      formState.spaceId = props.initialSpaceId
+      formState.folderId = props.initialFolderId ?? ''
+      await fetchFolders(formState.spaceId)
+    } else if (!formState.spaceId && spaces.value.length > 0) {
       formState.spaceId = spaces.value[0].id
       await fetchFolders(formState.spaceId)
     }
@@ -215,7 +236,8 @@ const flattenFolders = (
   ])
 }
 
-onMounted(() => {
-  fetchSpaces()
+onMounted(async () => {
+  await fetchSpaces()
+  await applyInitialLocation()
 })
 </script>

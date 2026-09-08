@@ -2,11 +2,31 @@
   <div id="documentWikiListPage" data-warm-page>
     <div v-if="activeRegion === 'docs'" class="wiki-shell">
       <aside class="wiki-panel wiki-tree-column">
-        <WikiSpaceTree ref="spaceTreeRef" :spaces="spaces" @select="handleTreeSelect" />
+        <WikiSpaceTree
+          ref="spaceTreeRef"
+          :spaces="spaces"
+          @select="handleTreeSelect"
+          @create-document="openCreateDocument"
+        />
       </aside>
 
       <main class="wiki-panel wiki-document-column" ref="documentColumnRef">
-        <section class="content-section">
+        <section v-if="isEditorMode" class="content-section editor-section">
+          <h2>{{ centerMode === 'create' ? '新建文档' : '编辑文档' }}</h2>
+          <a-spin :spinning="editorFetchLoading">
+            <DocumentWikiEditor
+              :key="editorKey"
+              :document-wiki="editingDocument"
+              :initial-space-id="editorInitialSpaceId"
+              :initial-folder-id="editorInitialFolderId"
+              :submit-text="centerMode === 'create' ? '创建' : '保存'"
+              :loading="editorSaveLoading"
+              @submit="handleEditorSubmit"
+              @cancel="cancelInlineEditor"
+            />
+          </a-spin>
+        </section>
+        <section v-else class="content-section">
           <WikiSearchBar
             v-model="searchParams"
             :all-space-options="allSpaceOptions"
@@ -23,6 +43,7 @@
             :loading="loading"
             :pagination="pagination"
             @open="openDocument"
+            @edit="openEditDocument"
             @move="moveDialogRef?.open($event)"
             @delete="deleteDocument"
           />
@@ -75,12 +96,15 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
+  addDocumentWikiUsingPost,
   deleteDocumentWikiUsingPost,
+  editDocumentWikiUsingPost,
   getDocumentWikiVisByIdUsingGet,
   listRootDocumentWikiUsingGet,
 } from '@/api/documentWikiController.ts'
 import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController.ts'
 import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
+import DocumentWikiEditor from '@/components/DocumentWikiEditor.vue'
 import WikiSpaceTree, { type WikiTreeSelection } from './components/WikiSpaceTree.vue'
 import WikiSearchBar from './components/WikiSearchBar.vue'
 import WikiDocumentList from './components/WikiDocumentList.vue'
@@ -92,6 +116,7 @@ import { useWikiSearch } from './components/useWikiSearch'
 const { searchParams, searchResults, isSearchMode, pagination, fetchSearchResults } =
   useWikiSearch()
 type RegionKey = 'docs' | 'recycle' | 'manage'
+type CenterMode = 'browse' | 'preview' | 'create' | 'edit'
 const recyclePanelRef = ref<InstanceType<typeof WikiRecyclePanel>>()
 const managePanelRef = ref<InstanceType<typeof WikiSpaceManagePanel>>()
 const moveDialogRef = ref<InstanceType<typeof WikiDocumentMoveDialog>>()
@@ -100,9 +125,16 @@ const loginUserStore = useLoginUserStore()
 
 const loading = ref(false)
 const activeRegion = ref<RegionKey>('docs')
+const centerMode = ref<CenterMode>('browse')
+const previousCenterMode = ref<CenterMode>('browse')
 const spaces = ref<API.WikiSpaceVis[]>([])
 const browseDocuments = ref<API.DocumentWikiVis[]>([])
 const selectedDocument = ref<API.DocumentWikiVis>({})
+const editingDocument = ref<API.DocumentWikiVis | undefined>()
+const editorInitialSpaceId = ref<IdValue>()
+const editorInitialFolderId = ref<IdValue | null>(null)
+const editorFetchLoading = ref(false)
+const editorSaveLoading = ref(false)
 const recycleSpaceId = ref<IdValue>()
 const spaceTreeRef = ref<InstanceType<typeof WikiSpaceTree>>()
 const documentColumnRef = ref<HTMLElement>()
@@ -113,6 +145,13 @@ const currentSelection = ref<WikiTreeSelection>({
 })
 
 const isAdmin = computed(() => loginUserStore.loginUser?.userRole === 'admin')
+const isEditorMode = computed(() => centerMode.value === 'create' || centerMode.value === 'edit')
+const editorKey = computed(
+  () =>
+    `${centerMode.value}:${editingDocument.value?.id ?? 'new'}:${editorInitialSpaceId.value ?? ''}:${
+      editorInitialFolderId.value ?? ''
+    }`,
+)
 const allSpaceOptions = computed(() =>
   spaces.value.map((space) => ({
     label: `${regionTitle(space)} / ${space.name}`,
@@ -128,7 +167,7 @@ const currentFolderName = computed(() => {
   return name ? String(name) : ''
 })
 const documentOutline = computed(() =>
-  extractDocumentOutline(selectedDocument.value.content ?? '').map((item, index) => ({
+  extractDocumentOutline(isEditorMode.value ? '' : (selectedDocument.value.content ?? '')).map((item, index) => ({
     ...item,
     id: `wiki-heading-${index}`,
   })),
@@ -205,6 +244,7 @@ const fetchSpaces = async () => {
 
 const handleTreeSelect = async (selection: WikiTreeSelection) => {
   currentSelection.value = selection
+  centerMode.value = 'browse'
   selectedDocument.value = {}
   if (!isSearchMode.value) {
     await refreshBrowseDocuments()
@@ -236,6 +276,7 @@ const onSearchTextChange = () => {
 }
 
 const doSearch = () => {
+  centerMode.value = 'browse'
   selectedDocument.value = {}
   if (!isSearchMode.value) {
     refreshBrowseDocuments()
@@ -254,9 +295,90 @@ const openDocument = async (id: IdValue) => {
   const res = await getDocumentWikiVisByIdUsingGet({ id: String(id) })
   if (res.data.code === 0 && res.data.data) {
     selectedDocument.value = res.data.data
+    centerMode.value = 'preview'
   } else {
     message.error('打开文档失败，' + res.data.message)
   }
+}
+
+const openCreateDocument = (selection: WikiTreeSelection) => {
+  currentSelection.value = selection
+  previousCenterMode.value = centerMode.value === 'create' || centerMode.value === 'edit' ? 'browse' : centerMode.value
+  editingDocument.value = undefined
+  editorInitialSpaceId.value = selection.spaceId
+  editorInitialFolderId.value = selection.folderId ?? null
+  selectedDocument.value = {}
+  centerMode.value = 'create'
+}
+
+const openEditDocument = async (documentWiki: API.DocumentWikiVis) => {
+  const id = documentWiki.id
+  if (!id) return
+  previousCenterMode.value = centerMode.value === 'create' || centerMode.value === 'edit' ? 'preview' : centerMode.value
+  editorFetchLoading.value = true
+  try {
+    const res = await getDocumentWikiVisByIdUsingGet({ id: String(id) })
+    if (res.data.code === 0 && res.data.data) {
+      editingDocument.value = res.data.data
+      editorInitialSpaceId.value = res.data.data.spaceId
+      editorInitialFolderId.value = res.data.data.folderId ?? null
+      selectedDocument.value = res.data.data
+      centerMode.value = 'edit'
+    } else {
+      message.error('获取文档失败，' + res.data.message)
+    }
+  } finally {
+    editorFetchLoading.value = false
+  }
+}
+
+const refreshWorkspaceAfterSave = async (documentId: IdValue, spaceId?: IdValue) => {
+  await fetchSpaces()
+  await spaceTreeRef.value?.refresh(spaceId)
+  if (isSearchMode.value) {
+    await fetchSearchResults()
+  } else {
+    await refreshBrowseDocuments()
+  }
+  await openDocument(documentId)
+}
+
+const handleEditorSubmit = async (values: API.DocumentWikiEditRequest) => {
+  editorSaveLoading.value = true
+  try {
+    if (centerMode.value === 'create') {
+      const res = await addDocumentWikiUsingPost(values)
+      if (res.data.code === 0 && res.data.data) {
+        message.success('创建成功')
+        editingDocument.value = undefined
+        await refreshWorkspaceAfterSave(res.data.data, values.spaceId)
+      } else {
+        message.error('创建失败，' + res.data.message)
+      }
+      return
+    }
+    const id = editingDocument.value?.id ?? values.id
+    if (!id) return
+    const res = await editDocumentWikiUsingPost({
+      ...values,
+      id,
+    })
+    if (res.data.code === 0) {
+      message.success('保存成功')
+      await refreshWorkspaceAfterSave(id, values.spaceId)
+    } else {
+      message.error('保存失败，' + res.data.message)
+    }
+  } catch (e: any) {
+    message.error('保存失败，' + e.message)
+  } finally {
+    editorSaveLoading.value = false
+  }
+}
+
+const cancelInlineEditor = () => {
+  editingDocument.value = undefined
+  centerMode.value = selectedDocument.value.id ? 'preview' : previousCenterMode.value
 }
 
 const deleteDocument = async (documentWiki: API.DocumentWikiVis) => {

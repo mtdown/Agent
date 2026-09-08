@@ -4,7 +4,7 @@
       <h3>{{ selectedDocument.title }}</h3>
       <a-space wrap>
         <a-button @click="emit('move', selectedDocument)">移动</a-button>
-        <a-button @click="router.push(`/edit_documentWiki/${selectedDocument.id}`)">编辑</a-button>
+        <a-button @click="emit('edit', selectedDocument)">编辑</a-button>
         <a-button danger @click="emit('delete', selectedDocument)">删除</a-button>
       </a-space>
     </a-flex>
@@ -62,9 +62,7 @@
           <template #actions>
             <a-button type="link" @click="emit('open', item.id)">打开</a-button>
             <a-button type="link" @click="emit('open', item.id)">查看</a-button>
-            <a-button type="link" @click="router.push(`/edit_documentWiki/${item.id}`)"
-              >编辑</a-button
-            >
+            <a-button type="link" @click="emit('edit', item)">编辑</a-button>
             <a-button type="link" @click="emit('move', item)">移动</a-button>
             <a-button type="link" danger @click="emit('delete', item)">删除</a-button>
           </template>
@@ -97,9 +95,7 @@
           <template #actions>
             <a-button type="link" @click="emit('open', item.id)">打开</a-button>
             <a-button type="link" @click="emit('open', item.id)">查看</a-button>
-            <a-button type="link" @click="router.push(`/edit_documentWiki/${item.id}`)"
-              >编辑</a-button
-            >
+            <a-button type="link" @click="emit('edit', item)">编辑</a-button>
             <a-button type="link" @click="emit('move', item)">移动</a-button>
             <a-button type="link" danger @click="emit('delete', item)">删除</a-button>
           </template>
@@ -122,11 +118,9 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import type { PaginationProps } from 'ant-design-vue'
 import { formatTime, type IdValue } from './wikiShared'
 
-const router = useRouter()
 const props = defineProps<{
   selectedDocument: API.DocumentWikiVis
   isSearchMode: boolean
@@ -139,6 +133,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   open: [id: IdValue]
+  edit: [document: API.DocumentWikiVis]
   move: [document: API.DocumentWikiVis]
   delete: [document: API.DocumentWikiVis]
 }>()
