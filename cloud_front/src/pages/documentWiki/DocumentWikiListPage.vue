@@ -7,6 +7,7 @@
           :spaces="spaces"
           @select="handleTreeSelect"
           @create-document="openCreateDocument"
+          @upload-document="uploadDocument"
         />
       </aside>
 
@@ -39,6 +40,7 @@
             :current-space-name="currentSpaceName"
             :current-folder-name="currentFolderName"
             :browse-documents="browseDocuments"
+            :browse-pagination="browsePagination"
             :search-results="searchResults"
             :loading="loading"
             :pagination="pagination"
@@ -51,8 +53,12 @@
       </main>
 
       <aside class="wiki-panel wiki-outline-column">
-        <div class="panel-head">本文大纲</div>
-        <nav v-if="documentOutline.length" class="outline-list" aria-label="本文大纲">
+        <div class="panel-head">{{ outlinePanelTitle }}</div>
+        <nav
+          v-if="outlineMode === 'document' && documentOutline.length"
+          class="outline-list"
+          aria-label="本文大纲"
+        >
           <button
             v-for="item in documentOutline"
             :key="item.id"
@@ -64,7 +70,23 @@
             {{ item.title }}
           </button>
         </nav>
-        <div v-else class="outline-empty">当前文档暂无可用大纲</div>
+        <nav
+          v-else-if="outlineMode === 'list' && folderOutlineDocs.length"
+          class="outline-list"
+          aria-label="文档列表"
+        >
+          <button
+            v-for="doc in folderOutlineDocs"
+            :key="doc.id"
+            type="button"
+            class="outline-item outline-doc-item"
+            :title="doc.title"
+            @click="openDocument(doc.id)"
+          >
+            {{ doc.title }}
+          </button>
+        </nav>
+        <div v-else class="outline-empty">{{ outlineEmptyText }}</div>
       </aside>
     </div>
     <section v-else-if="activeRegion === 'recycle'" class="wiki-panel page-panel">
@@ -100,7 +122,8 @@ import {
   deleteDocumentWikiUsingPost,
   editDocumentWikiUsingPost,
   getDocumentWikiVisByIdUsingGet,
-  listRootDocumentWikiUsingGet,
+  importDocumentWikiUsingPost,
+  listDocumentWikiVisByPageWithCacheUsingPost,
 } from '@/api/documentWikiController.ts'
 import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController.ts'
 import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
@@ -129,6 +152,8 @@ const centerMode = ref<CenterMode>('browse')
 const previousCenterMode = ref<CenterMode>('browse')
 const spaces = ref<API.WikiSpaceVis[]>([])
 const browseDocuments = ref<API.DocumentWikiVis[]>([])
+const browseCurrent = ref(1)
+const browseTotal = ref(0)
 const selectedDocument = ref<API.DocumentWikiVis>({})
 const editingDocument = ref<API.DocumentWikiVis | undefined>()
 const editorInitialSpaceId = ref<IdValue>()
@@ -166,18 +191,86 @@ const currentFolderName = computed(() => {
   const name = currentSelection.value.folder?.name
   return name ? String(name) : ''
 })
-const documentOutline = computed(() =>
-  extractDocumentOutline(isEditorMode.value ? '' : (selectedDocument.value.content ?? '')).map((item, index) => ({
-    ...item,
-    id: `wiki-heading-${index}`,
-  })),
-)
 
-const extractDocumentOutline = (content: string) => {
+// Paging for the browse list. Folder selections list that folder's own documents inline without
+// paging; aggregate region (公开文档) and single-space selections page through every document
+// they cover, 20 per page.
+const browsePagination = computed(() => {
+  if (currentSelection.value.folderId) return false
+  return {
+    current: browseCurrent.value,
+    pageSize: 20,
+    total: browseTotal.value,
+    showTotal: (value: number) => `共 ${value} 条`,
+    onChange: (page: number) => {
+      browseCurrent.value = page
+      fetchBrowsePage()
+    },
+  }
+})
+// The outline column serves two purposes: while a document is open (preview or inline edit)
+// it shows that document's heading outline; whenever the middle column is listing documents
+// (folder, space, or the 公开文档 aggregate) and no document is open, it mirrors that list as
+// a quick-jump navigation instead of showing an empty placeholder.
+const activeOutlineDocument = computed(() =>
+  isEditorMode.value ? editingDocument.value : selectedDocument.value,
+)
+const hasActiveDocument = computed(() => Boolean(activeOutlineDocument.value?.id))
+const outlineMode = computed<'document' | 'list' | 'empty'>(() => {
+  if (hasActiveDocument.value) return 'document'
+  if (browseDocuments.value.length) return 'list'
+  return 'empty'
+})
+const documentOutline = computed(() => {
+  const doc = activeOutlineDocument.value
+  return extractDocumentOutline(doc?.content ?? '', doc?.contentFormat).map((item, index) => ({
+    ...item,
+    // md-editor numbers headings 1-based, so the outline must match or clicks land one heading off.
+    id: `wiki-heading-${index + 1}`,
+  }))
+})
+const folderOutlineDocs = computed(() => browseDocuments.value)
+const outlinePanelTitle = computed(() => {
+  if (outlineMode.value === 'document') return '本文大纲'
+  const hasSelection =
+    currentSelection.value.folderId ||
+    currentSelection.value.spaceId ||
+    currentSelection.value.spaceType != null
+  if (outlineMode.value === 'list' || hasSelection) {
+    return currentSelection.value.folderId ? '文件夹文档' : '文档列表'
+  }
+  return '本文大纲'
+})
+const outlineEmptyText = computed(() => {
+  if (outlineMode.value === 'document') return '当前文档暂无可用大纲'
+  const hasSelection =
+    currentSelection.value.folderId ||
+    currentSelection.value.spaceId ||
+    currentSelection.value.spaceType != null
+  if (hasSelection) return '当前位置暂无文档'
+  return '请选择左侧文档或文件夹'
+})
+
+function extractDocumentOutline(content: string, contentFormat?: string) {
   const outline: { level: number; title: string }[] = []
-  const headingPattern = /^(#{1,4})\s+(.+)$/gm
+  if (contentFormat === 'html') {
+    const parser = new DOMParser()
+    const documentValue = parser.parseFromString(content, 'text/html')
+    documentValue.querySelectorAll('h1, h2, h3, h4').forEach((heading) => {
+      const title = heading.textContent?.trim()
+      if (!title) return
+      const level = Number(heading.tagName.slice(1))
+      outline.push({ level: Math.min(level, 3), title })
+    })
+    return outline
+  }
+  // Fenced code blocks are stripped first so `# comment` inside them is not mistaken for a
+  // heading; the remaining headings are counted the same way md-editor numbers them, which keeps
+  // the generated `wiki-heading-<index>` ids aligned with the rendered anchors.
+  const withoutCode = content.replace(/```[\s\S]*?```/g, '').replace(/~~~[\s\S]*?~~~/g, '')
+  const headingPattern = /^(#{1,6})\s+(.+)$/gm
   let match: RegExpExecArray | null
-  while ((match = headingPattern.exec(content))) {
+  while ((match = headingPattern.exec(withoutCode))) {
     outline.push({
       level: Math.min(match[1].length, 3),
       title: match[2].trim(),
@@ -246,24 +339,45 @@ const handleTreeSelect = async (selection: WikiTreeSelection) => {
   currentSelection.value = selection
   centerMode.value = 'browse'
   selectedDocument.value = {}
+  browseCurrent.value = 1
   if (!isSearchMode.value) {
     await refreshBrowseDocuments()
   }
 }
 
 const refreshBrowseDocuments = async () => {
-  const { spaceId, folderId, folder } = currentSelection.value
-  if (!spaceId) {
-    browseDocuments.value = []
-    return
-  }
+  const { spaceId, folderId, folder, spaceType } = currentSelection.value
+  // Folder selection lists that folder's own documents inline (usually few, no paging needed).
   if (folderId) {
     browseDocuments.value = folder?.documents ?? []
+    browseTotal.value = browseDocuments.value.length
     return
   }
-  const res = await listRootDocumentWikiUsingGet({ spaceId })
-  if (res.data.code === 0) {
-    browseDocuments.value = res.data.data ?? []
+  // Aggregate region (公开文档) or a single space pages through every document it covers.
+  if (spaceType != null || spaceId) {
+    await fetchBrowsePage()
+    return
+  }
+  browseDocuments.value = []
+  browseTotal.value = 0
+}
+
+// Pages every document covered by the current selection: a single space recurses into all of its
+// folders (spaceId without folderId), the 公开文档 aggregate spans every visible public space
+// (spaceType without spaceId). Both are served by the cached paged list endpoint.
+const fetchBrowsePage = async () => {
+  const { spaceId, spaceType } = currentSelection.value
+  const res = await listDocumentWikiVisByPageWithCacheUsingPost({
+    current: browseCurrent.value,
+    pageSize: 20,
+    sortField: 'editTime',
+    sortOrder: 'descend',
+    spaceId: spaceId ?? undefined,
+    spaceType: spaceType ?? undefined,
+  })
+  if (res.data.code === 0 && res.data.data) {
+    browseDocuments.value = res.data.data.records ?? []
+    browseTotal.value = Number(res.data.data.total ?? 0)
   } else {
     message.error('获取文档列表失败，' + res.data.message)
   }
@@ -287,6 +401,15 @@ const doSearch = () => {
 }
 
 const scrollToOutline = (id: string) => {
+  // HTML documents live inside a sandboxed iframe, so their headings are addressed by position
+  // through the frame document instead of by id inside the host page. Outline ids are 1-based.
+  if (selectedDocument.value.contentFormat === 'html') {
+    const index = Number(id.replace('wiki-heading-', '')) - 1
+    const frame = document.querySelector<HTMLIFrameElement>('.html-preview-frame')
+    const target = frame?.contentDocument?.querySelectorAll('h1, h2, h3, h4')[index]
+    target?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    return
+  }
   document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 }
 
@@ -311,9 +434,51 @@ const openCreateDocument = (selection: WikiTreeSelection) => {
   centerMode.value = 'create'
 }
 
+const uploadDocument = async (selection: WikiTreeSelection, file: File) => {
+  if (!selection.spaceId) {
+    message.warning('请先选择文档空间再上传文件')
+    return
+  }
+  const supportedPattern = /\.(md|html|htm)$/i
+  if (!supportedPattern.test(file.name)) {
+    message.error('仅支持上传 md、html、htm 文件')
+    return
+  }
+  if (file.size === 0) {
+    message.error('文件内容为空，请重新选择文件')
+    return
+  }
+  loading.value = true
+  try {
+    const res = await importDocumentWikiUsingPost(
+      {
+        spaceId: selection.spaceId,
+        folderId: selection.folderId ?? undefined,
+      },
+      {},
+      file,
+    )
+    if (res.data.code === 0 && res.data.data) {
+      message.success('文档上传成功')
+      currentSelection.value = selection
+      await refreshWorkspaceAfterSave(res.data.data, selection.spaceId)
+    } else {
+      message.error('文档上传失败，' + res.data.message)
+    }
+  } catch (e: any) {
+    message.error('文档上传失败，' + e.message)
+  } finally {
+    loading.value = false
+  }
+}
+
 const openEditDocument = async (documentWiki: API.DocumentWikiVis) => {
   const id = documentWiki.id
   if (!id) return
+  if (documentWiki.contentFormat === 'html') {
+    message.info('HTML 原页面文档本阶段仅支持预览，不支持编辑')
+    return
+  }
   previousCenterMode.value = centerMode.value === 'create' || centerMode.value === 'edit' ? 'preview' : centerMode.value
   editorFetchLoading.value = true
   try {
@@ -522,6 +687,15 @@ onMounted(async () => {
 .outline-item.level-3 {
   padding-left: 28px;
   font-size: 13px;
+}
+
+.outline-doc-item {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wiki-text);
 }
 
 .outline-empty {

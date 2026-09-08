@@ -2,9 +2,17 @@
   <div class="wiki-space-tree">
     <a-flex justify="space-between" align="center" class="tree-toolbar">
       <span class="tree-title">空间导航</span>
-      <a-button v-if="selectedSpaceId" size="small" @click="openDocumentCreator()"
-        >新建文档</a-button
-      >
+      <a-space v-if="selectedSpaceId" size="small">
+        <a-button size="small" @click="openDocumentCreator()">新建文档</a-button>
+        <a-button size="small" @click="openFilePicker">上传</a-button>
+        <input
+          ref="fileInputRef"
+          class="file-input"
+          type="file"
+          accept=".md,.html,.htm"
+          @change="onFileChange"
+        />
+      </a-space>
     </a-flex>
 
     <a-spin :spinning="loading">
@@ -67,6 +75,9 @@ export type TreeNodePayload = {
   nodeType: 'group' | 'space' | 'folder'
   space?: API.WikiSpaceVis
   folder?: API.WikiFolderVis
+  // Marks a clickable aggregate region node (e.g. "公开文档") that selects every space of a type
+  // instead of a single space. Plain group nodes leave this undefined and stay unselectable.
+  aggregateSpaceType?: number
   selectable?: boolean
   children?: TreeNodePayload[]
 }
@@ -75,6 +86,9 @@ export type WikiTreeSelection = {
   spaceId: IdValue
   folderId?: IdValue | null
   folder?: API.WikiFolderVis | null
+  // Set when an aggregate region node is selected (2 = public). The list page then pages through
+  // every document across all visible spaces of that type.
+  spaceType?: number | null
 }
 
 // Unified navigation tree: region groups -> spaces -> nested folders.
@@ -83,6 +97,7 @@ const props = defineProps<{ spaces: API.WikiSpaceVis[] }>()
 const emit = defineEmits<{
   select: [selection: WikiTreeSelection]
   createDocument: [selection: WikiTreeSelection]
+  uploadDocument: [selection: WikiTreeSelection, file: File]
 }>()
 
 const loading = ref(false)
@@ -91,6 +106,9 @@ const expandedKeys = ref<string[]>([])
 const selectedKeys = ref<string[]>([])
 const selectedSpaceId = ref<IdValue>()
 const selectedFolderId = ref<IdValue | null>(null)
+// Set when the clickable "公开文档" aggregate node is selected instead of a concrete space/folder.
+const selectedAggregateType = ref<number | null>(null)
+const fileInputRef = ref<HTMLInputElement>()
 
 const folderDialogsRef = ref<InstanceType<typeof WikiFolderDialogs>>()
 
@@ -108,18 +126,33 @@ const buildSpaceNode = (space: API.WikiSpaceVis): TreeNodePayload => ({
   children: buildFolderNodes(folderTrees.value[String(space.id)] ?? [], space.id),
 })
 
-const treeData = computed<TreeNodePayload[]>(() => [
-  ...publicSpaces.value.map(buildSpaceNode),
-  ...groupedSpaces.value
+const treeData = computed<TreeNodePayload[]>(() => {
+  const nodes: TreeNodePayload[] = []
+  // Clickable aggregate node: selecting it lists every public document across all public spaces.
+  if (publicSpaces.value.length > 0) {
+    nodes.push({
+      key: 'aggregate:public',
+      label: '公开文档',
+      nodeType: 'group',
+      aggregateSpaceType: 2,
+      selectable: true,
+      children: publicSpaces.value.map(buildSpaceNode),
+    })
+  }
+  // Team / personal groups stay plain non-selectable containers.
+  groupedSpaces.value
     .filter((group) => group.spaces.length > 0)
-    .map((group) => ({
-      key: group.key,
-      label: group.label,
-      nodeType: 'group' as const,
-      selectable: false,
-      children: group.spaces.map(buildSpaceNode),
-    })),
-])
+    .forEach((group) => {
+      nodes.push({
+        key: group.key,
+        label: group.label,
+        nodeType: 'group',
+        selectable: false,
+        children: group.spaces.map(buildSpaceNode),
+      })
+    })
+  return nodes
+})
 
 const buildFolderNodes = (folders: API.WikiFolderVis[], spaceId: IdValue): TreeNodePayload[] =>
   folders.map((folder) => ({
@@ -143,16 +176,26 @@ const findFolderNode = (
 }
 
 const emitSelection = () => {
+  if (selectedAggregateType.value != null) {
+    emit('select', {
+      spaceId: undefined,
+      folderId: null,
+      folder: null,
+      spaceType: selectedAggregateType.value,
+    })
+    return
+  }
   if (selectedFolderId.value) {
     const node = findFolderNode(treeData.value, selectedFolderId.value)
     emit('select', {
       spaceId: selectedSpaceId.value,
       folderId: selectedFolderId.value,
       folder: node?.folder ?? null,
+      spaceType: null,
     })
     return
   }
-  emit('select', { spaceId: selectedSpaceId.value, folderId: null, folder: null })
+  emit('select', { spaceId: selectedSpaceId.value, folderId: null, folder: null, spaceType: null })
 }
 
 const fetchSpaceTree = async (spaceId: IdValue) => {
@@ -189,20 +232,30 @@ const onSelect = (keys: (string | number)[]) => {
   }
   const key = String(keys[0])
   const node = findNodeByKey(treeData.value, key)
-  if (!node || node.nodeType === 'group') return
+  if (!node) return
+  // Plain group nodes (团队/个人) are not selectable; only the aggregate "公开文档" node is.
+  if (node.nodeType === 'group' && node.aggregateSpaceType == null) return
   selectedKeys.value = [key]
-  if (node.nodeType === 'space') {
+  if (node.nodeType === 'group' && node.aggregateSpaceType != null) {
+    selectedAggregateType.value = node.aggregateSpaceType
+    selectedSpaceId.value = undefined
+    selectedFolderId.value = null
+  } else if (node.nodeType === 'space') {
+    selectedAggregateType.value = null
     selectedSpaceId.value = node.space?.id
     selectedFolderId.value = null
   } else {
+    selectedAggregateType.value = null
     selectedSpaceId.value = node.folder?.spaceId
     selectedFolderId.value = node.folder?.id ?? null
   }
   emitSelection()
 }
 
-const currentSelectedKey = () =>
-  selectedFolderId.value ? `folder:${selectedFolderId.value}` : `space:${selectedSpaceId.value}`
+const currentSelectedKey = () => {
+  if (selectedAggregateType.value != null) return 'aggregate:public'
+  return selectedFolderId.value ? `folder:${selectedFolderId.value}` : `space:${selectedSpaceId.value}`
+}
 
 const findNodeByKey = (nodes: TreeNodePayload[], key: string): TreeNodePayload | undefined => {
   for (const node of nodes) {
@@ -229,6 +282,14 @@ const currentSelectionPayload = (): WikiTreeSelection => {
   return { spaceId: selectedSpaceId.value, folderId: null, folder: null }
 }
 const openDocumentCreator = () => emit('createDocument', currentSelectionPayload())
+const openFilePicker = () => fileInputRef.value?.click()
+const onFileChange = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  emit('uploadDocument', currentSelectionPayload(), file)
+  input.value = ''
+}
 const handleFolderChanged = async (spaceId: IdValue, parentId?: IdValue) => {
   const parentKey = parentId ? `folder:${parentId}` : `space:${spaceId}`
   if (!expandedKeys.value.includes(parentKey))
@@ -250,8 +311,16 @@ watch(
           groupedSpaces.value.find((group) => group.spaces.length > 0)?.spaces[0]
         if (firstSpace?.id != null) {
           selectedSpaceId.value = firstSpace.id
+          selectedAggregateType.value = null
           selectedKeys.value = [`space:${firstSpace.id}`]
-          expandedKeys.value = [`space:${firstSpace.id}`]
+          // Expand both the region group and the space so the default selection stays visible.
+          const regionKey =
+            firstSpace.type === 2
+              ? 'aggregate:public'
+              : firstSpace.type === 1
+                ? 'group:team'
+                : 'group:personal'
+          expandedKeys.value = [regionKey, `space:${firstSpace.id}`]
           emitSelection()
         }
       }
@@ -274,6 +343,10 @@ defineExpose({ refresh })
 
 .tree-toolbar {
   margin-bottom: 4px;
+}
+
+.file-input {
+  display: none;
 }
 
 .tree-title {

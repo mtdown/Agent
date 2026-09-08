@@ -14,6 +14,7 @@ import com.et.cloud.dto.documentWiki.DocumentWikiQueryRequest;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
+import com.et.cloud.model.dto.ImportedWikiDocument;
 import com.et.cloud.model.entity.DocumentWiki;
 import com.et.cloud.model.entity.User;
 import com.et.cloud.model.entity.WikiFolder;
@@ -23,6 +24,7 @@ import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
 import com.et.cloud.service.WikiAttachmentService;
 import com.et.cloud.service.WikiCacheManager;
+import com.et.cloud.service.WikiDocumentImportService;
 import com.et.cloud.service.WikiFolderService;
 import com.et.cloud.service.WikiSpaceService;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +68,9 @@ public class DocumentWikiController {
     private WikiAttachmentService wikiAttachmentService;
 
     @Resource
+    private WikiDocumentImportService wikiDocumentImportService;
+
+    @Resource
     private WikiCacheManager wikiCacheManager;
 
     @Resource
@@ -94,6 +99,42 @@ public class DocumentWikiController {
         if (StrUtil.isBlank(documentWiki.getContentFormat())) {
             documentWiki.setContentFormat("markdown");
         }
+        documentWikiService.validDocumentWiki(documentWiki);
+        boolean result = documentWikiService.save(documentWiki);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        wikiCacheManager.clearSpace(documentWiki.getSpaceId());
+        return ResultUtils.success(documentWiki.getId());
+    }
+
+    @PostMapping("/import")
+    public BaseResponse<Long> importDocumentWiki(@RequestParam("file") MultipartFile multipartFile,
+                                                 @RequestParam("spaceId") Long spaceId,
+                                                 @RequestParam(value = "folderId", required = false) Long folderId,
+                                                 @RequestParam(value = "title", required = false) String title,
+                                                 HttpServletRequest request) {
+        ThrowUtils.throwIf(multipartFile == null || multipartFile.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR, "空间不能为空");
+        User loginUser = userService.getLoginUser(request);
+        WikiSpace wikiSpace = wikiSpaceService.requireEditableSpace(spaceId, loginUser);
+        Long targetFolderId = null;
+        if (folderId != null) {
+            WikiFolder folder = wikiFolderService.requireVisibleFolder(folderId, wikiSpace.getId(), loginUser);
+            targetFolderId = folder.getId();
+        }
+        ImportedWikiDocument imported = wikiDocumentImportService.parse(multipartFile, title);
+        DocumentWiki documentWiki = new DocumentWiki();
+        documentWiki.setTitle(imported.getTitle());
+        documentWiki.setContent(imported.getContent());
+        documentWiki.setContentFormat(imported.getContentFormat());
+        documentWiki.setSourceType(imported.getSourceType());
+        documentWiki.setMetadataJson(imported.getMetadataJson());
+        documentWiki.setTags(JSONUtil.toJsonStr(java.util.Collections.emptyList()));
+        documentWiki.setSummary(documentWikiService.buildSummary(imported.getContent()));
+        documentWiki.setUserId(loginUser.getId());
+        documentWiki.setSpaceId(wikiSpace.getId());
+        documentWiki.setFolderId(targetFolderId);
+        documentWiki.setViewCount(0L);
+        documentWiki.setEditTime(new Date());
         documentWikiService.validDocumentWiki(documentWiki);
         boolean result = documentWikiService.save(documentWiki);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -206,6 +247,11 @@ public class DocumentWikiController {
         documentWiki.setSpaceId(oldDocumentWiki.getSpaceId());
         documentWiki.setFolderId(oldDocumentWiki.getFolderId());
         documentWiki.setTags(JSONUtil.toJsonStr(documentWikiEditRequest.getTags()));
+        preserveStoredWikiMetadata(documentWiki, oldDocumentWiki);
+        // Uploaded HTML original-page documents are preview-only in this stage: opening them in the
+        // Markdown/rich-text editor would destroy page-level structure, styling and scripts.
+        ThrowUtils.throwIf("html".equals(documentWiki.getContentFormat()) || "html".equals(oldDocumentWiki.getContentFormat()),
+                ErrorCode.PARAMS_ERROR, "HTML 原页面文档本阶段仅支持预览，不支持编辑");
         if (StrUtil.isBlank(documentWiki.getSummary())) {
             documentWiki.setSummary(documentWikiService.buildSummary(documentWiki.getContent()));
         }
@@ -267,6 +313,44 @@ public class DocumentWikiController {
         if (documentWikiQueryRequest.getSpaceId() != null) {
             wikiSpaceService.requireVisibleSpace(documentWikiQueryRequest.getSpaceId(), loginUser);
         }
-        documentWikiQueryRequest.setVisibleSpaceIds(wikiSpaceService.listVisibleSpaceIds(loginUser));
+        java.util.List<Long> visibleSpaceIds = wikiSpaceService.listVisibleSpaceIds(loginUser);
+        // Selecting a navigation region node (e.g. "公开文档") narrows the visible spaces to one
+        // type so the middle column can page through every document of that region.
+        Integer spaceType = documentWikiQueryRequest.getSpaceType();
+        if (spaceType != null && !visibleSpaceIds.isEmpty()) {
+            visibleSpaceIds = wikiSpaceService.lambdaQuery()
+                    .select(WikiSpace::getId)
+                    .in(WikiSpace::getId, visibleSpaceIds)
+                    .eq(WikiSpace::getType, spaceType)
+                    .list()
+                    .stream()
+                    .map(WikiSpace::getId)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        documentWikiQueryRequest.setVisibleSpaceIds(visibleSpaceIds);
+    }
+
+    private void preserveStoredWikiMetadata(DocumentWiki documentWiki, DocumentWiki oldDocumentWiki) {
+        if (StrUtil.isBlank(documentWiki.getContentFormat())) {
+            documentWiki.setContentFormat(oldDocumentWiki.getContentFormat());
+        }
+        if (StrUtil.isBlank(documentWiki.getSourceType())) {
+            documentWiki.setSourceType(oldDocumentWiki.getSourceType());
+        }
+        if (StrUtil.isBlank(documentWiki.getSourceUrl())) {
+            documentWiki.setSourceUrl(oldDocumentWiki.getSourceUrl());
+        }
+        if (StrUtil.isBlank(documentWiki.getContentHash())) {
+            documentWiki.setContentHash(oldDocumentWiki.getContentHash());
+        }
+        if (documentWiki.getContentVersion() == null) {
+            documentWiki.setContentVersion(oldDocumentWiki.getContentVersion());
+        }
+        if (StrUtil.isBlank(documentWiki.getVisibility())) {
+            documentWiki.setVisibility(oldDocumentWiki.getVisibility());
+        }
+        if (StrUtil.isBlank(documentWiki.getMetadataJson())) {
+            documentWiki.setMetadataJson(oldDocumentWiki.getMetadataJson());
+        }
     }
 }
