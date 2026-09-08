@@ -97,9 +97,12 @@ test('editor folder loader is hoisted so the immediate watcher cannot hit the TD
   assert.doesNotMatch(editorSource, /const fetchFolders =/)
 })
 
-test('html documents are preview-only in list, workspace and detail actions', () => {
+test('html documents are preview-only in the preview header, workspace and detail actions', () => {
   assert.match(listSource, /isPreviewOnly/)
-  assert.match(listSource, /仅预览/)
+  // List cards no longer carry action buttons, so the preview-only rule is enforced in the
+  // preview header instead of a disabled "仅预览" entry on every card.
+  assert.doesNotMatch(listSource, /仅预览/)
+  assert.match(listSource, /HTML 原页面文档本阶段仅支持预览，不支持编辑/)
   assert.match(pageSource, /HTML 原页面文档本阶段仅支持预览，不支持编辑/)
   assert.match(detailSource, /contentFormat\s*!==\s*'html'/)
 })

@@ -1,7 +1,10 @@
 <template>
   <article v-if="selectedDocument.id" class="document-preview">
     <a-flex justify="space-between" align="center" wrap="wrap" gap="middle">
-      <h3>{{ selectedDocument.title }}</h3>
+      <a-space align="center" wrap>
+        <a-button type="text" class="back-button" @click="emit('back')">← 返回列表</a-button>
+        <h3>{{ selectedDocument.title }}</h3>
+      </a-space>
       <a-space wrap>
         <a-button @click="emit('move', selectedDocument)">移动</a-button>
         <a-button
@@ -54,21 +57,6 @@
     >
       <template #renderItem="{ item }">
         <a-list-item>
-          <template #actions>
-            <a-button type="link" @click="emit('open', item.id)">打开</a-button>
-            <a-button type="link" @click="emit('open', item.id)">查看</a-button>
-            <a-button
-              v-if="isPreviewOnly(item)"
-              type="link"
-              disabled
-              title="HTML 原页面文档本阶段仅支持预览，不支持编辑"
-            >
-              仅预览
-            </a-button>
-            <a-button v-else type="link" @click="emit('edit', item)">编辑</a-button>
-            <a-button type="link" @click="emit('move', item)">移动</a-button>
-            <a-button type="link" danger @click="emit('delete', item)">删除</a-button>
-          </template>
           <a-list-item-meta>
             <template #title>
               <button class="result-title" @click="emit('open', item.id)">{{ item.title }}</button>
@@ -95,21 +83,6 @@
     >
       <template #renderItem="{ item }">
         <a-list-item>
-          <template #actions>
-            <a-button type="link" @click="emit('open', item.id)">打开</a-button>
-            <a-button type="link" @click="emit('open', item.id)">查看</a-button>
-            <a-button
-              v-if="isPreviewOnly(item)"
-              type="link"
-              disabled
-              title="HTML 原页面文档本阶段仅支持预览，不支持编辑"
-            >
-              仅预览
-            </a-button>
-            <a-button v-else type="link" @click="emit('edit', item)">编辑</a-button>
-            <a-button type="link" @click="emit('move', item)">移动</a-button>
-            <a-button type="link" danger @click="emit('delete', item)">删除</a-button>
-          </template>
           <a-list-item-meta>
             <template #title>
               <button class="result-title" @click="emit('open', item.id)">{{ item.title }}</button>
@@ -149,6 +122,7 @@ const emit = defineEmits<{
   edit: [document: API.DocumentWikiVis]
   move: [document: API.DocumentWikiVis]
   delete: [document: API.DocumentWikiVis]
+  back: []
 }>()
 
 // Uploaded HTML original-page documents are preview-only in this stage.
@@ -171,6 +145,13 @@ const browseTotalCount = computed(() => {
 }
 .doc-count {
   color: #999;
+}
+.back-button {
+  padding: 0 4px;
+  color: var(--wiki-text-muted);
+}
+.back-button:hover {
+  color: #a14f16;
 }
 .result-title {
   border: 0;
