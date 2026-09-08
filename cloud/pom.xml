@@ -70,6 +70,7 @@
             <artifactId>jsoup</artifactId>
             <version>1.15.3</version>
         </dependency>
+        <!-- Word (.docx) import is out of scope for this stage; no POI dependency is required. -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-jsqlparser-4.9</artifactId>

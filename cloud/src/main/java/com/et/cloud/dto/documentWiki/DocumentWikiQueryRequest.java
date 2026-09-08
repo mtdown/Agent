@@ -51,6 +51,13 @@ public class DocumentWikiQueryRequest extends PageRequest implements Serializabl
     private Long userId;
 
     /**
+     * Space type filter (0 personal, 1 team, 2 public). Set when a navigation region node such
+     * as "公开文档" is selected so the query lists documents across every visible space of that
+     * type instead of a single space.
+     */
+    private Integer spaceType;
+
+    /**
      * Filled by the controller after visibility checks.
      */
     private List<Long> visibleSpaceIds;

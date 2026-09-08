@@ -19,6 +19,7 @@ import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
 import com.et.cloud.service.WikiSpaceService;
 import org.apache.commons.lang3.StringUtils;
+import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -44,7 +45,10 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
 
     private static final int MAX_CATEGORY_LENGTH = 64;
 
-    private static final int MAX_CONTENT_LENGTH = 100000;
+    // Uploaded HTML pages keep their original markup (inline <style>, class names, scripts),
+    // so a single imported document is far larger than a hand-written Markdown note. The
+    // database column is longtext, so the limit exists only to stop pathological uploads.
+    private static final int MAX_CONTENT_LENGTH = 6000000;
 
     private static final int SUMMARY_LENGTH = 160;
 
@@ -52,7 +56,7 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
 
     private static final int MAX_METADATA_LENGTH = 2048;
 
-    private static final List<String> ALLOWED_CONTENT_FORMAT_LIST = Arrays.asList("plain", "markdown");
+    private static final List<String> ALLOWED_CONTENT_FORMAT_LIST = Arrays.asList("plain", "markdown", "html");
 
     private static final List<String> ALLOWED_SOURCE_TYPE_LIST = Arrays.asList("NATIVE", "UPLOAD", "IMPORT", "URL");
 
@@ -191,7 +195,8 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         ThrowUtils.throwIf(StrUtil.isBlank(title), ErrorCode.PARAMS_ERROR, "标题不能为空");
         ThrowUtils.throwIf(title.length() > MAX_TITLE_LENGTH, ErrorCode.PARAMS_ERROR, "标题过长");
         ThrowUtils.throwIf(StrUtil.isBlank(content), ErrorCode.PARAMS_ERROR, "正文不能为空");
-        ThrowUtils.throwIf(content.length() > MAX_CONTENT_LENGTH, ErrorCode.PARAMS_ERROR, "正文过长");
+        ThrowUtils.throwIf(content.length() > MAX_CONTENT_LENGTH, ErrorCode.PARAMS_ERROR,
+                "正文过长，单个文档不能超过 " + MAX_CONTENT_LENGTH + " 字符");
         ThrowUtils.throwIf(StrUtil.isNotBlank(summary) && summary.length() > MAX_SUMMARY_LENGTH, ErrorCode.PARAMS_ERROR, "摘要过长");
         ThrowUtils.throwIf(category != null && category.length() > MAX_CATEGORY_LENGTH, ErrorCode.PARAMS_ERROR, "分类过长");
         ThrowUtils.throwIf(documentWiki.getSpaceId() == null || documentWiki.getSpaceId() <= 0, ErrorCode.PARAMS_ERROR, "空间不能为空");
@@ -229,7 +234,7 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
         if (StrUtil.isBlank(content)) {
             return "";
         }
-        String normalizedContent = content.replaceAll("\\s+", " ").trim();
+        String normalizedContent = Jsoup.parse(content).text().replaceAll("\\s+", " ").trim();
         return StrUtil.sub(normalizedContent, 0, SUMMARY_LENGTH);
     }
 

@@ -45,19 +45,21 @@ class DocumentWikiServiceImplTest {
     }
 
     @Test
-    void validDocumentWikiRejectsIllegalContentFormat() {
+    void validDocumentWikiAcceptsHtmlContentFormat() {
         DocumentWiki documentWiki = new DocumentWiki();
         documentWiki.setTitle("Valid title");
         documentWiki.setContent("valid content");
         documentWiki.setSpaceId(1L);
         documentWiki.setContentFormat("html");
 
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> documentWikiService.validDocumentWiki(documentWiki)
-        );
+        assertDoesNotThrow(() -> documentWikiService.validDocumentWiki(documentWiki));
+    }
 
-        assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
+    @Test
+    void buildSummaryStripsHtmlTags() {
+        String summary = documentWikiService.buildSummary("<h1>Title</h1><p>Safe <strong>content</strong></p>");
+
+        assertEquals("Title Safe content", summary);
     }
 
     @Test

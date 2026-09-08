@@ -238,6 +238,7 @@ declare namespace API {
     sortField?: string
     sortOrder?: string
     spaceId?: string | number
+    spaceType?: number
     summary?: string
     tags?: string[]
     title?: string
@@ -267,6 +268,15 @@ declare namespace API {
   type getDocumentWikiVisByIdUsingGETParams = {
     /** id */
     id?: string | number
+  }
+
+  type importDocumentWikiUsingPOSTParams = {
+    /** folderId */
+    folderId?: string | number
+    /** spaceId */
+    spaceId: string | number
+    /** title */
+    title?: string
   }
 
   type GetOutPaintingTaskResponse = {

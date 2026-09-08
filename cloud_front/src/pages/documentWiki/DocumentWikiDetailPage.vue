@@ -18,12 +18,10 @@
         <a-typography-paragraph v-if="documentWiki.summary" type="secondary">
           {{ documentWiki.summary }}
         </a-typography-paragraph>
-        <MdPreview
-          v-if="documentWiki.contentFormat === 'markdown'"
-          :model-value="documentWiki.content ?? ''"
-          language="zh-CN"
+        <DocumentWikiContentViewer
+          :content="documentWiki.content"
+          :content-format="documentWiki.contentFormat"
         />
-        <div v-else class="content">{{ documentWiki.content }}</div>
       </article>
     </a-spin>
   </div>
@@ -33,12 +31,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
 import {
   deleteDocumentWikiUsingPost,
   getDocumentWikiVisByIdUsingGet,
 } from '@/api/documentWikiController.ts'
+import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
 import { useLoginUserStore } from '@/stores/useLoginUserStore.ts'
 
 interface Props {
@@ -52,7 +49,11 @@ const loading = ref(false)
 const documentWiki = ref<API.DocumentWikiVis>({})
 
 const canEdit = computed(() => {
-  return Boolean(loginUserStore.loginUser?.id && documentWiki.value.id)
+  // Uploaded HTML original-page documents are preview-only in this stage.
+  return (
+    Boolean(loginUserStore.loginUser?.id && documentWiki.value.id) &&
+    documentWiki.value.contentFormat !== 'html'
+  )
 })
 
 const canDelete = canEdit
@@ -114,8 +115,4 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
-.content {
-  line-height: 1.8;
-  white-space: pre-wrap;
-}
 </style>

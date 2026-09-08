@@ -4,7 +4,14 @@
       <h3>{{ selectedDocument.title }}</h3>
       <a-space wrap>
         <a-button @click="emit('move', selectedDocument)">移动</a-button>
-        <a-button @click="emit('edit', selectedDocument)">编辑</a-button>
+        <a-button
+          v-if="isPreviewOnly(selectedDocument)"
+          disabled
+          title="HTML 原页面文档本阶段仅支持预览，不支持编辑"
+        >
+          编辑
+        </a-button>
+        <a-button v-else @click="emit('edit', selectedDocument)">编辑</a-button>
         <a-button danger @click="emit('delete', selectedDocument)">删除</a-button>
       </a-space>
     </a-flex>
@@ -16,22 +23,10 @@
     <a-typography-paragraph v-if="selectedDocument.summary" type="secondary">
       {{ selectedDocument.summary }}
     </a-typography-paragraph>
-    <div class="content">
-      <template v-if="contentBlocks.length">
-        <template v-for="block in contentBlocks" :key="block.key">
-          <component
-            :is="block.tag"
-            v-if="block.type === 'heading'"
-            :id="block.id"
-            class="document-heading"
-          >
-            {{ block.text }}
-          </component>
-          <p v-else class="document-paragraph">{{ block.text }}</p>
-        </template>
-      </template>
-      <template v-else>{{ selectedDocument.content }}</template>
-    </div>
+    <DocumentWikiContentViewer
+      :content="selectedDocument.content"
+      :content-format="selectedDocument.contentFormat"
+    />
   </article>
 
   <template v-else>
@@ -48,21 +43,29 @@
         <template v-if="currentFolderName"> / {{ currentFolderName }}</template>
         <template v-else> / 根目录</template>
       </span>
-      <span class="doc-count">共 {{ browseDocuments.length }} 篇文档</span>
+      <span class="doc-count">共 {{ browseTotalCount }} 篇文档</span>
     </a-flex>
     <a-list
       v-if="!isSearchMode"
       item-layout="vertical"
       :data-source="browseDocuments"
       :loading="loading"
-      :pagination="false"
+      :pagination="browsePagination"
     >
       <template #renderItem="{ item }">
         <a-list-item>
           <template #actions>
             <a-button type="link" @click="emit('open', item.id)">打开</a-button>
             <a-button type="link" @click="emit('open', item.id)">查看</a-button>
-            <a-button type="link" @click="emit('edit', item)">编辑</a-button>
+            <a-button
+              v-if="isPreviewOnly(item)"
+              type="link"
+              disabled
+              title="HTML 原页面文档本阶段仅支持预览，不支持编辑"
+            >
+              仅预览
+            </a-button>
+            <a-button v-else type="link" @click="emit('edit', item)">编辑</a-button>
             <a-button type="link" @click="emit('move', item)">移动</a-button>
             <a-button type="link" danger @click="emit('delete', item)">删除</a-button>
           </template>
@@ -95,7 +98,15 @@
           <template #actions>
             <a-button type="link" @click="emit('open', item.id)">打开</a-button>
             <a-button type="link" @click="emit('open', item.id)">查看</a-button>
-            <a-button type="link" @click="emit('edit', item)">编辑</a-button>
+            <a-button
+              v-if="isPreviewOnly(item)"
+              type="link"
+              disabled
+              title="HTML 原页面文档本阶段仅支持预览，不支持编辑"
+            >
+              仅预览
+            </a-button>
+            <a-button v-else type="link" @click="emit('edit', item)">编辑</a-button>
             <a-button type="link" @click="emit('move', item)">移动</a-button>
             <a-button type="link" danger @click="emit('delete', item)">删除</a-button>
           </template>
@@ -119,6 +130,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PaginationProps } from 'ant-design-vue'
+import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
 import { formatTime, type IdValue } from './wikiShared'
 
 const props = defineProps<{
@@ -127,6 +139,7 @@ const props = defineProps<{
   currentSpaceName?: string
   currentFolderName: string
   browseDocuments: API.DocumentWikiVis[]
+  browsePagination?: PaginationProps | false
   searchResults: API.DocumentWikiVis[]
   loading: boolean
   pagination: PaginationProps
@@ -138,36 +151,17 @@ const emit = defineEmits<{
   delete: [document: API.DocumentWikiVis]
 }>()
 
-const contentBlocks = computed(() => {
-  const content = props.selectedDocument.content ?? ''
-  const lines = content.split(/\r?\n/)
-  const headingIndexes = new Map<number, string>()
-  let headingIndex = 0
-  return lines
-    .map((line, index) => {
-      const heading = /^(#{1,4})\s+(.+)$/.exec(line)
-      if (heading) {
-        const id = `wiki-heading-${headingIndex}`
-        headingIndexes.set(index, id)
-        headingIndex += 1
-        const level = Math.min(heading[1].length + 1, 4)
-        return {
-          key: `${index}-${id}`,
-          type: 'heading',
-          tag: `h${level}`,
-          id,
-          text: heading[2].trim(),
-        }
-      }
-      return {
-        key: `${index}-p`,
-        type: 'paragraph',
-        tag: 'p',
-        id: undefined,
-        text: line.trim(),
-      }
-    })
-    .filter((block) => block.text)
+// Uploaded HTML original-page documents are preview-only in this stage.
+const isPreviewOnly = (documentWiki?: API.DocumentWikiVis) =>
+  documentWiki?.contentFormat === 'html'
+
+// Total document count for the location bar: paged browse modes read it from the pagination
+// total, inline folder browsing falls back to the loaded rows.
+const browseTotalCount = computed(() => {
+  if (props.browsePagination && typeof props.browsePagination === 'object') {
+    return props.browsePagination.total ?? props.browseDocuments.length
+  }
+  return props.browseDocuments.length
 })
 </script>
 <style scoped>
@@ -197,22 +191,5 @@ const contentBlocks = computed(() => {
 .summary {
   color: #666;
   white-space: pre-wrap;
-}
-.content {
-  line-height: 1.8;
-  white-space: pre-wrap;
-}
-
-.document-heading {
-  scroll-margin-top: 18px;
-  margin: 22px 0 10px;
-  color: #251f18;
-  font-weight: 600;
-}
-
-.document-paragraph {
-  margin: 0 0 12px;
-  color: #3f3429;
-  line-height: 1.8;
 }
 </style>

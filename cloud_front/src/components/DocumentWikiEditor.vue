@@ -107,6 +107,10 @@ const folderOptions = computed(() => [
   { label: '空间根目录', value: '' },
   ...flattenFolders(folders.value),
 ])
+// Editing is Markdown-only in this stage: uploaded HTML original-page documents stay preview-only.
+const resolvedContentFormat = computed(() =>
+  props.documentWiki?.contentFormat === 'plain' ? 'plain' : 'markdown',
+)
 
 const applyInitialLocation = async () => {
   if (props.documentWiki?.id) return
@@ -157,7 +161,10 @@ const fetchSpaces = async () => {
   }
 }
 
-const fetchFolders = async (spaceId: SelectValue) => {
+// Declared as a hoisted function instead of a `const` arrow: the `immediate` watcher above runs
+// during setup and would otherwise hit the temporal dead zone ("Cannot access 'fetchFolders'
+// before initialization") whenever a document with a spaceId is edited inline.
+async function fetchFolders(spaceId: SelectValue) {
   if (!spaceId) {
     folders.value = []
     return
@@ -185,11 +192,24 @@ const handleFinish = () => {
     message.warning('请选择文档空间')
     return
   }
+  if (props.documentWiki?.contentFormat === 'html') {
+    message.warning('HTML 原页面文档本阶段仅支持预览，不支持编辑')
+    return
+  }
+  if (!props.documentWiki?.id) {
+    emit('submit', {
+      ...formState,
+      folderId: formState.folderId || undefined,
+      tags: formState.tags ?? [],
+      contentFormat: 'markdown',
+    })
+    return
+  }
   emit('submit', {
     ...formState,
     folderId: formState.folderId || undefined,
     tags: formState.tags ?? [],
-    contentFormat: 'markdown',
+    contentFormat: resolvedContentFormat.value,
   })
 }
 
@@ -241,3 +261,43 @@ onMounted(async () => {
   await applyInitialLocation()
 })
 </script>
+
+<style scoped>
+/* ---- Warm-theme overrides for the Markdown editor ------------------
+   md-editor-v3 ships a pure-white light theme driven by --md-* CSS
+   variables. Overriding those variables on the editor root recolors the
+   toolbar, editing area and live preview so the editor blends into the
+   warm Wiki panel instead of sitting on top of it as a large white block. */
+:deep(.md-editor) {
+  --md-bk-color: var(--wiki-panel);
+  --md-color: var(--wiki-text);
+  --md-border-color: var(--wiki-border);
+  --md-bk-color-outstand: var(--wiki-panel-head);
+  --md-bk-hover-color: var(--wiki-accent-soft);
+  --md-border-hover-color: var(--wiki-accent);
+  --md-border-active-color: var(--wiki-accent);
+  --md-hover-color: var(--wiki-text);
+  --md-scrollbar-bg-color: var(--wiki-muted);
+  --md-scrollbar-thumb-color: var(--wiki-border);
+  --md-scrollbar-thumb-hover-color: var(--wiki-accent);
+  --md-scrollbar-thumb-active-color: var(--wiki-accent);
+}
+
+/* CodeMirror paints its own canvas and gutter surfaces; keep them transparent
+   so the warm panel color shows through instead of a white editing area. */
+:deep(.md-editor .cm-editor),
+:deep(.md-editor .cm-content),
+:deep(.md-editor .cm-gutters) {
+  background: transparent;
+  color: var(--wiki-text);
+}
+
+/* The live preview pane reuses the preview theme; keep it transparent so it
+   matches the standalone warm preview instead of rendering white. */
+:deep(.md-editor-preview-wrapper),
+:deep(.md-editor-preview) {
+  background: transparent;
+  color: var(--wiki-text);
+}
+</style>
+
