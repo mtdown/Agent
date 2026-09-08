@@ -55,5 +55,7 @@
 
 ## 8. Upload For Review
 
-- [ ] 8.1 After code changes, automated checks, and负责人 acceptance are complete, run `upload.ps1 -Message "feat: add batch document import"` and verify the remote task branch is pushed
-- [ ] 8.2 Report the pushed branch and remind that merging to `main` must be performed by the负责人 through merge request / pull request review
+- [x] 8.1 After code changes, automated checks, and负责人 acceptance are complete, run `upload.ps1 -Message "feat: add batch document import"` and verify the remote task branch is pushed
+  - 2026-09-08 23:15: 负责人指示提前推送（人工验收 7.2–7.5 尚未执行，仍为未完成）。提交 `7a53fe0 feat: 批量文档导入(URL/多文件)与网页清洗为 Markdown`，已推到 `origin/feature/batch-document-import开发`（`5d5ae16..7a53fe0`），`rev-list origin/... ..HEAD` 为 0，工作区干净。
+  - `upload.ps1` 在会话内无法执行（`git` 原生调用被拦，脚本无输出无提交）；改用系统 git `C:\Program Files\Git\cmd\git`（2.50.0）执行等价的 `add -A` / `commit` / `push`。
+- [x] 8.2 Report the pushed branch and remind that merging to `main` must be performed by the负责人 through merge request / pull request review
