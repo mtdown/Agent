@@ -48,12 +48,24 @@
             @edit="openEditDocument"
             @move="moveDialogRef?.open($event)"
             @delete="deleteDocument"
+            @back="goBack"
           />
         </section>
       </main>
 
       <aside class="wiki-panel wiki-outline-column">
-        <div class="panel-head">{{ outlinePanelTitle }}</div>
+        <div class="panel-head">
+          <span>{{ outlinePanelTitle }}</span>
+          <a-button
+            v-if="outlineMode === 'list' && folderOutlineDocs.length"
+            type="link"
+            size="small"
+            class="manage-toggle"
+            @click="toggleManageMode"
+          >
+            {{ manageMode ? (allChecked ? '取消全选' : '全选') : '管理' }}
+          </a-button>
+        </div>
         <nav
           v-if="outlineMode === 'document' && documentOutline.length"
           class="outline-list"
@@ -75,18 +87,31 @@
           class="outline-list"
           aria-label="文档列表"
         >
-          <button
-            v-for="doc in folderOutlineDocs"
-            :key="doc.id"
-            type="button"
-            class="outline-item outline-doc-item"
-            :title="doc.title"
-            @click="openDocument(doc.id)"
-          >
-            {{ doc.title }}
-          </button>
+          <div v-for="doc in folderOutlineDocs" :key="doc.id" class="outline-row">
+            <a-checkbox
+              v-if="manageMode"
+              :checked="checkedDocIds.includes(doc.id)"
+              @change="() => toggleChecked(doc.id)"
+            />
+            <button
+              type="button"
+              class="outline-item outline-doc-item"
+              :title="doc.title"
+              @click="onOutlineDocClick(doc.id)"
+            >
+              {{ doc.title }}
+            </button>
+          </div>
         </nav>
         <div v-else class="outline-empty">{{ outlineEmptyText }}</div>
+        <div v-if="manageMode" class="manage-bar">
+          <span>已选 {{ checkedDocIds.length }} 篇</span>
+          <a-space size="small">
+            <a-button size="small" @click="openBatchMove">移动</a-button>
+            <a-button size="small" danger @click="batchDelete">删除</a-button>
+            <a-button size="small" @click="resetManageState">取消</a-button>
+          </a-space>
+        </div>
       </aside>
     </div>
     <section v-else-if="activeRegion === 'recycle'" class="wiki-panel page-panel">
@@ -114,7 +139,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -168,6 +193,16 @@ const currentSelection = ref<WikiTreeSelection>({
   folderId: null,
   folder: null,
 })
+// Right-column document management: `manageMode` toggles the checkbox UI, `checkedDocIds` holds
+// the ids ticked in the current page. Both must be cleared whenever the user moves elsewhere,
+// otherwise a stale id could be deleted after the location changed.
+const manageMode = ref(false)
+const checkedDocIds = ref<IdValue[]>([])
+
+const resetManageState = () => {
+  manageMode.value = false
+  checkedDocIds.value = []
+}
 
 const isAdmin = computed(() => loginUserStore.loginUser?.userRole === 'admin')
 const isEditorMode = computed(() => centerMode.value === 'create' || centerMode.value === 'edit')
@@ -192,22 +227,23 @@ const currentFolderName = computed(() => {
   return name ? String(name) : ''
 })
 
-// Paging for the browse list. Folder selections list that folder's own documents inline without
-// paging; aggregate region (公开文档) and single-space selections page through every document
-// they cover, 20 per page.
-const browsePagination = computed(() => {
-  if (currentSelection.value.folderId) return false
-  return {
-    current: browseCurrent.value,
-    pageSize: 20,
-    total: browseTotal.value,
-    showTotal: (value: number) => `共 ${value} 条`,
-    onChange: (page: number) => {
-      browseCurrent.value = page
-      fetchBrowsePage()
-    },
-  }
-})
+// Paging for the browse list. All three selection kinds (single space, folder, and the 公开文档
+// aggregate) page through the documents they cover, 20 per page, so a folder with many documents
+// stays consistent with the other two instead of silently dumping every row at once.
+const BROWSE_PAGE_SIZE = 20
+const browsePagination = computed(() => ({
+  current: browseCurrent.value,
+  pageSize: BROWSE_PAGE_SIZE,
+  total: browseTotal.value,
+  showTotal: (value: number) => `共 ${value} 条`,
+  onChange: (page: number) => {
+    browseCurrent.value = page
+    // Ticked ids belong to the page they were picked on; leaving them across pages would let a
+    // later batch action hit documents the user can no longer see.
+    resetManageState()
+    fetchBrowsePage()
+  },
+}))
 // The outline column serves two purposes: while a document is open (preview or inline edit)
 // it shows that document's heading outline; whenever the middle column is listing documents
 // (folder, space, or the 公开文档 aggregate) and no document is open, it mirrors that list as
@@ -306,9 +342,19 @@ watch(
   },
   { immediate: true },
 )
+// The search bar's space selector defaults to wherever the user is browsing. The 公开文档
+// aggregate node has no single spaceId, so it falls back to the "全部可见空间" placeholder.
+watch(
+  () => currentSelection.value.spaceId,
+  (spaceId) => {
+    searchParams.value.spaceId = spaceId
+  },
+  { immediate: true },
+)
 
 const refreshAll = async () => {
   loading.value = true
+  resetManageState()
   try {
     await fetchSpaces()
     await spaceTreeRef.value?.refresh()
@@ -340,21 +386,21 @@ const handleTreeSelect = async (selection: WikiTreeSelection) => {
   centerMode.value = 'browse'
   selectedDocument.value = {}
   browseCurrent.value = 1
-  if (!isSearchMode.value) {
-    await refreshBrowseDocuments()
+  resetManageState()
+  // Clicking the navigation tree is an explicit "take me to this place" intent, so it always wins
+  // over an active search: drop the keyword and show the selected location's documents.
+  if (isSearchMode.value) {
+    searchParams.value.searchText = ''
+    searchParams.value.current = 1
   }
+  await refreshBrowseDocuments()
 }
 
 const refreshBrowseDocuments = async () => {
-  const { spaceId, folderId, folder, spaceType } = currentSelection.value
-  // Folder selection lists that folder's own documents inline (usually few, no paging needed).
-  if (folderId) {
-    browseDocuments.value = folder?.documents ?? []
-    browseTotal.value = browseDocuments.value.length
-    return
-  }
-  // Aggregate region (公开文档) or a single space pages through every document it covers.
-  if (spaceType != null || spaceId) {
+  const { spaceId, folderId, spaceType } = currentSelection.value
+  // A single space, a folder, or the 公开文档 aggregate all page through the documents they
+  // cover; only "nothing selected" clears the list.
+  if (spaceType != null || spaceId || folderId) {
     await fetchBrowsePage()
     return
   }
@@ -363,16 +409,18 @@ const refreshBrowseDocuments = async () => {
 }
 
 // Pages every document covered by the current selection: a single space recurses into all of its
-// folders (spaceId without folderId), the 公开文档 aggregate spans every visible public space
-// (spaceType without spaceId). Both are served by the cached paged list endpoint.
+// folders (spaceId without folderId), a folder scopes to that folder's own documents (folderId),
+// and the 公开文档 aggregate spans every visible public space (spaceType without spaceId).
+// All three are served by the cached paged list endpoint.
 const fetchBrowsePage = async () => {
-  const { spaceId, spaceType } = currentSelection.value
+  const { spaceId, folderId, spaceType } = currentSelection.value
   const res = await listDocumentWikiVisByPageWithCacheUsingPost({
     current: browseCurrent.value,
-    pageSize: 20,
+    pageSize: BROWSE_PAGE_SIZE,
     sortField: 'editTime',
     sortOrder: 'descend',
     spaceId: spaceId ?? undefined,
+    folderId: folderId ?? undefined,
     spaceType: spaceType ?? undefined,
   })
   if (res.data.code === 0 && res.data.data) {
@@ -415,6 +463,7 @@ const scrollToOutline = (id: string) => {
 
 const openDocument = async (id: IdValue) => {
   if (!id) return
+  resetManageState()
   const res = await getDocumentWikiVisByIdUsingGet({ id: String(id) })
   if (res.data.code === 0 && res.data.data) {
     selectedDocument.value = res.data.data
@@ -422,6 +471,36 @@ const openDocument = async (id: IdValue) => {
   } else {
     message.error('打开文档失败，' + res.data.message)
   }
+}
+
+// Leaves the document preview / inline editor and returns to the document list of the current
+// location. Shared by the "返回列表" button and the Escape shortcut so both behave identically.
+const goBack = async () => {
+  if (isEditorMode.value) {
+    cancelInlineEditor()
+    return
+  }
+  if (centerMode.value !== 'preview') return
+  selectedDocument.value = {}
+  centerMode.value = 'browse'
+  await refreshBrowseDocuments()
+}
+
+// Escape must never steal the key from an open dialog or from the editor while the user types.
+const isEscapeTaken = (target: EventTarget | null) => {
+  const element = target as HTMLElement | null
+  if (element?.closest) {
+    if (element.closest('input, textarea, [contenteditable="true"]')) return true
+  }
+  return Boolean(document.querySelector('.ant-modal-wrap:not([style*="display: none"])'))
+}
+
+const onKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape') return
+  if (activeRegion.value !== 'docs') return
+  if (isEscapeTaken(event.target)) return
+  event.preventDefault()
+  void goBack()
 }
 
 const openCreateDocument = (selection: WikiTreeSelection) => {
@@ -563,11 +642,91 @@ const deleteDocument = async (documentWiki: API.DocumentWikiVis) => {
   })
 }
 
+// --- Right-column document management -------------------------------------------------------
+// Only the documents rendered on the current page can be selected, so "select all" stays honest
+// about what it covers when the middle column is paginated.
+const selectableDocIds = computed(() =>
+  folderOutlineDocs.value.map((doc) => doc.id).filter((id): id is IdValue => Boolean(id)),
+)
+const allChecked = computed(
+  () =>
+    selectableDocIds.value.length > 0 &&
+    checkedDocIds.value.length === selectableDocIds.value.length,
+)
+
+const toggleManageMode = () => {
+  if (!manageMode.value) {
+    manageMode.value = true
+    return
+  }
+  checkedDocIds.value = allChecked.value ? [] : [...selectableDocIds.value]
+}
+
+const toggleChecked = (id: IdValue) => {
+  const index = checkedDocIds.value.indexOf(id)
+  checkedDocIds.value =
+    index >= 0
+      ? checkedDocIds.value.filter((value) => value !== id)
+      : [...checkedDocIds.value, id]
+}
+
+// While managing, a row click ticks the checkbox instead of opening the document, so selecting
+// several documents never navigates away from the list.
+const onOutlineDocClick = (id: IdValue) => {
+  if (manageMode.value) {
+    toggleChecked(id)
+    return
+  }
+  void openDocument(id)
+}
+
+const openBatchMove = () => {
+  if (!checkedDocIds.value.length) {
+    message.warning('请先选择要移动的文档')
+    return
+  }
+  moveDialogRef.value?.openBatch([...checkedDocIds.value], currentSelection.value.spaceId)
+}
+
+const batchDelete = () => {
+  if (!checkedDocIds.value.length) {
+    message.warning('请先选择要删除的文档')
+    return
+  }
+  const targetIds = [...checkedDocIds.value]
+  Modal.confirm({
+    title: `删除后将进入回收站，确认删除选中的 ${targetIds.length} 篇文档？`,
+    async onOk() {
+      let success = 0
+      let failed = 0
+      for (const id of targetIds) {
+        const res = await deleteDocumentWikiUsingPost({ id })
+        if (res.data.code === 0) {
+          success += 1
+        } else {
+          failed += 1
+        }
+      }
+      if (failed === 0) {
+        message.success(`已删除 ${success} 篇文档`)
+      } else {
+        message.warning(`已删除 ${success} 篇，失败 ${failed} 篇`)
+      }
+      await refreshAll()
+    },
+  })
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', onKeydown)
   await fetchSpaces()
   if (route.query.open) {
     await openDocument(route.query.open as string)
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 <style scoped>
@@ -624,6 +783,8 @@ onMounted(async () => {
   min-height: 46px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 0 14px;
   border-bottom: 1px solid var(--wiki-border);
   background: var(--wiki-panel-head);
@@ -687,6 +848,38 @@ onMounted(async () => {
 .outline-item.level-3 {
   padding-left: 28px;
   font-size: 13px;
+}
+
+.manage-toggle {
+  padding: 0 4px;
+  font-weight: 400;
+}
+
+.outline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.outline-row .outline-doc-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.manage-bar {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-top: 1px solid var(--wiki-border);
+  background: var(--wiki-panel-head);
+  border-radius: 0 0 6px 6px;
+  flex-shrink: 0;
+  color: var(--wiki-text-muted);
 }
 
 .outline-doc-item {

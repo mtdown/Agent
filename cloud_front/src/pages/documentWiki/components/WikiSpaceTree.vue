@@ -371,8 +371,10 @@ defineExpose({ refresh })
   white-space: nowrap;
 }
 
+/* Kept visible at rest: the folder menu (rename / move / delete) is undiscoverable when the
+   trigger only appears on hover. Dimmed slightly so it does not compete with the node label. */
 .node-op {
-  opacity: 0;
+  opacity: 0.55;
   padding: 0 4px;
 }
 
