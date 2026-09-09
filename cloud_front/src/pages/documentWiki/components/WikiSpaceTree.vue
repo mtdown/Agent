@@ -126,10 +126,20 @@ const buildSpaceNode = (space: API.WikiSpaceVis): TreeNodePayload => ({
   children: buildFolderNodes(folderTrees.value[String(space.id)] ?? [], space.id),
 })
 
+// 分组行与唯一空间行合并后的根节点：仍是一个空间节点（key 与 nodeType 不变），仅标签改用
+// 分组标题——这样点击选中、文件夹挂载、依赖 selectedSpaceId 的「新建文档/上传」按钮全部免改。
+const singleSpaceRootNode = (space: API.WikiSpaceVis, label: string): TreeNodePayload => ({
+  ...buildSpaceNode(space),
+  label,
+})
+
 const treeData = computed<TreeNodePayload[]>(() => {
   const nodes: TreeNodePayload[] = []
-  // Clickable aggregate node: selecting it lists every public document across all public spaces.
-  if (publicSpaces.value.length > 0) {
+  // 公开空间全局唯一（ensurePublicSpace）：单空间时折叠为单行「公开文档」根节点，不再出现
+  // 「公开文档 > 公开文档」两层重复；异常多空间时退回聚合格式兜底。
+  if (publicSpaces.value.length === 1) {
+    nodes.push(singleSpaceRootNode(publicSpaces.value[0], '公开文档'))
+  } else if (publicSpaces.value.length > 1) {
     nodes.push({
       key: 'aggregate:public',
       label: '公开文档',
@@ -139,18 +149,30 @@ const treeData = computed<TreeNodePayload[]>(() => {
       children: publicSpaces.value.map(buildSpaceNode),
     })
   }
-  // Team / personal groups stay plain non-selectable containers.
-  groupedSpaces.value
-    .filter((group) => group.spaces.length > 0)
-    .forEach((group) => {
-      nodes.push({
-        key: group.key,
-        label: group.label,
-        nodeType: 'group',
-        selectable: false,
-        children: group.spaces.map(buildSpaceNode),
-      })
+  // 团队空间保留「团队文档」分组：空间名各不相同（如「产品部」），分组行不冗余。
+  const teamGroup = groupedSpaces.value.find((group) => group.key === 'group:team')
+  if (teamGroup?.spaces.length) {
+    nodes.push({
+      key: teamGroup.key,
+      label: teamGroup.label,
+      nodeType: 'group',
+      selectable: false,
+      children: teamGroup.spaces.map(buildSpaceNode),
     })
+  }
+  // 个人空间每用户唯一（ensurePersonalSpaceForUser）：单空间时折叠为单行「个人文档」根节点。
+  const personalGroup = groupedSpaces.value.find((group) => group.key === 'group:personal')
+  if (personalGroup?.spaces.length === 1) {
+    nodes.push(singleSpaceRootNode(personalGroup.spaces[0], personalGroup.label))
+  } else if (personalGroup && personalGroup.spaces.length > 1) {
+    nodes.push({
+      key: personalGroup.key,
+      label: personalGroup.label,
+      nodeType: 'group',
+      selectable: false,
+      children: personalGroup.spaces.map(buildSpaceNode),
+    })
+  }
   return nodes
 })
 
@@ -313,8 +335,9 @@ watch(
           selectedSpaceId.value = firstSpace.id
           selectedAggregateType.value = null
           selectedKeys.value = [`space:${firstSpace.id}`]
-          // Expand every non-empty group on first load so all three regions are visible at a
-          // glance. The default selection's own space stays expanded as well.
+          // Expand remaining group nodes (team / aggregate fallback) so every region label is
+          // visible at a glance. Merged single-space roots carry `space:` keys, so the default
+          // selection's own key already covers its merged node.
           const groupKeys = treeData.value
             .filter((node) => node.nodeType === 'group')
             .map((node) => node.key)
