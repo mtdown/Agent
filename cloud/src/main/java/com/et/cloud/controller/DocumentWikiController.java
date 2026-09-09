@@ -3,6 +3,7 @@ package com.et.cloud.controller;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.et.cloud.commen.BaseResponse;
 import com.et.cloud.commen.DeleteRequest;
@@ -279,7 +280,13 @@ public class DocumentWikiController {
         documentWiki.setSpaceId(targetSpace.getId());
         documentWiki.setFolderId(moveRequest.getTargetFolderId());
         documentWiki.setEditTime(new Date());
-        boolean result = documentWikiService.updateById(documentWiki);
+        // updateById 的默认 NOT_NULL 策略会跳过 null 字段，而「移到空间根目录」正是要写 folderId = null，
+        // 必须用 LambdaUpdateWrapper 显式 SET，否则假成功（跨空间移根还会残留旧 folderId 导致文档从树上消失）。
+        boolean result = documentWikiService.update(new LambdaUpdateWrapper<DocumentWiki>()
+                .eq(DocumentWiki::getId, documentWiki.getId())
+                .set(DocumentWiki::getSpaceId, targetSpace.getId())
+                .set(DocumentWiki::getFolderId, moveRequest.getTargetFolderId())
+                .set(DocumentWiki::getEditTime, documentWiki.getEditTime()));
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         wikiCacheManager.clearDocument(oldSpaceId, documentWiki.getId());
         wikiCacheManager.clearDocument(targetSpace.getId(), documentWiki.getId());

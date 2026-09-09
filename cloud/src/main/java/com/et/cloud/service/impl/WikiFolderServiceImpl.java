@@ -2,6 +2,7 @@ package com.et.cloud.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
@@ -103,7 +104,12 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
         }
         oldFolder.setParentId(parentId);
         oldFolder.setEditTime(new Date());
-        boolean result = this.updateById(oldFolder);
+        // updateById 的默认 NOT_NULL 策略会跳过 null 字段，而「移到空间根目录」正是要写 parentId = null，
+        // 必须用 LambdaUpdateWrapper 显式 SET，否则假成功。
+        boolean result = this.update(new LambdaUpdateWrapper<WikiFolder>()
+                .eq(WikiFolder::getId, oldFolder.getId())
+                .set(WikiFolder::getParentId, parentId)
+                .set(WikiFolder::getEditTime, oldFolder.getEditTime()));
         wikiCacheManager.clearSpace(oldFolder.getSpaceId());
         return result;
     }
