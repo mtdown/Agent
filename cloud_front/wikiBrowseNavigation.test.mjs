@@ -40,7 +40,7 @@ test('preview header keeps document actions and gains a back entry', () => {
 })
 
 test('folder browsing queries the backend by folderId with a shared page size', () => {
-  assert.match(pageSource, /const BROWSE_PAGE_SIZE = 20/)
+  assert.match(pageSource, /const BROWSE_PAGE_SIZE = 15/)
   assert.match(pageSource, /pageSize: BROWSE_PAGE_SIZE/)
   assert.match(pageSource, /folderId: folderId \?\? undefined/)
   // Folder mode must page like the other two selections and must not read the tree cache.
@@ -74,7 +74,9 @@ test('escape shortcut is registered, guarded and torn down', () => {
 
 test('right column exposes manage mode only in list mode', () => {
   assert.match(pageSource, /v-if="outlineMode === 'list' && folderOutlineDocs\.length"/)
-  assert.match(pageSource, /manageMode \? \(allChecked \? '取消全选' : '全选'\) : '管理'/)
+  // enhance-wiki-space-management 之后顶部按钮是纯「管理/退出」切换，全选移到底部操作条。
+  assert.match(pageSource, /manageMode \? '退出' : '管理'/)
+  assert.match(pageSource, /allChecked \? '取消全选' : '全选'/)
   assert.match(pageSource, /v-if="manageMode" class="manage-bar"/)
   assert.match(pageSource, /已选 \{\{ checkedDocIds\.length \}\} 篇/)
   assert.match(pageSource, /onOutlineDocClick/)

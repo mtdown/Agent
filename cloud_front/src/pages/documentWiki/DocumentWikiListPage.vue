@@ -1,6 +1,10 @@
 <template>
   <div id="documentWikiListPage" data-warm-page>
-    <div v-if="activeRegion === 'docs'" class="wiki-shell">
+    <div
+      v-if="activeRegion === 'docs'"
+      class="wiki-shell"
+      :class="{ 'wiki-shell--browse': centerMode === 'browse' }"
+    >
       <aside class="wiki-panel wiki-tree-column">
         <WikiSpaceTree
           ref="spaceTreeRef"
@@ -49,6 +53,7 @@
             @move="moveDialogRef?.open($event)"
             @delete="deleteDocument"
             @back="goBack"
+            @jump-to-page="handlePageJump"
           />
         </section>
       </main>
@@ -235,9 +240,9 @@ const currentFolderName = computed(() => {
 })
 
 // Paging for the browse list. All three selection kinds (single space, folder, and the 公开文档
-// aggregate) page through the documents they cover, 20 per page, so a folder with many documents
+// aggregate) page through the documents they cover, 15 per page, so a folder with many documents
 // stays consistent with the other two instead of silently dumping every row at once.
-const BROWSE_PAGE_SIZE = 20
+const BROWSE_PAGE_SIZE = 15
 const browsePagination = computed(() => ({
   current: browseCurrent.value,
   pageSize: BROWSE_PAGE_SIZE,
@@ -251,6 +256,13 @@ const browsePagination = computed(() => ({
     fetchBrowsePage()
   },
 }))
+// 列表页「页码输入框」跳转：与翻页器共享同一份 resetManageState + fetchBrowsePage。
+const handlePageJump = (page: number) => {
+  if (page === browseCurrent.value) return
+  browseCurrent.value = page
+  resetManageState()
+  fetchBrowsePage()
+}
 // The outline column serves two purposes: while a document is open (preview or inline edit)
 // it shows that document's heading outline; whenever the middle column is listing documents
 // (folder, space, or the 公开文档 aggregate) and no document is open, it mirrors that list as
@@ -775,6 +787,14 @@ onBeforeUnmount(() => {
   height: 100%;
   overflow: auto;
   scrollbar-width: thin;
+  /* 默认透明、不留可见轨道；hover 时才染暖色，Windows 上滚动条只在滚动/悬停时显形。 */
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.wiki-tree-column:hover,
+.wiki-document-column:hover,
+.wiki-outline-column:hover {
   scrollbar-color: var(--wiki-accent) var(--wiki-muted);
 }
 
@@ -783,13 +803,39 @@ onBeforeUnmount(() => {
 .wiki-outline-column::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+  background: transparent;
 }
 
 .wiki-tree-column::-webkit-scrollbar-thumb,
 .wiki-document-column::-webkit-scrollbar-thumb,
 .wiki-outline-column::-webkit-scrollbar-thumb {
-  background: var(--wiki-accent);
+  background: transparent;
   border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.wiki-tree-column:hover::-webkit-scrollbar-thumb,
+.wiki-document-column:hover::-webkit-scrollbar-thumb,
+.wiki-outline-column:hover::-webkit-scrollbar-thumb {
+  background: var(--wiki-accent);
+}
+
+/* 列表态（browse）中栏结构化滚动：三栏保持固定一屏布局（左右两栏各自栏内滚动），
+   中栏自身不再整体滚动——搜索表单与位置栏固定在顶部，仅文档摘要列表在栏内滚动，
+   分页器常驻底部。预览/编辑态仍走上方固定高布局（中栏整体滚动）。 */
+.wiki-shell--browse .wiki-document-column {
+  overflow: hidden;
+}
+
+.wiki-shell--browse .content-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wiki-shell--browse .content-section > :deep(.search-form) {
+  flex-shrink: 0;
 }
 
 .panel-head {
@@ -925,6 +971,16 @@ onBeforeUnmount(() => {
   .wiki-outline-column {
     height: auto;
     max-height: none;
+  }
+
+  /* 窄屏纵向堆叠时中栏回到自然高度、整体随页面滚动，列表不再限高内滚。 */
+  .wiki-shell--browse .wiki-document-column {
+    overflow: auto;
+  }
+
+  .wiki-shell--browse .content-section {
+    flex: none;
+    display: block;
   }
 }
 </style>
