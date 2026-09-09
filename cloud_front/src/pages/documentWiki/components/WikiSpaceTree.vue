@@ -313,14 +313,12 @@ watch(
           selectedSpaceId.value = firstSpace.id
           selectedAggregateType.value = null
           selectedKeys.value = [`space:${firstSpace.id}`]
-          // Expand both the region group and the space so the default selection stays visible.
-          const regionKey =
-            firstSpace.type === 2
-              ? 'aggregate:public'
-              : firstSpace.type === 1
-                ? 'group:team'
-                : 'group:personal'
-          expandedKeys.value = [regionKey, `space:${firstSpace.id}`]
+          // Expand every non-empty group on first load so all three regions are visible at a
+          // glance. The default selection's own space stays expanded as well.
+          const groupKeys = treeData.value
+            .filter((node) => node.nodeType === 'group')
+            .map((node) => node.key)
+          expandedKeys.value = [...new Set([...groupKeys, `space:${firstSpace.id}`])]
           emitSelection()
         }
       }
