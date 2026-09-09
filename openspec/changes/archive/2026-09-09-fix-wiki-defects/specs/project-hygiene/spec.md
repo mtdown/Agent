@@ -2,7 +2,7 @@
 
 Defines that the project's test suite runs without external services, that sharding code is either enabled or honestly retired rather than left as dead configuration, and that `README.md` does not claim a known-unfinished feature is complete.
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Backend tests run without an external Redis
 

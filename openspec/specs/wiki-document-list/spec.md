@@ -1,8 +1,9 @@
-## Purpose
+# wiki-document-list Specification
 
+## Purpose
 Defines that paginated wiki document queries resolve their authors in a single batch, matching the approach already used by the picture module, instead of issuing one author query per returned row.
 
-## MODIFIED Requirements
+## Requirements
 
 ### Requirement: Document list loads authors in one batch
 
