@@ -123,6 +123,21 @@ export async function permanentDeleteTeamSpaceUsingPost(
   })
 }
 
+/** renameSpace POST /api/wikiSpace/rename */
+export async function renameSpaceUsingPost(
+  body: API.WikiSpaceRenameRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean_>('/api/wikiSpace/rename', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
 /** restoreTeamSpace POST /api/wikiSpace/restore/team */
 export async function restoreTeamSpaceUsingPost(
   body: API.WikiSpaceConfirmRequest,

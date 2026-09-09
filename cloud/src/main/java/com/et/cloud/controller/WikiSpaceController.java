@@ -4,6 +4,7 @@ import com.et.cloud.annotation.AuthCheck;
 import com.et.cloud.commen.BaseResponse;
 import com.et.cloud.commen.ResultUtils;
 import com.et.cloud.dto.wikispace.WikiSpaceConfirmRequest;
+import com.et.cloud.dto.wikispace.WikiSpaceRenameRequest;
 import com.et.cloud.dto.wikispace.WikiTeamMemberAddRequest;
 import com.et.cloud.dto.wikispace.WikiTeamMemberDeleteRequest;
 import com.et.cloud.dto.wikispace.WikiTeamSpaceAddRequest;
@@ -51,6 +52,17 @@ public class WikiSpaceController {
     public BaseResponse<List<WikiSpaceVis>> listManageTeamSpaces(HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(wikiSpaceService.listManageTeamSpaces(loginUser));
+    }
+
+    /**
+     * 重命名团队空间。不加 AuthCheck：团队空间的 admin 成员同样可以改名。
+     */
+    @PostMapping("/rename")
+    public BaseResponse<Boolean> renameSpace(@RequestBody WikiSpaceRenameRequest renameRequest,
+                                             HttpServletRequest request) {
+        ThrowUtils.throwIf(renameRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(wikiSpaceService.renameSpace(renameRequest.getId(), renameRequest.getName(), loginUser));
     }
 
     @PostMapping("/member/add")

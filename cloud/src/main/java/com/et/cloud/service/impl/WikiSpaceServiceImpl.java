@@ -79,7 +79,7 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
         }
         wikiSpace = new WikiSpace();
         wikiSpace.setType(TYPE_PERSONAL);
-        wikiSpace.setName("个人文档");
+        wikiSpace.setName(PERSONAL_SPACE_DEFAULT_NAME);
         wikiSpace.setOwnerUserId(userId);
         wikiSpace.setIsDelete(0);
         this.save(wikiSpace);
@@ -252,6 +252,39 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
     }
 
     @Override
+    public boolean checkSpaceRenamable(WikiSpace wikiSpace, User loginUser) {
+        if (wikiSpace == null || loginUser == null || Objects.equals(wikiSpace.getIsDelete(), 1)) {
+            return false;
+        }
+        // 个人空间与公开空间的名字由系统持有，任何角色都不可改名
+        if (!Objects.equals(wikiSpace.getType(), TYPE_TEAM)) {
+            return false;
+        }
+        return isAdmin(loginUser) || isTeamSpaceAdmin(wikiSpace.getId(), loginUser.getId());
+    }
+
+    @Override
+    public Boolean renameSpace(Long spaceId, String name, User loginUser) {
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "空间名称不能为空");
+        WikiSpace wikiSpace = this.getById(spaceId);
+        ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(
+                !checkSpaceRenamable(wikiSpace, loginUser),
+                ErrorCode.NO_AUTH_ERROR,
+                "该空间不支持重命名");
+        WikiSpace update = new WikiSpace();
+        update.setId(wikiSpace.getId());
+        update.setName(name.trim());
+        boolean updated = this.updateById(update);
+        if (updated) {
+            wikiCacheManager.clearSpace(wikiSpace.getId());
+        }
+        return updated;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteTeamSpace(Long spaceId, Boolean confirm, User loginUser) {
         requireAdmin(loginUser);
@@ -300,6 +333,17 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
         baseMapper.physicallyDeleteById(spaceId);
         wikiCacheManager.clearSpace(spaceId);
         return true;
+    }
+
+    /**
+     * 团队成员是否持有该空间的管理员角色。与 checkSpaceEditable 的区别：不放行 editor。
+     */
+    private boolean isTeamSpaceAdmin(Long spaceId, Long userId) {
+        return wikiSpaceUserMapper.selectCount(new QueryWrapper<WikiSpaceUser>()
+                .eq("spaceId", spaceId)
+                .eq("userId", userId)
+                .eq("isDelete", 0)
+                .eq("spaceRole", SpaceRoleEnum.ADMIN.getValue())) > 0;
     }
 
     private void requireAdmin(User loginUser) {

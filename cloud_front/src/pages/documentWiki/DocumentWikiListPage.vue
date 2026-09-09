@@ -61,9 +61,9 @@
             type="link"
             size="small"
             class="manage-toggle"
-            @click="toggleManageMode"
+            @click="manageMode ? exitManageMode() : enterManageMode()"
           >
-            {{ manageMode ? (allChecked ? '取消全选' : '全选') : '管理' }}
+            {{ manageMode ? '退出' : '管理' }}
           </a-button>
         </div>
         <nav
@@ -107,6 +107,13 @@
         <div v-if="manageMode" class="manage-bar">
           <span>已选 {{ checkedDocIds.length }} 篇</span>
           <a-space size="small">
+            <a-button
+              size="small"
+              :disabled="!selectableDocIds.length"
+              @click="toggleSelectAll"
+            >
+              {{ allChecked ? '取消全选' : '全选' }}
+            </a-button>
             <a-button size="small" @click="openBatchMove">移动</a-button>
             <a-button size="small" danger @click="batchDelete">删除</a-button>
             <a-button size="small" @click="resetManageState">取消</a-button>
@@ -654,11 +661,17 @@ const allChecked = computed(
     checkedDocIds.value.length === selectableDocIds.value.length,
 )
 
-const toggleManageMode = () => {
-  if (!manageMode.value) {
-    manageMode.value = true
-    return
-  }
+// Entering manage mode must not tick anything: selecting is a separate, explicit action that now
+// lives in the bottom action bar next to the other batch operations.
+const enterManageMode = () => {
+  manageMode.value = true
+}
+
+const exitManageMode = () => {
+  resetManageState()
+}
+
+const toggleSelectAll = () => {
   checkedDocIds.value = allChecked.value ? [] : [...selectableDocIds.value]
 }
 

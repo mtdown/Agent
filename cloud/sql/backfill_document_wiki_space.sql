@@ -1,5 +1,5 @@
 INSERT INTO wiki_space (type, name, ownerUserId)
-SELECT 0, CONCAT('个人区-', u.id), u.id
+SELECT 0, '个人区', u.id
 FROM user u
 LEFT JOIN wiki_space s ON s.type = 0 AND s.ownerUserId = u.id AND s.isDelete = 0
 WHERE u.isDelete = 0 AND s.id IS NULL;

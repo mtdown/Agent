@@ -21,6 +21,7 @@
       <a-table-column title="操作">
         <template #default="{ record }">
           <a-space wrap>
+            <a-button v-if="record.isDelete !== 1" @click="openRename(record)">重命名</a-button>
             <a-button @click="selectManageSpace(record)">成员</a-button>
             <a-button v-if="record.isDelete === 1" @click="restoreTeamSpace(record)">恢复</a-button>
             <a-button v-if="record.isDelete === 1" danger @click="permanentDeleteTeamSpace(record)">
@@ -36,7 +37,17 @@
       <a-flex justify="space-between" align="center" wrap="wrap" gap="middle">
         <h3>成员管理</h3>
         <a-space>
-          <a-input v-model:value="memberUserId" placeholder="用户 ID" />
+          <a-select
+            v-model:value="memberUserId"
+            show-search
+            allow-clear
+            placeholder="搜索并选择用户"
+            style="min-width: 240px"
+            :filter-option="false"
+            :options="memberOptions"
+            :disabled="!selectedManageSpaceId"
+            @search="searchUsers"
+          />
           <a-select v-model:value="memberRole" style="width: 120px">
             <a-select-option value="viewer">viewer</a-select-option>
             <a-select-option value="editor">editor</a-select-option>
@@ -56,12 +67,28 @@
         </template>
       </a-list>
     </div>
+
+    <a-modal
+      v-model:open="renameVisible"
+      title="重命名空间"
+      ok-text="保存"
+      cancel-text="取消"
+      :confirm-loading="renaming"
+      @ok="submitRename"
+    >
+      <a-input
+        v-model:value="renameName"
+        placeholder="请输入空间名称"
+        @press-enter="submitRename"
+      />
+    </a-modal>
   </section>
 </template>
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { IdValue } from './wikiShared'
+import { listUserVisByPageUsingPost } from '@/api/userController.ts'
 import {
   addTeamMemberUsingPost,
   addTeamSpaceUsingPost,
@@ -70,6 +97,7 @@ import {
   listTeamMembersUsingGet,
   permanentDeleteTeamSpaceUsingPost,
   removeTeamMemberUsingPost,
+  renameSpaceUsingPost,
   restoreTeamSpaceUsingPost,
 } from '@/api/wikiSpaceController.ts'
 const props = defineProps<{ loading: boolean; active: boolean }>()
@@ -78,8 +106,14 @@ const manageSpaces = ref<API.WikiSpaceVis[]>([])
 const selectedManageSpaceId = ref<IdValue>()
 const members = ref<API.WikiSpaceUserVis[]>([])
 const newTeamName = ref('')
-const memberUserId = ref('')
+const memberUserId = ref<IdValue>()
 const memberRole = ref('editor')
+const userOptions = ref<API.UserVis[]>([])
+const userSearchTimer = ref<number>()
+const renameVisible = ref(false)
+const renameName = ref('')
+const renameTargetId = ref<IdValue>()
+const renaming = ref(false)
 const fetchManageSpaces = async () => {
   const res = await listManageTeamSpacesUsingGet()
   if (res.data.code === 0) {
@@ -102,12 +136,46 @@ const createTeamSpace = async () => {
   }
 }
 
+// Members are picked from the existing users instead of typing a raw user id. Users that are
+// already in the space stay visible but disabled, so the admin can tell "already added" apart
+// from "not found".
+const memberOptions = computed(() =>
+  userOptions.value.map((user) => {
+    const name = user.userName || user.userAccount || String(user.id ?? '')
+    return {
+      label: `${name}（${user.userAccount ?? user.id}）`,
+      value: user.id,
+      disabled: members.value.some((member) => String(member.userId) === String(user.id)),
+    }
+  }),
+)
+
+const fetchUsers = async (keyword?: string) => {
+  const res = await listUserVisByPageUsingPost({
+    current: 1,
+    pageSize: 20,
+    userName: keyword?.trim() ? keyword.trim() : undefined,
+  })
+  if (res.data.code === 0) {
+    userOptions.value = res.data.data?.records ?? []
+  } else {
+    message.error('获取用户列表失败，' + res.data.message)
+  }
+}
+
+const searchUsers = (keyword: string) => {
+  window.clearTimeout(userSearchTimer.value)
+  userSearchTimer.value = window.setTimeout(() => fetchUsers(keyword), 300)
+}
+
 const selectManageSpace = async (space: API.WikiSpaceVis) => {
   selectedManageSpaceId.value = space.id
+  memberUserId.value = undefined
   const res = await listTeamMembersUsingGet({ spaceId: space.id })
   if (res.data.code === 0) {
     members.value = res.data.data ?? []
   }
+  await fetchUsers()
 }
 
 const addMember = async () => {
@@ -119,11 +187,41 @@ const addMember = async () => {
   })
   if (res.data.code === 0) {
     message.success('成员已添加')
-    memberUserId.value = ''
+    memberUserId.value = undefined
     await selectManageSpace({ id: selectedManageSpaceId.value })
     emit('changed')
   } else {
     message.error('添加成员失败，' + res.data.message)
+  }
+}
+
+const openRename = (space: API.WikiSpaceVis) => {
+  renameTargetId.value = space.id
+  renameName.value = String(space.name ?? '')
+  renameVisible.value = true
+}
+
+// Renaming emits `changed` so the parent reloads the space list; the navigation tree renders
+// space names from the same list and therefore picks the new name up too.
+const submitRename = async () => {
+  const name = renameName.value?.trim()
+  if (!renameTargetId.value || !name) {
+    message.warning('请输入空间名称')
+    return
+  }
+  renaming.value = true
+  try {
+    const res = await renameSpaceUsingPost({ id: renameTargetId.value, name })
+    if (res.data.code === 0) {
+      message.success('空间已重命名')
+      renameVisible.value = false
+      await fetchManageSpaces()
+      emit('changed')
+    } else {
+      message.error('重命名失败，' + res.data.message)
+    }
+  } finally {
+    renaming.value = false
   }
 }
 

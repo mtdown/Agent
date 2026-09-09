@@ -822,6 +822,11 @@ declare namespace API {
     id?: string | number
   }
 
+  type WikiSpaceRenameRequest = {
+    id?: string | number
+    name?: string
+  }
+
   type WikiSpaceUserVis = {
     createTime?: string
     id?: string | number
