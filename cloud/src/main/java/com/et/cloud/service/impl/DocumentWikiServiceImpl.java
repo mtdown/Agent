@@ -3,7 +3,9 @@ package com.et.cloud.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.SecureUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.et.cloud.dto.documentWiki.DocumentWikiQueryRequest;
@@ -15,11 +17,13 @@ import com.et.cloud.model.entity.DocumentWiki;
 import com.et.cloud.model.entity.User;
 import com.et.cloud.model.vis.DocumentWikiVis;
 import com.et.cloud.model.vis.UserVis;
+import com.et.cloud.rag.WikiDocumentChangedEvent;
 import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
 import com.et.cloud.service.WikiSpaceService;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -65,6 +69,115 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
 
     @Resource
     private WikiSpaceService wikiSpaceService;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
+
+    // ==================== RAG index hooks ====================
+    // All document write entries (manual create, single import, batch file/url
+    // import, edit, recycle operations) funnel into these overrides, so the
+    // chunk index follows the document lifecycle from one single place.
+    // Events are consumed AFTER_COMMIT and asynchronously — indexing problems
+    // can never fail a document operation.
+
+    @Override
+    public boolean save(DocumentWiki documentWiki) {
+        if (documentWiki.getContentVersion() == null) {
+            documentWiki.setContentVersion(1);
+        }
+        if (StrUtil.isBlank(documentWiki.getContentHash()) && documentWiki.getContent() != null) {
+            documentWiki.setContentHash(SecureUtil.md5(documentWiki.getContent()));
+        }
+        boolean saved = super.save(documentWiki);
+        if (saved) {
+            eventPublisher.publishEvent(WikiDocumentChangedEvent.of(
+                    WikiDocumentChangedEvent.ChangeType.DOC_CREATED,
+                    documentWiki.getId(), documentWiki.getSpaceId(), documentWiki.getContentVersion()));
+        }
+        return saved;
+    }
+
+    @Override
+    public boolean updateById(DocumentWiki documentWiki) {
+        DocumentWiki old = documentWiki == null || documentWiki.getId() == null
+                ? null : this.getById(documentWiki.getId());
+        int newVersion = old == null || old.getContentVersion() == null ? 1 : old.getContentVersion() + 1;
+        if (documentWiki != null) {
+            documentWiki.setContentVersion(newVersion);
+            if (documentWiki.getContent() != null) {
+                documentWiki.setContentHash(SecureUtil.md5(documentWiki.getContent()));
+            }
+        }
+        boolean updated = super.updateById(documentWiki);
+        if (updated && documentWiki != null) {
+            Long spaceId = documentWiki.getSpaceId() != null ? documentWiki.getSpaceId()
+                    : (old != null ? old.getSpaceId() : null);
+            eventPublisher.publishEvent(WikiDocumentChangedEvent.of(
+                    WikiDocumentChangedEvent.ChangeType.DOC_UPDATED,
+                    documentWiki.getId(), spaceId, newVersion));
+        }
+        return updated;
+    }
+
+    @Override
+    public Boolean logicalDelete(Long id, Long deleteBy) {
+        DocumentWiki doc = baseMapper.selectByIdIncludeDeleted(id);
+        boolean deleted = baseMapper.logicalDeleteById(id, new Date(), deleteBy) > 0;
+        if (deleted && doc != null) {
+            eventPublisher.publishEvent(WikiDocumentChangedEvent.of(
+                    WikiDocumentChangedEvent.ChangeType.DOC_LOGICAL_DELETED,
+                    id, doc.getSpaceId(), doc.getContentVersion()));
+        }
+        return deleted;
+    }
+
+    @Override
+    public Boolean restore(Long id) {
+        DocumentWiki documentWiki = baseMapper.selectByIdIncludeDeleted(id);
+        ThrowUtils.throwIf(documentWiki == null, ErrorCode.NOT_FOUND_ERROR);
+        boolean restored = baseMapper.restoreById(id) > 0;
+        if (restored) {
+            eventPublisher.publishEvent(WikiDocumentChangedEvent.of(
+                    WikiDocumentChangedEvent.ChangeType.DOC_RESTORED,
+                    id, documentWiki.getSpaceId(), documentWiki.getContentVersion()));
+        }
+        return restored;
+    }
+
+    @Override
+    public Boolean permanentDelete(Long id) {
+        DocumentWiki doc = baseMapper.selectByIdIncludeDeleted(id);
+        boolean deleted = baseMapper.physicallyDeleteById(id) > 0;
+        if (deleted && doc != null) {
+            eventPublisher.publishEvent(WikiDocumentChangedEvent.of(
+                    WikiDocumentChangedEvent.ChangeType.DOC_PERMANENT_DELETED,
+                    id, doc.getSpaceId(), null));
+        }
+        return deleted;
+    }
+
+    /**
+     * Moves a document (optionally across spaces) with the explicit-SET wrapper
+     * (null folderId means space root) and notifies the RAG index.
+     */
+    @Override
+    public boolean moveDocument(Long id, Long targetSpaceId, Long targetFolderId) {
+        DocumentWiki doc = this.getById(id);
+        ThrowUtils.throwIf(doc == null, ErrorCode.NOT_FOUND_ERROR);
+        Long fromSpaceId = doc.getSpaceId();
+        // updateById 的默认 NOT_NULL 策略会跳过 null 字段，而「移到空间根目录」正是要写 folderId = null，
+        // 必须用 LambdaUpdateWrapper 显式 SET，否则假成功（跨空间移根还会残留旧 folderId 导致文档从树上消失）。
+        boolean moved = this.update(new LambdaUpdateWrapper<DocumentWiki>()
+                .eq(DocumentWiki::getId, id)
+                .set(DocumentWiki::getSpaceId, targetSpaceId)
+                .set(DocumentWiki::getFolderId, targetFolderId)
+                .set(DocumentWiki::getEditTime, new Date()));
+        if (moved) {
+            eventPublisher.publishEvent(WikiDocumentChangedEvent.moved(id, fromSpaceId, targetSpaceId));
+        }
+        return moved;
+    }
+    // ==================== end RAG index hooks ====================
 
     @Override
     public QueryWrapper<DocumentWiki> getQueryWrapper(DocumentWikiQueryRequest documentWikiQueryRequest) {
@@ -241,22 +354,5 @@ public class DocumentWikiServiceImpl extends ServiceImpl<DocumentWikiMapper, Doc
     @Override
     public DocumentWiki getByIdIncludeDeleted(Long id) {
         return baseMapper.selectByIdIncludeDeleted(id);
-    }
-
-    @Override
-    public Boolean logicalDelete(Long id, Long deleteBy) {
-        return baseMapper.logicalDeleteById(id, new Date(), deleteBy) > 0;
-    }
-
-    @Override
-    public Boolean restore(Long id) {
-        DocumentWiki documentWiki = baseMapper.selectByIdIncludeDeleted(id);
-        ThrowUtils.throwIf(documentWiki == null, ErrorCode.NOT_FOUND_ERROR);
-        return baseMapper.restoreById(id) > 0;
-    }
-
-    @Override
-    public Boolean permanentDelete(Long id) {
-        return baseMapper.physicallyDeleteById(id) > 0;
     }
 }

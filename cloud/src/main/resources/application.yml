@@ -78,6 +78,24 @@ cos:
 aliYunAi:
   apiKey: ${ALIYUN_AI_API_KEY:}   # 阿里云 AI 功能已废弃；未配置时不阻塞启动和测试
 
+# RAG 配置（add-wiki-rag-pipeline）。api-key 未配置时索引流程降级跳过，不阻塞文档保存
+rag:
+  embedding:
+    # 默认本地 Ollama（OpenAI 兼容端点，无需 api-key）；云端切换示例：
+    # RAG_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+    # RAG_EMBEDDING_MODEL=text-embedding-v3  RAG_EMBEDDING_API_KEY=sk-xxx
+    base-url: ${RAG_EMBEDDING_BASE_URL:http://localhost:11434/v1}
+    api-key: ${RAG_EMBEDDING_API_KEY:}
+    model: ${RAG_EMBEDDING_MODEL:qwen3-embedding:4b}
+    timeout-seconds: 30
+  retrieval:
+    top-k: 6
+  index:
+    batch-embed-size: 10
+    async-core-pool-size: 2
+    async-max-pool-size: 4
+    async-queue-capacity: 200
+
 #server:
 #  port: 8123
 #  servlet:

@@ -54,4 +54,10 @@ public interface DocumentWikiService extends IService<DocumentWiki> {
     Boolean restore(Long id);
 
     Boolean permanentDelete(Long id);
+
+    /**
+     * Moves a document to a target space/folder (null folder = space root).
+     * Explicit-SET update plus RAG index notification.
+     */
+    boolean moveDocument(Long id, Long targetSpaceId, Long targetFolderId);
 }
