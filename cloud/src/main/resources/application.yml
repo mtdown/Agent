@@ -90,6 +90,16 @@ rag:
     timeout-seconds: 30
   retrieval:
     top-k: 6
+  llm:
+    # 回答生成 LLM（OpenAI 兼容 /chat/completions 流式）；key 走环境变量，未配置时问答接口返回可读错误
+    base-url: ${RAG_LLM_BASE_URL:https://api.deepseek.com}
+    api-key: ${RAG_LLM_API_KEY:}
+    model: ${RAG_LLM_MODEL:deepseek-v4-flash-vision-exp}
+    # 默认（快速）模式的非思考模型，勾选「深度思考」时才用上面的思考型模型
+    fast-model: ${RAG_LLM_FAST_MODEL:deepseek-chat}
+    timeout-seconds: 120
+    # 思考型模型的 reasoning_content 与正文共用 token 预算，2048 会导致复杂题思考阶段即被截断（finishReason=length、正文为空）
+    max-tokens: 8192
   index:
     batch-embed-size: 10
     async-core-pool-size: 2
