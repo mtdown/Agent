@@ -74,6 +74,11 @@ const router = createRouter({
       component: () => import('@/pages/documentWiki/DocumentWikiBatchImportPage.vue'),
     },
     {
+      path: '/aiAssistant',
+      name: 'AI 助手',
+      component: () => import('@/pages/aiAssistant/AiAssistantPage.vue'),
+    },
+    {
       path: '/add_documentWiki',
       name: '创建文档',
       component: () => import('@/pages/documentWiki/AddDocumentWikiPage.vue'),

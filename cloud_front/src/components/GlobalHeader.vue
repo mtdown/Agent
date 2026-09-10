@@ -53,6 +53,7 @@ import {
   ImportOutlined,
   LogoutOutlined,
   PictureOutlined,
+  RobotOutlined,
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
@@ -73,6 +74,12 @@ type RawNavItem = {
 
 const originItems: RawNavItem[] = [
   { key: '/documentWiki', icon: () => h(BookOutlined), label: 'WIKI文档' },
+  {
+    key: '/aiAssistant',
+    icon: () => h(RobotOutlined),
+    label: 'AI 助手',
+    loginOnly: true,
+  },
   {
     key: '/documentWiki/batch',
     icon: () => h(ImportOutlined),

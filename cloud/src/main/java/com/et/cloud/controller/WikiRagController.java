@@ -5,6 +5,8 @@ import com.et.cloud.commen.ResultUtils;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
 import com.et.cloud.model.entity.User;
+import com.et.cloud.rag.RagAskRequest;
+import com.et.cloud.rag.RagAskService;
 import com.et.cloud.rag.RagSearchRequest;
 import com.et.cloud.rag.RagSearchResult;
 import com.et.cloud.rag.RagSearchService;
@@ -12,12 +14,14 @@ import com.et.cloud.rag.WikiChunkView;
 import com.et.cloud.rag.WikiRagIndexService;
 import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -39,6 +43,9 @@ public class WikiRagController {
     private RagSearchService ragSearchService;
 
     @Resource
+    private RagAskService ragAskService;
+
+    @Resource
     private WikiRagIndexService wikiRagIndexService;
 
     @Resource
@@ -49,6 +56,17 @@ public class WikiRagController {
                                                 HttpServletRequest httpServletRequest) {
         User loginUser = userService.getLoginUser(httpServletRequest);
         return ResultUtils.success(ragSearchService.search(loginUser, request));
+    }
+
+    /**
+     * Streamed RAG ask for the AI assistant panel (SSE: meta/reason/delta/done/error).
+     * Validation throws standard BaseResponse errors before the stream starts.
+     */
+    @PostMapping(value = "/ask", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter ask(@RequestBody RagAskRequest request,
+                          HttpServletRequest httpServletRequest) {
+        User loginUser = userService.getLoginUser(httpServletRequest);
+        return ragAskService.ask(loginUser, request);
     }
 
     @GetMapping("/document/{docId}/chunks")

@@ -15,9 +15,38 @@ public class RagProperties {
 
     private Embedding embedding = new Embedding();
 
+    private Llm llm = new Llm();
+
     private Retrieval retrieval = new Retrieval();
 
     private Index index = new Index();
+
+    @Data
+    public static class Llm {
+        private String baseUrl = "https://api.deepseek.com";
+        private String apiKey = "";
+        /** 深度思考模式使用的思考型模型 */
+        private String model = "deepseek-v4-flash-vision-exp";
+        /** 默认（快速）模式使用的非思考模型，秒级响应 */
+        private String fastModel = "deepseek-chat";
+        private int timeoutSeconds = 120;
+        // 思考型模型 reasoning 与正文共用预算，需留足空间，避免 finishReason=length 截断
+        private int maxTokens = 8192;
+
+        public boolean isConfigured() {
+            return apiKey != null && !apiKey.isBlank();
+        }
+
+        /** deepThinking=true 用思考型模型，否则用快速模型；快速模型未配置时回退思考型 */
+        public String resolveModel(boolean deepThinking) {
+            if (!deepThinking) {
+                if (fastModel != null && !fastModel.isBlank()) {
+                    return fastModel;
+                }
+            }
+            return model;
+        }
+    }
 
     @Data
     public static class Embedding {
