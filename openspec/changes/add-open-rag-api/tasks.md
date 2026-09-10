@@ -31,4 +31,4 @@
     2. **LLM 间歇性 Connection reset**（实测 DeepSeek 3/3 亚秒全通，日志仅 1 次，属瞬时网络抖动）：RagLlmClient 重构为 `doStream` 返回结果状态——未输出任何内容即失败自动重试 1 次；已输出后失败直接报错不重试（防重复输出）；用户主动中断不重试。顺手修**流截断静默成功**缺陷：流结束时既无 finish_reason 也无 [DONE] 判为失败（此前默认当 stop 成功，中途断流会被当成完整回答）。
     3. **Windows Git Bash 内联中文 JSON 编码错误**：示例 Content-Type 加 `charset=utf-8`、改 `--data-binary @body.json` 形式，抽屉加 Windows 终端提示行。
   - 验证：后端全量 **182/182**（新增：连接失败重试 1、部分输出不重试 1），前端 vue-tsc 通过。
-- [ ] 4.4 负责人确认后上传任务分支
+- [x] 4.4 负责人确认后上传任务分支 — 2026-09-10 提交 e90c901 推送成功（本地/远程 HEAD 一致）
