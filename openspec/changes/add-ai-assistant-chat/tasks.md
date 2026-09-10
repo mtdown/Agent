@@ -35,4 +35,7 @@
     - ④停止：前端停止按钮 AbortController.abort()；后端 emitter onCompletion/onTimeout → future.cancel(true) 中断 LLM 阻塞流。
   - 验证：后端 171/171 全过（+1 模型选择测试）、前端 vue-tsc 通过。
   - 2026-09-10 手测复验：其余全过；右栏文档不能滚动 —— a-spin 内部 .ant-spin-nested-loading/.ant-spin-container 未透传高度导致 flex 链断裂，补深层样式修复。vue-tsc 通过。
-- [ ] 4.4 负责人确认后上传任务分支
+- [x] 4.4 负责人确认后上传任务分支
+  - 2026-09-10 验收通过（含右栏滚动修复复验），提交 bb1fb3d（19 文件 +2208 行）推送至
+    origin/feature/ai-assistant-chat开发，rev-parse 校验本地远程一致。待负责人在远程平台发起
+    PR/MR 合并至 main。
