@@ -19,8 +19,10 @@ import com.et.cloud.model.entity.WikiSpaceUser;
 import com.et.cloud.model.vis.UserVis;
 import com.et.cloud.model.vis.WikiSpaceUserVis;
 import com.et.cloud.model.vis.WikiSpaceVis;
+import com.et.cloud.rag.WikiDocumentChangedEvent;
 import com.et.cloud.service.WikiCacheManager;
 import com.et.cloud.service.WikiSpaceService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +50,9 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
 
     @Resource
     private WikiCacheManager wikiCacheManager;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public WikiSpace ensurePublicSpace() {
@@ -304,6 +309,9 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
         wikiFolderMapper.logicalDeleteBySpaceId(spaceId, now, loginUser.getId());
         documentWikiMapper.logicalDeleteBySpaceId(spaceId, now, loginUser.getId());
         wikiCacheManager.clearSpace(spaceId);
+        // RAG：空间内文档全部失效（AFTER_COMMIT 异步）
+        eventPublisher.publishEvent(
+                WikiDocumentChangedEvent.spaceEvent(WikiDocumentChangedEvent.ChangeType.SPACE_LOGICAL_DELETED, spaceId));
         return true;
     }
 
@@ -317,6 +325,9 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
         wikiFolderMapper.restoreBySpaceId(spaceId);
         documentWikiMapper.restoreBySpaceId(spaceId);
         wikiCacheManager.clearSpace(spaceId);
+        // RAG：空间恢复，版本未变的 chunk 翻回 ACTIVE
+        eventPublisher.publishEvent(
+                WikiDocumentChangedEvent.spaceEvent(WikiDocumentChangedEvent.ChangeType.SPACE_RESTORED, spaceId));
         return true;
     }
 
@@ -332,6 +343,9 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
         wikiSpaceUserMapper.physicallyDeleteBySpaceId(spaceId);
         baseMapper.physicallyDeleteById(spaceId);
         wikiCacheManager.clearSpace(spaceId);
+        // RAG：空间彻底删除，chunk 物理删除
+        eventPublisher.publishEvent(
+                WikiDocumentChangedEvent.spaceEvent(WikiDocumentChangedEvent.ChangeType.SPACE_PERMANENT_DELETED, spaceId));
         return true;
     }
 
