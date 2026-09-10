@@ -3,6 +3,12 @@
 // API 手写模块：RAG 问答（SSE 流式走 fetch，axios 不支持流式读取）
 import request from '@/request'
 
+/**
+ * 真实后端地址（axios baseURL）。开放 API 的 curl 示例必须指向它，
+ * 而不是 window.location.origin（前端 dev server 没有 /api 代理，纯 HTTP 客户端访问会 404）。
+ */
+export const apiBaseUrl = (request.defaults.baseURL || window.location.origin) as string
+
 /** 检索命中 / 引用元数据 */
 export interface RagCitation {
   index: number
@@ -84,6 +90,31 @@ export async function ragSearchUsingPost(body: RagSearchRequest) {
   return request<RagBaseResponse>('/api/rag/search', {
     method: 'POST',
     data: body,
+  })
+}
+
+// ---- 开放 API Key 管理（类型见 api/typings.d.ts 的 API.RagApiKeyView / API.RagApiKeyCreatedView）----
+
+/** 创建 API Key（明文仅返回一次） */
+export async function createRagApiKeyUsingPost(keyName: string) {
+  return request<API.BaseResponseRagApiKeyCreated_>('/api/rag/key/create', {
+    method: 'POST',
+    data: { keyName },
+  })
+}
+
+/** 列出当前用户的 API Key（不含明文） */
+export async function listRagApiKeysUsingGet() {
+  return request<API.BaseResponseListRagApiKeyView_>('/api/rag/key/list', {
+    method: 'GET',
+  })
+}
+
+/** 删除（吊销）API Key */
+export async function deleteRagApiKeyUsingPost(id: number) {
+  return request<API.BaseResponseBoolean_>('/api/rag/key/delete', {
+    method: 'POST',
+    data: { id },
   })
 }
 

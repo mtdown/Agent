@@ -861,4 +861,31 @@ declare namespace API {
   type WikiTeamSpaceAddRequest = {
     name?: string
   }
+
+  type RagApiKeyView = {
+    id?: string | number
+    keyName?: string
+    keyPrefix?: string
+    createTime?: string
+  }
+
+  type RagApiKeyCreatedView = {
+    id?: string | number
+    keyName?: string
+    keyPrefix?: string
+    apiKey?: string
+    createTime?: string
+  }
+
+  type BaseResponseRagApiKeyCreated_ = {
+    code?: number
+    data?: RagApiKeyCreatedView
+    message?: string
+  }
+
+  type BaseResponseListRagApiKeyView_ = {
+    code?: number
+    data?: RagApiKeyView[]
+    message?: string
+  }
 }
