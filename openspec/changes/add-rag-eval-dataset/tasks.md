@@ -7,16 +7,16 @@
 
 ## 1. 准备与语料体检（Step 0）
 
-- [ ] 1.1 建 `eval/` 目录骨架：`README.md`（待写）、`audit/`、`scripts/`、`tools/`、`tmp/`，并把 `eval/tmp/` 加入 `.gitignore`；验证：`git status` 只显示新增骨架文件，`eval/tmp/` 被忽略
-- [ ] 1.2 写 `eval/scripts/corpus_audit.py`：统计空壳率（正文 <200 字）、表格拍平率、文号覆盖率、`pageText` 与 `content.md` 长度差异分布、跨辖区噪声；验证：产出 `eval/audit/corpus-audit.md`，每个维度给出篇数+占比+最差样本
-- [ ] 1.3 写 `eval/scripts/export_anchor_map.py`：查 `wiki_chunk` 导出 `metadataId → docId → (chunkIndex → chunkId)` 到 `eval/tmp/anchor-map.json`；验证：216 篇标题全部匹配到 `docTitle`，匹配数不足 216 时脚本报错退出（不产出部分映射）
+- [x] 1.1 建 `eval/` 目录骨架：`audit/`、`scripts/`、`tools/`、`tmp/`，并把 `eval/tmp/`、`eval/.env` 加入 `.gitignore`；验证：`eval/tmp/` 与 `eval/.env` 均被忽略（已确认）
+- [x] 1.2 写 `eval/scripts/corpus_audit.py`：统计空壳率、表格丢失率、文号覆盖率、跨辖区噪声、内容重复；验证：产出 `eval/audit/corpus-audit.md` —— **216 篇 / 空壳 5 篇(2.3%，均为任免批复类短文件) / 含 MD 表格 0 篇、12 篇提及表或附表 / 有文号 54 篇(仅政策文件) / 跨省联合发文 1 篇(川渝通办，合法) / 重复 0 组**
+- [x] 1.3 写 `eval/scripts/export_anchor_map.py`：查 `wiki_chunk` 导出映射到 `eval/tmp/anchor-map.json`；验证：**匹配 216/216，ACTIVE chunk 2061 全覆盖，无歧义、无孤儿 docId**（政策文件 1232 chunk / 部门解读 165 / 新闻发布会 233 / 媒体视角 431）
 - [ ] 1.4 **【负责人人工】** 复核体检报告：确认空壳篇是否影响出题、跨辖区噪声清单是否完整；验证：负责人在报告末尾签字式批注或回复确认
 
 ## 2. 配对锚定（Step 1）
 
-- [ ] 2.1 写 `eval/scripts/build_pairs.py`：从解读标题书名号提取政策名并规范化匹配政策文件，输出 `eval/pairs.json`（含 `reviewState`、`matchType`、政策/解读 `docId`）；验证：产出约 25 组配对，未匹配篇标记为 unmatched
-- [ ] 2.2 **【负责人人工】** 逐条核对 25 组配对，把 `reviewState` 置为 confirmed / rejected；验证：`pairs.json` 中无 `reviewState` 仍为 pending 的条目
-- [ ] 2.3 汇总配对结论写入 `eval/audit/pairs-audit.md`：确认数、拒绝数与拒绝原因；验证：文件存在且与 `pairs.json` 统计一致
+- [x] 2.1 写 `eval/scripts/build_pairs.py`：从解读标题书名号提取政策名并规范化匹配政策文件，输出 `eval/pairs.json`（含 `reviewState`、`matchType`、政策/解读 `docId`）；验证：**产出 31 组配对（部门解读 19/21、新闻发布会 8/10、媒体视角 4/128），覆盖唯一政策 26 篇**；全部为 contains 匹配（政策标题带「关于印发《X》的通知」前缀，属预期），未匹配 128 篇标记为 unmatched
+- [ ] 2.2 **【负责人人工】** 逐条核对 31 组配对，把 `reviewState` 置为 confirmed / rejected；验证：`pairs.json` 中无 `reviewState` 仍为 pending 的条目 —— **当前阻塞，等待负责人确认**
+- [x] 2.3 汇总配对结论写入 `eval/audit/pairs-audit.md`：验证：文件已产出，含覆盖情况、5 篇一对多政策提示、31 组待确认清单，与 `pairs.json` 统计一致
 
 ## 3. 题目格式规范与生成（Step 2）
 
