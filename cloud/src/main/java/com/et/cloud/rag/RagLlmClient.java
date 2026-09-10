@@ -62,6 +62,10 @@ public class RagLlmClient {
     /**
      * Streams one chat completion. Blocks until the stream ends, fails, or times out.
      *
+     * <p>Transient upstream failures (e.g. connection reset) that happen BEFORE any
+     * output was emitted are retried once automatically; failures after partial
+     * output are surfaced immediately to avoid duplicated content.</p>
+     *
      * @param deepThinking true = thinking model, false = fast model
      * @param prompt user prompt carrying the numbered reference materials
      */
@@ -71,6 +75,43 @@ public class RagLlmClient {
             callback.onError("LLM 未配置（RAG_LLM_API_KEY）");
             return;
         }
+        EmittingCallback first = new EmittingCallback(callback);
+        int status = doStream(config, systemPrompt, prompt, deepThinking, first);
+        if (status == INTERRUPTED) {
+            callback.onError("LLM 流式响应被中断");
+            return;
+        }
+        if (status == OK) {
+            return;
+        }
+        if (first.emitted) {
+            // partial output already streamed to the caller; retrying would duplicate it
+            callback.onError(first.error);
+            return;
+        }
+        log.warn("LLM 首次请求失败且未输出内容（{}），自动重试一次", first.error);
+        EmittingCallback second = new EmittingCallback(callback);
+        int retryStatus = doStream(config, systemPrompt, prompt, deepThinking, second);
+        if (retryStatus == INTERRUPTED) {
+            callback.onError("LLM 流式响应被中断");
+            return;
+        }
+        if (retryStatus == FAILED) {
+            callback.onError(second.error);
+        }
+    }
+
+    private static final int OK = 0;
+    private static final int INTERRUPTED = 1;
+    private static final int FAILED = 2;
+
+    /**
+     * Runs one streaming attempt. Deltas and the final onFinished are delivered
+     * through the callback; error/interruption outcomes are RETURNED, not
+     * delivered, so the caller can decide whether to retry.
+     */
+    private int doStream(RagProperties.Llm config, String systemPrompt, String prompt,
+                         boolean deepThinking, EmittingCallback cb) {
         JSONObject body = new JSONObject();
         body.set("model", config.resolveModel(deepThinking));
         body.set("stream", true);
@@ -93,30 +134,71 @@ public class RagLlmClient {
             if (response.statusCode() != 200) {
                 // non-stream error body: join lines for the message
                 String errText = String.join("\n", response.body().toList());
-                callback.onError("LLM 响应异常 HTTP " + response.statusCode() + ": " + truncate(errText));
-                return;
+                cb.error = "LLM 响应异常 HTTP " + response.statusCode() + ": " + truncate(errText);
+                return FAILED;
             }
             String[] finishReason = {null};
             Usage[] usage = {null};
+            boolean[] sawDone = {false};
             try {
-                response.body().forEach(line -> parseLine(line, callback, finishReason, usage));
+                response.body().forEach(line -> parseLine(line, cb, finishReason, usage, sawDone));
             } catch (java.util.concurrent.CancellationException e) {
-                callback.onError("LLM 流式响应被中断");
-                return;
+                return INTERRUPTED;
+            }
+            if (finishReason[0] == null && !sawDone[0]) {
+                // stream ended without finish_reason or [DONE]: upstream truncated it
+                cb.error = "LLM 流式响应异常截断（未收到结束标记）";
+                return FAILED;
             }
             if (finishReason[0] == null) {
                 finishReason[0] = "stop";
             }
-            callback.onFinished(finishReason[0], usage[0]);
+            cb.onFinished(finishReason[0], usage[0]);
+            return OK;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            callback.onError("LLM 流式响应被中断");
+            return INTERRUPTED;
         } catch (Exception e) {
-            callback.onError("LLM 请求失败: " + e.getMessage());
+            cb.error = "LLM 请求失败: " + e.getMessage();
+            return FAILED;
         }
     }
 
-    private void parseLine(String line, StreamCallback callback, String[] finishReason, Usage[] usage) {
+    /** Forwards deltas immediately and tracks whether anything was emitted (retry-safety). */
+    private static final class EmittingCallback implements StreamCallback {
+        private final StreamCallback delegate;
+        boolean emitted;
+        String error;
+
+        EmittingCallback(StreamCallback delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void onReasoningDelta(String text) {
+            emitted = true;
+            delegate.onReasoningDelta(text);
+        }
+
+        @Override
+        public void onContentDelta(String text) {
+            emitted = true;
+            delegate.onContentDelta(text);
+        }
+
+        @Override
+        public void onFinished(String finishReason, Usage usage) {
+            delegate.onFinished(finishReason, usage);
+        }
+
+        @Override
+        public void onError(String message) {
+            delegate.onError(message);
+        }
+    }
+
+    private void parseLine(String line, StreamCallback callback, String[] finishReason, Usage[] usage,
+                           boolean[] sawDone) {
         if (line == null || line.isEmpty()) {
             return;
         }
@@ -125,6 +207,7 @@ public class RagLlmClient {
         }
         String payload = line.substring(5).trim();
         if ("[DONE]".equals(payload)) {
+            sawDone[0] = true;
             return;
         }
         try {

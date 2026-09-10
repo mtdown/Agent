@@ -158,4 +158,76 @@ class RagLlmClientTest {
         client.streamChat("system", "prompt", true, new RecordingCallback());
         assertEquals("thinking-model", requestedModel[0]);
     }
+
+    @Test
+    void retriesOnceWhenConnectionFailsBeforeOutput() {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        server.createContext("/chat/completions", exchange -> {
+            if (calls.incrementAndGet() == 1) {
+                // abrupt close without any response: client sees IOException (connection reset)
+                exchange.close();
+                return;
+            }
+            byte[] out = ("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"重试成功\"},\"finish_reason\":\"stop\"}]}\n\n"
+                    + "data: [DONE]\n\n").getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, out.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(out);
+            }
+        });
+        server.start();
+        properties.getLlm().setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+        properties.getLlm().setApiKey("test-key");
+        properties.getLlm().setModel("thinking-model");
+        properties.getLlm().setFastModel("fast-model");
+        RagLlmClient client = new RagLlmClient(properties);
+        RecordingCallback callback = new RecordingCallback();
+
+        client.streamChat("system", "prompt", false, callback);
+
+        assertEquals(2, calls.get());
+        assertEquals("重试成功", callback.content.toString());
+        assertEquals("stop", callback.finishReason);
+        assertNull(callback.error);
+    }
+
+    @Test
+    void doesNotRetryAfterPartialOutput() {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        server.createContext("/chat/completions", exchange -> {
+            if (calls.incrementAndGet() == 1) {
+                // stream one delta, then break the connection mid-stream
+                byte[] partial = "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"部分\"}}]}\n\n"
+                        .getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+                exchange.sendResponseHeaders(200, 0);
+                OutputStream os = exchange.getResponseBody();
+                os.write(partial);
+                os.flush();
+                exchange.close(); // no finish_reason, no [DONE]
+                return;
+            }
+            byte[] out = "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"不该出现\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, out.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(out);
+            }
+        });
+        server.start();
+        properties.getLlm().setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+        properties.getLlm().setApiKey("test-key");
+        properties.getLlm().setModel("thinking-model");
+        properties.getLlm().setFastModel("fast-model");
+        RagLlmClient client = new RagLlmClient(properties);
+        RecordingCallback callback = new RecordingCallback();
+
+        client.streamChat("system", "prompt", false, callback);
+
+        assertEquals(1, calls.get());
+        assertEquals("部分", callback.content.toString());
+        assertTrue(callback.error != null, "partial-output failure must surface an error");
+    }
 }

@@ -32,6 +32,9 @@
               <QuestionCircleOutlined class="thinking-tip" />
             </a-tooltip>
           </div>
+          <a-button type="link" size="small" class="open-api-btn" @click="openKeyDrawer">
+            <ApiOutlined /> 开放 API
+          </a-button>
         </div>
 
         <!-- 消息流 -->
@@ -178,12 +181,99 @@
         </div>
       </div>
     </div>
+
+    <!-- 开放 API Key 管理抽屉 -->
+    <a-drawer
+      v-model:open="keyDrawer.open"
+      title="开放 API"
+      placement="right"
+      :width="480"
+    >
+      <p class="key-desc">
+        为外部程序（如本地 Agent）签发只读检索 Key。Key 只能访问<b>你可见的空间</b>，
+        删除即立即失效。明文 Key 仅创建时展示一次。
+      </p>
+
+      <!-- 创建 -->
+      <div class="key-create-bar">
+        <a-input
+          v-model:value="keyDrawer.newName"
+          placeholder="Key 用途名，如：本地 Agent"
+          :maxlength="64"
+          @keydown.enter="createKey"
+        />
+        <a-button type="primary" :loading="keyDrawer.creating" @click="createKey">
+          创建
+        </a-button>
+      </div>
+
+      <!-- 明文一次性展示 -->
+      <a-alert
+        v-if="keyDrawer.createdKey"
+        type="success"
+        show-icon
+        class="key-plaintext-alert"
+      >
+        <template #message>
+          Key「{{ keyDrawer.createdKey.keyName }}」已创建：
+          <div class="key-plaintext-row">
+            <code class="key-plaintext">{{ keyDrawer.createdKey.apiKey }}</code>
+            <a-button size="small" type="primary" @click="copyText(keyDrawer.createdKey.apiKey ?? '', 'Key')">
+              复制
+            </a-button>
+          </div>
+          <div class="key-plaintext-warn">⚠️ 关闭后无法再次查看，请立即保存</div>
+        </template>
+      </a-alert>
+
+      <!-- 列表 -->
+      <div class="key-list">
+        <div v-if="keyDrawer.keys.length === 0 && !keyDrawer.loading" class="key-empty">
+          暂无 API Key
+        </div>
+        <div v-for="k in keyDrawer.keys" :key="k.id" class="key-item">
+          <div class="key-item-main">
+            <div class="key-item-name">{{ k.keyName }}</div>
+            <div class="key-item-meta">
+              <code>{{ k.keyPrefix }}…</code>
+              <span v-if="k.createTime">{{ formatKeyTime(k.createTime) }}</span>
+            </div>
+          </div>
+          <a-popconfirm title="删除后立即失效，确定？" @confirm="deleteKey(k.id)">
+            <a-button type="link" danger size="small">删除</a-button>
+          </a-popconfirm>
+        </div>
+      </div>
+
+      <!-- 调用示例 -->
+      <a-collapse ghost class="curl-collapse">
+        <a-collapse-panel key="curl" header="curl 调用示例">
+          <div class="curl-block">
+            <div class="curl-title">只读检索</div>
+            <div class="curl-row">
+              <pre class="curl-code">{{ curlSearchExample }}</pre>
+              <a-button size="small" @click="copyText(curlSearchExample, '示例')">复制</a-button>
+            </div>
+            <div class="curl-title">流式问答（SSE）</div>
+            <div class="curl-row">
+              <pre class="curl-code">{{ curlAskExample }}</pre>
+              <a-button size="small" @click="copyText(curlAskExample, '示例')">复制</a-button>
+            </div>
+            <div class="curl-tip">
+              Windows 终端直接内联中文可能出现编码错误，建议把 JSON 写入 UTF-8 文件后用
+              <code>--data-binary @body.json</code> 发送。
+            </div>
+          </div>
+        </a-collapse-panel>
+      </a-collapse>
+    </a-drawer>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import {
+  ApiOutlined,
   CloseOutlined,
   FileTextOutlined,
   QuestionCircleOutlined,
@@ -197,6 +287,12 @@ import {
   type RagAskMeta,
   type RagAskUsage,
   type RagCitation,
+} from '@/api/ragController'
+import {
+  createRagApiKeyUsingPost,
+  deleteRagApiKeyUsingPost,
+  listRagApiKeysUsingGet,
+  apiBaseUrl,
 } from '@/api/ragController'
 import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController'
 import { getDocumentWikiVisByIdUsingGet } from '@/api/documentWikiController'
@@ -491,6 +587,104 @@ const onMarkerClick = (e: MouseEvent) => {
     }
   }
 }
+
+// ---- 开放 API Key 管理 ----
+const keyDrawer = ref<{
+  open: boolean
+  loading: boolean
+  creating: boolean
+  newName: string
+  keys: API.RagApiKeyView[]
+  createdKey: API.RagApiKeyCreatedView | null
+}>({
+  open: false,
+  loading: false,
+  creating: false,
+  newName: '',
+  keys: [],
+  createdKey: null,
+})
+
+const openKeyDrawer = () => {
+  keyDrawer.value.open = true
+  loadKeys()
+}
+
+const loadKeys = async () => {
+  keyDrawer.value.loading = true
+  try {
+    const res = await listRagApiKeysUsingGet()
+    keyDrawer.value.keys = res.data.data ?? []
+  } catch (e) {
+    antMessage.error('加载 Key 列表失败')
+  } finally {
+    keyDrawer.value.loading = false
+  }
+}
+
+const createKey = async () => {
+  if (keyDrawer.value.creating) return
+  keyDrawer.value.creating = true
+  try {
+    const res = await createRagApiKeyUsingPost(keyDrawer.value.newName.trim() || '默认 Key')
+    keyDrawer.value.createdKey = res.data.data ?? null
+    keyDrawer.value.newName = ''
+    await loadKeys()
+  } catch (e) {
+    antMessage.error('创建 Key 失败')
+  } finally {
+    keyDrawer.value.creating = false
+  }
+}
+
+const deleteKey = async (id: number | string) => {
+  try {
+    await deleteRagApiKeyUsingPost(Number(id))
+    antMessage.success('Key 已删除并立即失效')
+    if (keyDrawer.value.createdKey && String(keyDrawer.value.createdKey.id) === String(id)) {
+      keyDrawer.value.createdKey = null
+    }
+    await loadKeys()
+  } catch (e) {
+    antMessage.error('删除失败')
+  }
+}
+
+const formatKeyTime = (time: string) => {
+  try {
+    return new Date(time).toLocaleString('zh-CN', { hour12: false })
+  } catch {
+    return time
+  }
+}
+
+const copyText = async (text: string, label: string) => {
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    antMessage.success(`${label}已复制`)
+  } catch {
+    // 降级：老式 execCommand
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    antMessage.success(`${label}已复制`)
+  }
+}
+
+const apiBase = apiBaseUrl
+const curlSearchExample = `curl -X POST ${apiBase}/api/open/rag/search \\
+  -H "Content-Type: application/json; charset=utf-8" \\
+  -H "X-API-Key: cpk_你的Key" \\
+  --data-binary @body.json`
+
+const curlAskExample = `curl -N -X POST ${apiBase}/api/open/rag/ask \\
+  -H "Content-Type: application/json; charset=utf-8" \\
+  -H "X-API-Key: cpk_你的Key" \\
+  --data-binary @body.json`
 
 onMounted(() => {
   loadSpaces()
@@ -910,6 +1104,138 @@ onMounted(() => {
 
 .stop-btn {
   min-width: 84px;
+}
+
+/* 开放 API */
+.open-api-btn {
+  padding: 0 4px;
+  color: #a14f16;
+  font-size: 13px;
+}
+
+.key-desc {
+  font-size: 13px;
+  color: #6b5b3e;
+  line-height: 1.8;
+}
+
+.key-create-bar {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.key-plaintext-alert {
+  margin-bottom: 12px;
+}
+
+.key-plaintext-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.key-plaintext {
+  flex: 1;
+  word-break: break-all;
+  font-size: 12px;
+  background: #f6f1e4;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.key-plaintext-warn {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #c0392b;
+}
+
+.key-list {
+  margin-bottom: 16px;
+}
+
+.key-empty {
+  text-align: center;
+  color: #a89a7f;
+  padding: 20px 0;
+}
+
+.key-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border-bottom: 1px dashed #e8dcc8;
+}
+
+.key-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.key-item-name {
+  font-weight: 600;
+  color: #4a3b22;
+  font-size: 14px;
+}
+
+.key-item-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #a08c68;
+}
+
+.key-item-meta code {
+  background: #f6f1e4;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.curl-collapse {
+  margin-top: 8px;
+}
+
+.curl-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b4f1d;
+  margin: 10px 0 4px;
+}
+
+.curl-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.curl-code {
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.6;
+  background: #f6f1e4;
+  border: 1px solid #e8dcc8;
+  border-radius: 4px;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+
+.curl-tip {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #8c8c8c;
+  line-height: 1.6;
+}
+
+.curl-tip code {
+  padding: 1px 4px;
+  background: #f6f1e4;
+  border-radius: 3px;
+  font-size: 10px;
 }
 
 @media (max-width: 760px) {
