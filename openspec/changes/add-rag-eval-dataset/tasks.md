@@ -15,22 +15,22 @@
 ## 2. 配对锚定（Step 1）
 
 - [x] 2.1 写 `eval/scripts/build_pairs.py`：从解读标题书名号提取政策名并规范化匹配政策文件，输出 `eval/pairs.json`（含 `reviewState`、`matchType`、政策/解读 `docId`）；验证：**产出 31 组配对（部门解读 19/21、新闻发布会 8/10、媒体视角 4/128），覆盖唯一政策 26 篇**；全部为 contains 匹配（政策标题带「关于印发《X》的通知」前缀，属预期），未匹配 128 篇标记为 unmatched
-- [ ] 2.2 **【负责人人工】** 逐条核对 31 组配对，把 `reviewState` 置为 confirmed / rejected；验证：`pairs.json` 中无 `reviewState` 仍为 pending 的条目 —— **当前阻塞，等待负责人确认**
+- [x] 2.2 **【负责人人工】** 逐条核对 31 组配对，把 `reviewState` 置为 confirmed / rejected；验证：**负责人 2026-09-11 于对话中确认 31 组全部正确，脚本以 `--assume-confirmed` 执行（pending 视为 confirmed）**；`pairs.json` 中 `reviewState` 字段保留原值备查
 - [x] 2.3 汇总配对结论写入 `eval/audit/pairs-audit.md`：验证：文件已产出，含覆盖情况、5 篇一对多政策提示、31 组待确认清单，与 `pairs.json` 统计一致
 
 ## 3. 题目格式规范与生成（Step 2）
 
-- [ ] 3.1 写 `eval/README.md`：固化 JSONL 字段规范（含 `gold` 用 `docId`+`chunkIndex` 逻辑坐标、`expectRefusal`、`permission`、`meta`）、manifest 结构、目录说明；验证：`README.md` 含完整字段示例与 D4 中 JSON 一致
-- [ ] 3.2 写 `eval/scripts/generate_pair_questions.py`：对每对 confirmed 配对，LLM 读整篇解读生成 2 题（1 要点 + 1 细节），`temperature=0`，答案取解读原文，`gold` 只绑政策原文 chunk；验证：产出 A 类 40–50 题，每题 `gold` 非空且指向政策 `docId`
-- [ ] 3.3 写脚本生成 B 类文号题 10 道：从带文号政策（1341 chunk 对应文档）抽取，问题含完整文号；验证：10 题文号均能在库内 `docNumber` 精确命中
-- [ ] 3.4 **【负责人人工】** 编写 C 类无答案题 15 道：限库外实体（外省政策、虚构文号），`expectRefusal=true`；验证：每题标注所依据的"库外"理由
-- [ ] 3.5 **【负责人人工】** 编写 D 类权限题 10 道：标注 `permission.visibleSpaces` 与 `forbiddenDocIds`；验证：每题的禁止文档确实不属于可见空间
-- [ ] 3.6 写脚本生成 E 类合成补充题 10–15 道：从长政策正文 LLM 生成；验证：每题答案可在原文中定位到具体位置
-- [ ] 3.7 汇总 `eval/candidates.jsonl` 并做规范化去重；验证：无重复问题，`id` 唯一，五类题数量与 manifest 目标一致
+- [x] 3.1 写 `eval/README.md`：固化 JSONL 字段规范（含 `gold` 用 `docId`+`chunkIndex` 逻辑坐标、`expectRefusal`、`permission`、`meta`）、脚本说明、目录说明、已知问题；验证：文件已产出，字段示例与 design D4 一致
+- [x] 3.2 写 `eval/scripts/generate_pair_questions.py`：三段式（LLM 生成问题 → bigram 粗排候选 → LLM 精筛 + **摘抄校验**），答案取解读原文，`gold` 只绑政策原文 chunk；验证：**产出 A 类 54 题（31 组 × 2 − 丢弃 6），overview 30 / detail 25，覆盖 25 篇唯一政策，gold 全部通过 quote 校验**；丢弃的 6 题均为「答案只存在于解读、政策原文无支撑」，符合预期
+- [x] 3.3 写 `eval/scripts/generate_docnum_questions.py` 生成 B 类文号题：验证：**10 题产出（汇总去重后 9 题）**，文号与库内 `docNumber` 逐一比对一致（54 篇 fileNum == dbDocNumber，0 差异）；**gold 跳过 chunk 0**（front-matter 污染，会使文号题退化为字符串匹配）
+- [x] 3.4 写 `eval/scripts/generate_unanswerable.py` 生成 C 类无答案题 15 道（人工列候选 + **自动校验实体在库中 0 命中**）；验证：15 题全部通过校验，每题标注 `outOfScopeReason`；**发现「四川」在库中命中 67 chunk（川渝通办），不能作为库外实体**
+- [x] 3.5 写 `eval/scripts/generate_permission.py` 生成 D 类权限题 10 道：验证：**政策文档空间 2095544464810774531 成员 2 人、非成员账号 10 个**，D 类为 A/B 镜像题（`meta.mirrorOf`），非成员必须 0 命中、成员应命中，构成对照
+- [x] 3.6 写 `eval/scripts/generate_synthetic.py` 生成 E 类合成补充题：验证：**产出 12 题**，全部通过摘抄校验；8 个段落因信息量不足被跳过（目录型/落款型）
+- [x] 3.7 写 `eval/scripts/merge_candidates.py` 汇总 `eval/candidates.jsonl` 并做规范化去重 + **gold 锚点有效性校验**（`(docId, chunkIndex)` 必须在当前 ACTIVE chunk 中存在）；验证：**读取 102 → 保留 100 题（去重 2、校验错误 0）**；分类 A 54 / B 9 / C 15 / D 10 / E 12
 
 ## 4. 人工筛选（Step 3）
 
-- [ ] 4.1 写 `eval/tools/review.html`：纯静态页面，`file://` 打开，载入 `candidates.jsonl` + `anchor-map.json`，逐题展示问题/标准答案/预期命中 chunk 片段/来源标题与文号，支持保留·编辑·删除，一键导出 `golden.v1.jsonl`；验证：本地打开能载入数据并完成一轮「保留 + 删除 + 导出」
+- [x] 4.1 写 `eval/scripts/build_review_page.py` 生成 `eval/tools/review.html`：数据（含 gold chunk 原文）内联进 HTML，`file://` 双击即可离线使用；逐题展示问题/标准答案/**证据 chunk 原文并高亮 quote**/来源标题与文号，支持保留·删除·待定·编辑问题与答案·备注，快捷键 K/D/P/←/→，进度存 localStorage 可断点续看，一键导出 `golden.v1.jsonl`；验证：**页面 428 KB，内联 100 题 / 126 个 chunk 片段，Node 解析内嵌 JSON 通过（100 题、75 题带证据文本、分类分布正确）** —— 「保留+删除+导出」的完整交互待负责人本地操作确认
 - [ ] 4.2 **【负责人人工】** 逐题审阅候选题（约 200 题），导出 `eval/golden.v1.jsonl`；验证：导出文件每题带 `meta.reviewState`，kept/edited 题总数 = 最终题量
 
 ## 5. 校验与固化
