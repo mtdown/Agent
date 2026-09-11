@@ -107,6 +107,43 @@ python eval/scripts/validate.py eval/candidates.jsonl --self-test
 
 LLM 调用均设置 `enable_thinking=false`（实测 qwen3.8-flash：耗时 2.4s→0.7s、token 212→50，答案一致）。
 
+## 跑评测（change `add-rag-eval-runner`）
+
+数据集是**考卷**，`run_eval.py` 是**阅卷器**。`Recall@K / MRR / 跨空间泄漏率` 是跑出来的分数，
+不是数据集里的字段 —— 固定写死就失去了"换 embedding 前后对比"的意义。
+
+```bash
+# 0) 制备评测用 API Key（成员 + 非成员，用于 D 类权限对照）
+python eval/scripts/prepare_keys.py          # 明文写入 eval/.env（gitignore）
+
+# 1) 探测后端与 key（后端未启动会直接退出码 1，不会静默产出全 0 指标）
+python eval/scripts/run_eval.py --probe
+
+# 2) 跑基线 —— http 模式，测真实系统，对外引用的指标一律用它
+python eval/scripts/run_eval.py
+
+# 3) 离线模式 —— 不依赖后端，用于 embedding 模型选型对比
+python eval/scripts/run_eval.py --retriever offline --offline-vector recompute
+```
+
+**一次检索取 top10，本地截断算 K ∈ {1,3,5,6,10}**，99 题只需 99 次请求（不是 5×99）。
+
+指标口径：
+
+| 指标 | 定义 | 备注 |
+|---|---|---|
+| `recall@K` | gold 坐标命中比例 | chunk 级，区分度最高，但对切分策略敏感 |
+| `docRecall@K` | gold 涉及的 docId 被命中比例 | 文档级，**跨实验对比首选** |
+| `mrr` | 1 / 首个 gold 命中的位次，未命中为 0 | 衡量"正确答案排第几" |
+| `hitRate@K` | 前 K 是否命中至少一个 | 最宽松 |
+
+- **C 类**（gold 为空）不进召回分母，只报非空返回率与 `top1Score` 分布，**不拍相似度阈值**
+- **D 类**用成员/非成员双 key 对照，泄漏一票否决且**不进 overall 平均**；
+  offline 模式无权限过滤，会标记 `notApplicable` 而不是产出假的 0 泄漏
+- 两种 retriever 的分数**不可混合平均**，结果 JSON 记录了 `retriever` 与 `embeddingModel`
+
+产物：`eval/results/baseline-<ts>-<mode>.json`（逐题明细）+ `eval/audit/baseline-report.md`。
+
 ## AI 预筛（LLM-as-Judge）
 
 `llm_judge.py` 用 `qwen3.8-flash` 对候选题做质量评审，**只做预筛，不替代人**：
