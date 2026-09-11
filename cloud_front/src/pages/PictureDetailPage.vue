@@ -185,4 +185,14 @@ const doShare = () => {
   justify-content: center; /* 水平居中 */
   align-items: center; /* 垂直居中 */
 }
+
+/* 窄屏：500×500 固定预览框在 375px 手机上会横向溢出 125px，
+   改为按屏宽自适应、高度让浏览器按原比例算 */
+@media (max-width: 768px) {
+  :deep(.preview-image) {
+    width: 100%;
+    height: auto;
+    max-height: 45vh;
+  }
+}
 </style>

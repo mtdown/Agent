@@ -1,15 +1,20 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 
-const DEV_BASE_URL = 'http://127.0.0.1:8123'
 const PROD_BASE_URL = 'http://111.230.167.134'
+// 开发环境走「同源」：/api 请求打到当前页面自己的域名+端口，再由 vite dev server 的
+// proxy 转发到本机 8123（配置见 vite.config.ts 的 server.proxy）。
+// 这样无论是 localhost、局域网 IP，还是 cpolar/ngrok 的公网域名，前后端都只用一个端口，
+// 不需要为每种访问方式改地址，也不会出现 https 页面请求 http 接口被浏览器拦截的情况。
+const DEV_BASE_URL = ''
 
 // 创建 Axios 实例
 // 如果不写这个 withCredentials 前端就不会携带 cookie ，会出现前端已经登录但是后端不认的情况
 const myAxios = axios.create({
   baseURL: DEV_BASE_URL,
   // baseURL: PROD_BASE_URL,
-  timeout: 10000,
+  // 首次 RAG 检索 / AI 对话在本机要跑向量化，实测可达 20s 左右，10s 会误判超时
+  timeout: 60000,
   withCredentials: true,
 })
 // 全局请求拦截器

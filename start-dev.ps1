@@ -67,11 +67,11 @@ $backendProc = Start-Process -FilePath $javaExe `
     -WindowStyle Hidden -PassThru
 Write-Host "    backend PID: $($backendProc.Id) (log: $backendLog)"
 
-Write-Host "==> [4/4] Starting frontend dev server on 127.0.0.1:$frontPort ..."
+Write-Host "==> [4/4] Starting frontend dev server on 0.0.0.0:$frontPort (LAN accessible) ..."
 $frontLog = Join-Path $tmpDir 'dev-frontend.log'
 $frontErr = Join-Path $tmpDir 'dev-frontend.err.log'
 $frontProc = Start-Process -FilePath 'cmd.exe' `
-    -ArgumentList @('/c', "npm run dev -- --port $frontPort --host 127.0.0.1") `
+    -ArgumentList @('/c', "npm run dev -- --port $frontPort --host 0.0.0.0") `
     -WorkingDirectory $frontDir `
     -RedirectStandardOutput $frontLog `
     -RedirectStandardError $frontErr `
@@ -95,5 +95,15 @@ if (-not $frontUp) {
     Write-Host '    WARN: frontend not up yet, check tmp/dev-frontend.log'
 }
 Write-Host ''
-Write-Host 'All done. Open http://127.0.0.1:3000  (admin / 12345678)'
+$lanIp = (Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+    Sort-Object InterfaceIndex | Select-Object -First 1).IPAddress
+Write-Host 'All done. (admin / 12345678)'
+Write-Host "  PC     : http://127.0.0.1:$frontPort"
+if ($lanIp) { Write-Host "  Phone  : http://$lanIp:$frontPort   (same WiFi)" }
+Write-Host ''
+Write-Host 'Need access from outside the LAN? (front & back now share one port)'
+Write-Host "  cpolar http $frontPort        # open the https://*.cpolar.cn URL it prints"
+Write-Host '  (stop the tunnel after the demo)'
+Write-Host ''
 Write-Host 'Stop everything with: powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1'
