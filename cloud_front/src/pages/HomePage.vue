@@ -194,4 +194,23 @@ onMounted(() => {
   margin-top: 8px;
   margin-bottom: 8px;
 }
+
+/* 窄屏：搜索栏由「筛选区 + 固定 400px 搜索框」改为上下堆叠，
+   否则 400px 搜索框在 375px 手机上会横向溢出 */
+@media (max-width: 768px) {
+  #homePage {
+    padding: 12px;
+  }
+
+  .search-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-input-section {
+    width: 100%;
+    padding-top: 0;
+  }
+}
 </style>

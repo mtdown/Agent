@@ -1,0 +1,84 @@
+/* 移动端兜底适配
+   只处理两类问题：内容撑破视口（溢出）、控件太小不好点（可点性）。
+   刻意不改已有布局结构，以免与页面内已存在的 @media（760px / 900px）冲突。
+   页面级的布局适配仍应写在各自的 .vue 里。 */
+
+@media (max-width: 768px) {
+  /* 任何子元素都不许把页面顶出横向滚动条 */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* 表格：列多时横向滚动，而不是被压缩成一团
+     （等价于官方推荐的 :scroll="{ x: 'max-content' }"，这里做全局兜底） */
+  .ant-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-table-wrapper .ant-table {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  /* 抽屉 / 弹窗：窄屏铺满，避免固定宽度（如 480px）溢出视口 */
+  .ant-drawer-content-wrapper {
+    width: 100% !important;
+    max-width: 100vw;
+  }
+
+  .ant-modal {
+    max-width: calc(100vw - 24px);
+    margin: 12px auto;
+  }
+
+  /* 分页器：页码多时换行，不要顶破容器 */
+  .ant-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 8px;
+  }
+
+  /* 触摸目标放大到易点尺寸 */
+  .ant-btn {
+    min-height: 34px;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selector {
+    min-height: 36px;
+  }
+
+  /* 图片与缩略图不溢出 */
+  .ant-image,
+  .ant-image-img {
+    max-width: 100%;
+  }
+
+  /* 标签多时换行，不要横向挤出去 */
+  .ant-tag {
+    margin-bottom: 4px;
+  }
+
+  /* 卡片内边距收紧，把宽度让给内容 */
+  .ant-card-body {
+    padding: 12px;
+  }
+
+  /* 筛选区常见写法是多个带 min-width（180~260px）的控件并排，
+     窄屏下会累加撑破容器，这里允许换行 */
+  .ant-space,
+  .ant-form-inline {
+    flex-wrap: wrap;
+  }
+
+  /* 行内控件在窄屏按屏宽收缩，不要顶破父容器 */
+  .ant-input-search,
+  .ant-select,
+  .ant-picker {
+    max-width: 100%;
+  }
+}
