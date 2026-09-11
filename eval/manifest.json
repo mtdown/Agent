@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-11T15:03:13+08:00",
+  "generatedAt": "2026-09-11T16:48:28+08:00",
   "changeId": "add-rag-eval-dataset",
   "branch": "feature/rag-eval开发",
   "dataset": {
-    "source": "candidates.jsonl",
-    "total": 100,
+    "source": "golden.v1.jsonl",
+    "total": 99,
     "byCategory": {
       "B 文号题": 9,
       "A 配对题": 54,
       "D 权限题": 10,
       "E 合成题": 12,
-      "C 无答案题": 15
+      "C 无答案题": 14
     },
     "reviewStateDist": {
-      "pending": 100
+      "kept": 99
     },
     "deviations": [
-      "与目标配比完全一致"
+      "C 无答案题 实际 14 / 目标 15（差 -1）"
     ]
   },
   "models": {
