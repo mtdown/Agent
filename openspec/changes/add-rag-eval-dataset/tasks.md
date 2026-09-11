@@ -43,7 +43,7 @@
   - 与设计稿的两处偏差（已确认）：①「跨辖区噪声文档未出题」改为**提示而非禁止**——corpus-audit 已确认唯一的跨省文件是川渝通办联合发文，属合法语料，禁止会误伤；② 去重键改为 `(category, 归一化问题)`，因 D 类是 A/B 的镜像题，问题文本本就相同
 - [ ] 5.2 对 `golden.v1.jsonl` 跑校验并修复不合格题目；验证：校验全绿，输出题量/分类配比/覆盖文档数摘要 —— **依赖 4.2 产出 golden；已用 `candidates.jsonl` 预跑验证校验器可用（PASS），golden 导出后需再跑一次**
 - [x] 5.3 生成 `eval/manifest.json` 与 `eval/scripts/gen_manifest.py`：语料快照（216 篇逐篇 sha256 + 汇总 hash `fc472f63…`）、chunk 快照（2061 行 / 216 篇 / 全 ACTIVE / 单空间）、LLM 与 embedding 模型版本（**不记密钥**）、实际配比与偏差说明、只读约束自检；验证：**`validate.py` 已内置 manifest 字段完整性校验**；人为构造缺字段 manifest 时准确报出 10 处缺失
-- [ ] 5.4 提交改动到 `feature/rag-eval开发` 并推送远程（走 `upload.ps1` 或等价系统 git 步骤）；验证：`git status` 干净，远程分支可见新提交
+- [x] 5.4 提交改动到 `feature/rag-eval开发` 并推送远程；验证：**已推送至 `origin/feature/rag-eval开发`（`765e757..f8524a9`，累计 6 个提交全部同步，`rev-list --left-right` 为 `0 0`，`git status` 干净）**；本机 PowerShell 沙箱内 git 不可用导致 `upload.ps1` 无法执行，改用系统 git（`/c/Program Files/Git/cmd/git`）复刻等价的 add / commit / push 步骤
 
 ## 6. 集成验证与汇报
 
