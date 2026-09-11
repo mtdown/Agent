@@ -38,6 +38,10 @@ build/
 ### VS Code ###
 .vscode/
 
+### RAG eval dataset ###
+eval/tmp/
+eval/.env
+
 ### Local runtime and diagnostics ###
 .workbuddy/
 tmp/
