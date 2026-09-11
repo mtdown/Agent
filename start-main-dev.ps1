@@ -58,9 +58,9 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "4. 正在启动本地服务..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 if ($Public) {
-    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -Public
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -Public -NoPause
 } else {
-    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1"
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -NoPause
 }
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[警告] 启动服务可能失败，请检查服务状态。" -ForegroundColor Yellow

@@ -19,7 +19,9 @@
 # ============================================================
 param(
     [switch]$Public,
-    [string]$Tunnel = 'auto'
+    [string]$Tunnel = 'auto',
+    # -NoPause: do not wait for Enter at the end (used by parent scripts)
+    [switch]$NoPause
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -211,12 +213,24 @@ function Start-PublicTunnel {
         Write-Host "    Tunnel started, but the public URL could not be read automatically."
         Write-Host "    Check the minimized $tool window, or: Get-Content $tunnelLog"
     }
+    return $publicUrl
 }
 
+$publicUrl = $null
 if ($Public) {
-    Start-PublicTunnel -Port $frontPort
+    $publicUrl = Start-PublicTunnel -Port $frontPort
 } else {
     Write-Host 'Public tunnel not started - re-run with -Public to expose it on the internet.'
 }
 Write-Host ''
+if ($publicUrl) {
+    Write-Host '================================================================' -ForegroundColor Green
+    Write-Host "  Public URL (share this) : $publicUrl" -ForegroundColor Green
+    Write-Host '================================================================' -ForegroundColor Green
+}
+Write-Host ''
 Write-Host 'Stop everything with: powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1'
+if (-not $NoPause) {
+    Write-Host ''
+    Read-Host 'Press Enter to close this window (services keep running)'
+}

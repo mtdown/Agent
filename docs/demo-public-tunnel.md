@@ -28,6 +28,9 @@ All done. (admin / 12345678)
 |---|---|
 | `-Public` | 同时启动公网穿透 |
 | `-Tunnel cpolar\|cloudflared\|ngrok\|none` | 指定工具（默认自动探测）；`none` = 明确不启用 |
+| `-NoPause` | 末尾不等待回车（父脚本调用时用，手动启动不用加） |
+
+脚本跑完会停在 `Press Enter to close this window`，服务在后台继续运行 —— 公网地址在结尾会再打印一次并用绿框标出，不怕被前面的日志刷掉。
 
 隧道 PID 写在 `tmp/tunnel.pid`，`.\stop-dev.ps1` 会连同前后端一起关掉，不用手动收尾。
 
