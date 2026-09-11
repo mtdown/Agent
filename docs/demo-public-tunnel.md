@@ -5,15 +5,16 @@
 ## 0. 一键启动
 
 ```powershell
-# 只在本机 / 局域网用
+# 一键：起服务 + 自动起公网穿透（默认行为，不用加参数）
 powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 
-# 同时起公网穿透（推荐演示用）
-powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Public
+# 只在本机 / 局域网用，不暴露公网
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -NoTunnel
 ```
 
-`-Public` 会自动按 `cpolar` → `cloudflared` → `ngrok` 的顺序找已安装的工具，
-起完隧道后从它的本地 API 读公网地址并打印出来：
+默认会按 `cpolar` → `cloudflared` → `ngrok` 的顺序找已安装的工具，
+起完隧道后从它的本地 API 读公网地址并打印出来。没装任何工具时只是不启动，
+本地和局域网访问照常，不会报错。
 
 ```
 All done. (admin / 12345678)
@@ -26,9 +27,13 @@ All done. (admin / 12345678)
 
 | 参数 | 作用 |
 |---|---|
-| `-Public` | 同时启动公网穿透 |
-| `-Tunnel cpolar\|cloudflared\|ngrok\|none` | 指定工具（默认自动探测）；`none` = 明确不启用 |
+| `-NoTunnel` | **只走局域网，不暴露公网**（日常开发用这个） |
+| `-Tunnel cpolar\|cloudflared\|ngrok\|none` | 指定工具（默认自动探测）；`none` = 同 `-NoTunnel` |
+| `-Public` | 兼容保留，现在默认就会起穿透，不用再加 |
 | `-NoPause` | 末尾不等待回车（父脚本调用时用，手动启动不用加） |
+
+⚠️ 默认行为是**暴露到公网**：账号 `admin / 12345678` 会被放到公网上。
+日常开发请加 `-NoTunnel`，或演示结束后立刻 `.\stop-dev.ps1`。
 
 脚本跑完会停在 `Press Enter to close this window`，服务在后台继续运行 —— 公网地址在结尾会再打印一次并用绿框标出，不怕被前面的日志刷掉。
 
@@ -42,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\start-main-dev.ps1 -Public -Stay
 
 | 参数 | 作用 |
 |---|---|
-| `-Public` | 透传给 start-dev.ps1，起公网穿透 |
+| `-Public` | 允许起公网穿透（**不加则只走局域网**，因为它是日常开发入口） |
 | `-Stay` | **不切回 main 分支**，在当前分支启动 |
 
 ⚠️ 不加 `-Stay` 时该脚本会 `git checkout main` 并拉取最新代码。

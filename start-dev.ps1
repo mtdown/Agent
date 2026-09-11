@@ -6,20 +6,26 @@
 #          (0.0.0.0:3000, LAN accessible). Logs go to tmp/dev-backend.log
 #          and tmp/dev-frontend.log.
 #
-#  -Public   also start a public tunnel so the site is reachable from
-#            outside the LAN. Front and back now share one port (the vite
-#            dev server proxies /api to 8123), so tunneling the frontend
-#            port alone is enough. Tunnel PID is written to tmp/tunnel.pid
-#            and .\stop-dev.ps1 stops it together with the dev services.
-#  -Tunnel   cpolar | cloudflared | ngrok | none  (default: auto-detect)
+#  Tunnel is ON by default: if cpolar/cloudflared/ngrok is installed, the
+#  site is exposed to the internet right away (use -NoTunnel to skip).
+#  Front and back now share one port (the vite dev server proxies /api to
+#  8123), so tunneling the frontend port alone is enough. The tunnel PID
+#  is written to tmp/tunnel.pid and .\stop-dev.ps1 stops it too.
+#
+#  -Public    kept for compatibility (tunnel is already the default)
+#  -NoTunnel  stay on the LAN only, do not expose anything publicly
+#  -Tunnel    cpolar | cloudflared | ngrok | none  (default: auto-detect)
 #
 #  NOTE: keep every string literal ASCII-only. Windows PowerShell 5.1
 #        decodes a BOM-less .ps1 with the system ANSI code page, so
 #        non-ASCII message text can be misdecoded at parse time.
 # ============================================================
 param(
+    # Kept for compatibility: the tunnel now starts by default.
     [switch]$Public,
     [string]$Tunnel = 'auto',
+    # -NoTunnel / -Tunnel none : stay on the LAN only (no public exposure)
+    [switch]$NoTunnel,
     # -NoPause: do not wait for Enter at the end (used by parent scripts)
     [switch]$NoPause
 )
@@ -217,10 +223,13 @@ function Start-PublicTunnel {
 }
 
 $publicUrl = $null
-if ($Public) {
+$wantTunnel = -not ($NoTunnel -or $Tunnel -eq 'none')
+if ($wantTunnel) {
+    # Default is ON: if a tunnel tool is installed the site goes public.
+    # Use -NoTunnel to keep it on the LAN only.
     $publicUrl = Start-PublicTunnel -Port $frontPort
 } else {
-    Write-Host 'Public tunnel not started - re-run with -Public to expose it on the internet.'
+    Write-Host 'Public tunnel disabled (-NoTunnel) - LAN access only.'
 }
 Write-Host ''
 if ($publicUrl) {

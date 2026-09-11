@@ -1,5 +1,5 @@
 param(
-    # -Public: 同时启动公网穿透（参数透传给 start-dev.ps1）
+    # -Public: 允许启动公网穿透（透传给 start-dev.ps1）；不带则只走局域网
     [switch]$Public,
     # -Stay: 不切回 main 分支，直接在当前分支启动（演示未合入 main 的功能时用）
     [switch]$Stay
@@ -60,7 +60,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 if ($Public) {
     powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -Public -NoPause
 } else {
-    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -NoPause
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -NoPause -NoTunnel
 }
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[警告] 启动服务可能失败，请检查服务状态。" -ForegroundColor Yellow
