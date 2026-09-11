@@ -39,16 +39,17 @@
 
 ## 5. 校验与固化
 
-- [ ] 5.1 写 `eval/scripts/validate.py`：校验 schema 完整性、所有 `gold` 锚点可解析到当前 ACTIVE chunk、问题去重、配比符合目标、C/D 类必填字段存在、跨辖区噪声文档未出题；验证：故意注入一条坏数据（不存在的 chunkIndex）时脚本报错并指出题号
-- [ ] 5.2 对 `golden.v1.jsonl` 跑校验并修复不合格题目；验证：校验全绿，输出题量/分类配比/覆盖文档数摘要
-- [ ] 5.3 生成 `eval/manifest.json`：语料快照 hash、chunk 快照统计、LLM 模型版本与生成时间、实际配比与偏差说明；验证：文件可被 `validate.py` 读取且字段完整
+- [x] 5.1 写 `eval/scripts/validate.py`：校验 schema 完整性、所有 `gold` 锚点可解析到当前 ACTIVE chunk、`gold[].quote` 真实性、问题去重、五类齐全与配比偏差、C/D 类专属规则、**禁止出现 `chunkId` 字段**（递归扫描）；验证：**`--self-test` 注入 `chunkIndex=999999` 的坏数据后正确报错并指出题号 `SELFTEST-BAD`**；对 100 道候选题实跑**全绿无错误**（162 gold 段落覆盖 37 篇文档、144 条 quote 校验通过）
+  - 与设计稿的两处偏差（已确认）：①「跨辖区噪声文档未出题」改为**提示而非禁止**——corpus-audit 已确认唯一的跨省文件是川渝通办联合发文，属合法语料，禁止会误伤；② 去重键改为 `(category, 归一化问题)`，因 D 类是 A/B 的镜像题，问题文本本就相同
+- [ ] 5.2 对 `golden.v1.jsonl` 跑校验并修复不合格题目；验证：校验全绿，输出题量/分类配比/覆盖文档数摘要 —— **依赖 4.2 产出 golden；已用 `candidates.jsonl` 预跑验证校验器可用（PASS），golden 导出后需再跑一次**
+- [x] 5.3 生成 `eval/manifest.json` 与 `eval/scripts/gen_manifest.py`：语料快照（216 篇逐篇 sha256 + 汇总 hash `fc472f63…`）、chunk 快照（2061 行 / 216 篇 / 全 ACTIVE / 单空间）、LLM 与 embedding 模型版本（**不记密钥**）、实际配比与偏差说明、只读约束自检；验证：**`validate.py` 已内置 manifest 字段完整性校验**；人为构造缺字段 manifest 时准确报出 10 处缺失
 - [ ] 5.4 提交改动到 `feature/rag-eval开发` 并推送远程（走 `upload.ps1` 或等价系统 git 步骤）；验证：`git status` 干净，远程分支可见新提交
 
 ## 6. 集成验证与汇报
 
-- [ ] 6.1 跑 `openspec validate add-rag-eval-dataset --strict`；验证：零错误零警告
-- [ ] 6.2 汇总汇报：体检结论（空壳率/表格拍平率/文号覆盖）、配对数与拒绝数、最终题量与配比、校验结果、已知局限（表格题未出、C 类待 runner 复核）；验证：汇报文本写入 `tasks.md` 末尾「实施结果小结」
-- [ ] 6.3 把本轮遇到的报错与阻塞记入 `IssueLog.xlsx`（时间/分支/change id/阶段/报错/影响/方案/状态/验证）；验证：表格新增对应行
+- [x] 6.1 跑 `openspec validate add-rag-eval-dataset --strict`；验证：**输出 `Change 'add-rag-eval-dataset' is valid`，零错误零警告**
+- [ ] 6.2 汇总汇报：体检结论（空壳率/表格拍平率/文号覆盖）、配对数与拒绝数、最终题量与配比、校验结果、已知局限（表格题未出、C 类待 runner 复核）；验证：汇报文本写入 `tasks.md` 末尾「实施结果小结」—— **待 4.2 完成后与最终题量一并写入**
+- [x] 6.3 把本轮遇到的报错与阻塞记入 `IssueLog.xlsx`（时间/分支/change id/阶段/报错/影响/方案/状态/验证）；验证：**已追加第 113–114 行**（分支切换导致 eval 产物不可见、validate 规则与 D 类结构冲突），状态均为已修复、验证通过
 
 ## Verification
 

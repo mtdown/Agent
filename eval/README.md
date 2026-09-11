@@ -94,6 +94,13 @@ python eval/scripts/llm_judge.py            # 首次全量；加 --repeat 可跑
 python eval/scripts/build_review_page.py
 
 # 8. 重新生成页面后，双击 eval/tools/review.html 即可离线审阅
+
+# 9. 【人工筛选后】把 golden.v1.jsonl 放到 eval/，再校验 + 生成快照
+python eval/scripts/validate.py eval/golden.v1.jsonl    # golden 模式额外要求 reviewState ∈ {kept, edited}
+python eval/scripts/gen_manifest.py eval/golden.v1.jsonl
+
+# 校验器自检：注入不存在的 chunkIndex，验证能报错并指出题号
+python eval/scripts/validate.py eval/candidates.jsonl --self-test
 ```
 
 LLM 调用均设置 `enable_thinking=false`（实测 qwen3.8-flash：耗时 2.4s→0.7s、token 212→50，答案一致）。
