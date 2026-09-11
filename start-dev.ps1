@@ -119,13 +119,34 @@ if (-not $frontUp) {
     Write-Host '    WARN: frontend not up yet, check tmp/dev-frontend.log'
 }
 Write-Host ''
-$lanIp = (Get-NetIPAddress -AddressFamily IPv4 |
-    Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
-    Sort-Object InterfaceIndex | Select-Object -First 1).IPAddress
+# Pick the adapter that owns the default route. Sorting by InterfaceIndex
+# picks a virtual adapter (VMware / Hyper-V, e.g. 192.168.206.1) whose
+# subnet the phone is not on - that address looks valid but is unreachable.
+$lanIp = $null
+$lanAdapter = $null
+$defRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+    Where-Object { $_.NextHop -ne '0.0.0.0' } |
+    Sort-Object RouteMetric | Select-Object -First 1
+if ($defRoute) {
+    $addr = Get-NetIPAddress -InterfaceIndex $defRoute.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1
+    if ($addr) {
+        $lanIp = $addr.IPAddress
+        $netAdapter = Get-NetAdapter -InterfaceIndex $defRoute.InterfaceIndex -ErrorAction SilentlyContinue
+        if ($netAdapter) { $lanAdapter = $netAdapter.Name }
+    }
+}
+if (-not $lanIp) {
+    $lanIp = (Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+        Sort-Object InterfaceIndex | Select-Object -First 1).IPAddress
+}
 Write-Host 'All done. (admin / 12345678)'
 Write-Host "  PC     : http://127.0.0.1:$frontPort"
 # NOTE: $($lanIp) - an unbraced `$lanIp:$frontPort` parses as a scoped variable and breaks the script
-if ($lanIp) { Write-Host "  Phone  : http://$($lanIp):$($frontPort)   (same WiFi)" }
+if ($lanIp) {
+    Write-Host "  Phone  : http://$($lanIp):$($frontPort)   (same WiFi$(if ($lanAdapter) { " / via '$lanAdapter'" }))"
+}
 # ------------------------------------------------------------
 #  Public tunnel (optional, -Public)
 # ------------------------------------------------------------
