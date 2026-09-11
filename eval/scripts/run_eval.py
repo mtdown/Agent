@@ -77,7 +77,7 @@ class HttpRetriever:
 
     name = "http"
 
-    def __init__(self, base_url, api_key, space_ids=None, timeout=30):
+    def __init__(self, base_url, api_key, space_ids=None, timeout=60):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.space_ids = space_ids
@@ -364,7 +364,7 @@ def main():
     non_member_key = args.non_member_key or cfg.get("EVAL_NONMEMBER_API_KEY", "")
 
     if args.retriever == "http":
-        base_url = args.base_url or cfg.get("BACKEND_BASE_URL", "http://localhost:8123")
+        base_url = args.base_url or cfg.get("BACKEND_BASE_URL", "http://localhost:8123/api")
         retriever = HttpRetriever(base_url, member_key, [POLICY_SPACE_ID] if args.space_scope else None)
     else:
         retriever = OfflineRetriever(
@@ -591,7 +591,9 @@ def main():
         "config": {
             "retriever": retriever.name,
             "baseUrl": getattr(retriever, "base_url", None),
-            "embeddingModel": cfg.get("EMBEDDING_MODEL", ""),
+            # http 模式下 embedding 由后端 application.yml 的 rag.embedding.model 决定，
+            # 不能拿 .env 里给 offline 模式配的模型冒名顶替（会产出误导性报告）
+            "embeddingModel": cfg.get("EMBEDDING_MODEL", "") if retriever.name == "offline" else None,
             "fetchK": FETCH_K,
             "ks": KS,
             "spaceScoped": bool(args.space_scope),
@@ -641,7 +643,11 @@ def gen_report(result, by_id):
     L.append(f"- 运行 ID：`{result['runId']}`")
     L.append(f"- 检索模式：`{cfg['retriever']}`（baseUrl `{cfg['baseUrl']}`）")
     L.append(f"- 数据集：`{cfg['goldenFile']}` · sha256 `{cfg['goldenSha256'][:16]}…`")
-    L.append(f"- embedding：`{cfg['embeddingModel'] or '（后端运行时配置）'}`")
+    if cfg["retriever"] == "http":
+        emb_note = "由后端 `application.yml` 的 `rag.embedding.model` 决定（runner 不读后端配置，需人工核对）"
+    else:
+        emb_note = f"`{cfg['embeddingModel'] or '（未配置）'}`"
+    L.append(f"- embedding：{emb_note}")
     L.append(f"- 检索参数：一次取 top{cfg['fetchK']}，本地截断算 K ∈ {{{', '.join(map(str, cfg['ks']))}}}")
     L.append(f"- 时间：{cfg['startedAt']} → {cfg['finishedAt']}\n")
 
