@@ -222,6 +222,8 @@ function Start-PublicTunnel {
         Start-Sleep -Seconds 1
         $publicUrl = Get-TunnelPublicUrl
         if ($publicUrl) { break }
+        # A tool that dies at once will never serve an API (e.g. cpolar without authtoken)
+        if ($i -ge 2 -and $proc.HasExited) { break }
     }
     # cloudflared has no local API - fall back to scraping its own output
     if (-not $publicUrl) {
@@ -237,8 +239,24 @@ function Start-PublicTunnel {
         Write-Host "  Public : $publicUrl" -ForegroundColor Green
         Write-Host '           (random domain changes on every restart; keep the tunnel window open)'
     } else {
-        Write-Host "    Tunnel started, but the public URL could not be read automatically."
-        Write-Host "    Check the minimized $tool window, or: Get-Content $tunnelLog"
+        Write-Host "    Tunnel process started, but no public URL was obtained."
+        $joined = ''
+        foreach ($f in @($tunnelLog, $tunnelErr)) {
+            if (Test-Path $f) { $joined += (Get-Content $f -Raw -ErrorAction SilentlyContinue) }
+        }
+        if ($proc.HasExited) {
+            Write-Host "    NOTE: $tool exited immediately (exit code $($proc.ExitCode))." -ForegroundColor Yellow
+        }
+        if ($joined -match 'authtoken') {
+            Write-Host "    => $tool is not authenticated yet (log says: $($joined.Trim()))." -ForegroundColor Yellow
+            Write-Host "       Fix once :  cpolar authtoken <your-token>" -ForegroundColor Yellow
+            Write-Host "       Token    :  https://dashboard.cpolar.com (free signup)" -ForegroundColor Yellow
+            Write-Host "       No account? use the registration-free tool instead:" -ForegroundColor Yellow
+            Write-Host "         winget install Cloudflare.cloudflared" -ForegroundColor Yellow
+            Write-Host "         then rerun: .\\start-dev.ps1 -Tunnel cloudflared" -ForegroundColor Yellow
+        } else {
+            Write-Host "    Check the minimized $tool window, or: Get-Content $tunnelLog"
+        }
     }
     return $publicUrl
 }
