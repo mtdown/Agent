@@ -26,6 +26,10 @@ param(
     [string]$Tunnel = 'auto',
     # -NoTunnel / -Tunnel none : stay on the LAN only (no public exposure)
     [switch]$NoTunnel,
+    # -Preview: build first and serve the bundle instead of the dev server.
+    # Use this for public tunnels - the dev server fires hundreds of module
+    # requests and each one pays a round trip through the tunnel.
+    [switch]$Preview,
     # -NoPause: do not wait for Enter at the end (used by parent scripts)
     [switch]$NoPause
 )
@@ -91,15 +95,36 @@ $backendProc = Start-Process -FilePath $javaExe `
     -WindowStyle Hidden -PassThru
 Write-Host "    backend PID: $($backendProc.Id) (log: $backendLog)"
 
-Write-Host "==> [4/4] Starting frontend dev server on 0.0.0.0:$frontPort (LAN accessible) ..."
 $frontLog = Join-Path $tmpDir 'dev-frontend.log'
 $frontErr = Join-Path $tmpDir 'dev-frontend.err.log'
-$frontProc = Start-Process -FilePath 'cmd.exe' `
-    -ArgumentList @('/c', "npm run dev -- --port $frontPort --host 0.0.0.0") `
-    -WorkingDirectory $frontDir `
-    -RedirectStandardOutput $frontLog `
-    -RedirectStandardError $frontErr `
-    -WindowStyle Hidden -PassThru
+if ($Preview) {
+    Write-Host '==> [4/4] Building frontend bundle (npm run build) - needed for public tunnels ...'
+    $buildLog = Join-Path $tmpDir 'dev-frontend-build.log'
+    Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run build') `
+        -WorkingDirectory $frontDir -RedirectStandardOutput $buildLog `
+        -RedirectStandardError $buildLog -WindowStyle Hidden -Wait
+    $distIndex = Join-Path $frontDir 'dist\index.html'
+    if (-not (Test-Path $distIndex)) {
+        Write-Host "    ERROR: build failed (no dist\index.html). See $buildLog"
+        exit 1
+    }
+    Write-Host "    build ok (log: $buildLog)"
+    Write-Host "==> [4/4] Serving production bundle on 0.0.0.0:$frontPort ..."
+    $frontProc = Start-Process -FilePath 'cmd.exe' `
+        -ArgumentList @('/c', "npx vite preview --port $frontPort --host 0.0.0.0 --strictPort") `
+        -WorkingDirectory $frontDir `
+        -RedirectStandardOutput $frontLog `
+        -RedirectStandardError $frontErr `
+        -WindowStyle Hidden -PassThru
+} else {
+    Write-Host "==> [4/4] Starting frontend dev server on 0.0.0.0:$frontPort (LAN accessible) ..."
+    $frontProc = Start-Process -FilePath 'cmd.exe' `
+        -ArgumentList @('/c', "npm run dev -- --port $frontPort --host 0.0.0.0") `
+        -WorkingDirectory $frontDir `
+        -RedirectStandardOutput $frontLog `
+        -RedirectStandardError $frontErr `
+        -WindowStyle Hidden -PassThru
+}
 Write-Host "    frontend launcher PID: $($frontProc.Id) (log: $frontLog)"
 
 Write-Host ''

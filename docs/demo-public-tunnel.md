@@ -30,10 +30,32 @@ All done. (admin / 12345678)
 | `-NoTunnel` | **只走局域网，不暴露公网**（日常开发用这个） |
 | `-Tunnel cpolar\|cloudflared\|ngrok\|none` | 指定工具（默认自动探测）；`none` = 同 `-NoTunnel` |
 | `-Public` | 兼容保留，现在默认就会起穿透，不用再加 |
+| `-Preview` | **公网演示必加**：先打包再提供服务，而不是跑 dev server |
 | `-NoPause` | 末尾不等待回车（父脚本调用时用，手动启动不用加） |
+
+### 为什么公网演示必须加 `-Preview`
+
+Vite 开发服务器是**未打包**的：浏览器要按模块发**几百个独立请求**，每个请求都要在隧道里
+往返一次，延迟叠加后就是"完全进不去"（现象：地址能打开但一直转圈，或直接超时）。
+
+`-Preview` 会先 `npm run build`，再用 `vite preview` 提供打包产物，请求数从几百降到个位数：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Preview
+```
+
+代价：改代码后要重跑脚本（热更新失效），纯演示场景无所谓。
 
 ⚠️ 默认行为是**暴露到公网**：账号 `admin / 12345678` 会被放到公网上。
 日常开发请加 `-NoTunnel`，或演示结束后立刻 `.\stop-dev.ps1`。
+
+### 慢 / 打不开的排查顺序
+
+1. **先确认局域网地址能不能开**：`http://192.168.0.105:3000`。局域网秒开而公网很慢，
+   说明是穿透带宽瓶颈（cpolar 免费版通常只有 1~2 Mbps，而主 chunk 有 2.6 MB），
+   此时优先用局域网演示，或改用 Tailscale（点对点，不受免费隧道限速）。
+2. 公网一定要加 `-Preview`，否则几百个模块请求会拖死。
+3. 还慢就换工具对比：`-Tunnel cloudflared` / `-Tunnel ngrok`。
 
 脚本跑完会停在 `Press Enter to close this window`，服务在后台继续运行 —— 公网地址在结尾会再打印一次并用绿框标出，不怕被前面的日志刷掉。
 

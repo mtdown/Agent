@@ -35,4 +35,17 @@ export default defineConfig({
       },
     },
   },
+  // 公网演示走 preview（打包产物）：dev 模式下浏览器会发几百个模块请求，
+  // 每个都要在隧道里往返一次，叠加起来慢到打不开；打包后只剩几个文件。
+  preview: {
+    host: '0.0.0.0',
+    port: 3000,
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8123',
+        changeOrigin: false,
+      },
+    },
+  },
 })
