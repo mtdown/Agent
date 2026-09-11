@@ -28,10 +28,14 @@
 - [x] 3.6 写 `eval/scripts/generate_synthetic.py` 生成 E 类合成补充题：验证：**产出 12 题**，全部通过摘抄校验；8 个段落因信息量不足被跳过（目录型/落款型）
 - [x] 3.7 写 `eval/scripts/merge_candidates.py` 汇总 `eval/candidates.jsonl` 并做规范化去重 + **gold 锚点有效性校验**（`(docId, chunkIndex)` 必须在当前 ACTIVE chunk 中存在）；验证：**读取 102 → 保留 100 题（去重 2、校验错误 0）**；分类 A 54 / B 9 / C 15 / D 10 / E 12
 
-## 4. 人工筛选（Step 3）
+## 4. AI 预筛 + 人工筛选（Step 3）
 
+- [x] 4.0 写 `eval/scripts/llm_judge.py`（LLM-as-Judge 预筛）：按三套判据评审全部候选题——有证据题审「可答性/忠实性/标注完整性/问题自然度」，无答案题审「库外合理性/自然度/诱导硬答风险」，权限题审「指向明确性/自然度/泄漏可判定性」；输出 `eval/ai-judge.jsonl` + `eval/audit/ai-judge-report.md`；验证：**100 题全部评审完成，keep 37 / edit 47 / drop 16，0 error；证据类四维均分 answerability 4.76 / faithfulness 4.29 / sufficiency 3.32 / naturalness 4.63**
+- [x] 4.0.1 Judge 输出「应补充/应移除的 chunkIndex」，使 `sufficiency` 低的题可**补 gold 修复**而非丢弃；验证：**40 题给出 missingChunks，其中 39 题答案可答性≥4 且忠实性≥4（即答案无误、仅标注不全）**
 - [x] 4.1 写 `eval/scripts/build_review_page.py` 生成 `eval/tools/review.html`：数据（含 gold chunk 原文）内联进 HTML，`file://` 双击即可离线使用；逐题展示问题/标准答案/**证据 chunk 原文并高亮 quote**/来源标题与文号，支持保留·删除·待定·编辑问题与答案·备注，快捷键 K/D/P/←/→，进度存 localStorage 可断点续看，一键导出 `golden.v1.jsonl`；验证：**页面 428 KB，内联 100 题 / 126 个 chunk 片段，Node 解析内嵌 JSON 通过（100 题、75 题带证据文本、分类分布正确）** —— 「保留+删除+导出」的完整交互待负责人本地操作确认
-- [ ] 4.2 **【负责人人工】** 逐题审阅候选题（约 200 题），导出 `eval/golden.v1.jsonl`；验证：导出文件每题带 `meta.reviewState`，kept/edited 题总数 = 最终题量
+- [x] 4.1.1 页面接入 AI 评审：列表显示 verdict 徽章、新增「AI 建议」过滤器（保留/待修/建议删/可补证据修复）、详情展示四维分数+问题标签+理由+修改建议，并支持**一键采纳**把 AI 指出的缺失段落并入 gold；验证：**Node 解析通过（100 题全带 ai 字段，43 题带建议段落共 245 段、0 段缺文本，adopt 函数与过滤器均存在）**
+- [ ] 4.2 **【负责人人工】** 逐题审阅候选题（约 100 题，AI 已预筛：37 可直接保留、47 待修、16 建议删），导出 `eval/golden.v1.jsonl`；验证：导出文件每题带 `meta.reviewState`，kept/edited 题总数 = 最终题量
+- [ ] 4.3 **【负责人决策】** C 类无答案题的口径分歧：脚本校验（DB 0 命中）确认当前库确实无此内容，但 Judge 认为其中 9 题主题（婚姻登记/住房补贴/医保报销/护照/户籍等）在真实政务知识库中大概率存在。现方案为**保留并单独统计**，是否补充 3–5 道「纯越界」对照题（跨辖区/非政务主题）待定；验证：决策结果写入 `eval/README.md` 的 C 类说明
 
 ## 5. 校验与固化
 

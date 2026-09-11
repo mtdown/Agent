@@ -87,11 +87,50 @@ python eval/scripts/generate_synthetic.py --count 12                # E 类
 # 5. 汇总（去重 + 锚点有效性校验）
 python eval/scripts/merge_candidates.py
 
-# 6. 生成筛选页
+# 6. AI 预筛（LLM-as-Judge，输出 ai-judge.jsonl + audit/ai-judge-report.md）
+python eval/scripts/llm_judge.py            # 首次全量；加 --repeat 可跑第二遍算 Judge 一致率
+
+# 7. 生成筛选页（自动载入 ai-judge.jsonl，页面上显示 AI 建议）
 python eval/scripts/build_review_page.py
+
+# 8. 重新生成页面后，双击 eval/tools/review.html 即可离线审阅
 ```
 
 LLM 调用均设置 `enable_thinking=false`（实测 qwen3.8-flash：耗时 2.4s→0.7s、token 212→50，答案一致）。
+
+## AI 预筛（LLM-as-Judge）
+
+`llm_judge.py` 用 `qwen3.8-flash` 对候选题做质量评审，**只做预筛，不替代人**：
+人工只需复核 AI 标记 edit/drop 的题，并对 keep 的题抽样复核。
+
+三套判据：
+
+| 题型 | 评审维度 |
+|---|---|
+| A/B/E（有证据） | answerability 可答性 · faithfulness 忠实性 · **sufficiency 标注完整性** · naturalness 问题自然度 |
+| C（无答案） | plausibility 库外合理性 · naturalness · trap_risk 诱导硬答风险 |
+| D（权限） | specificity 指向明确性 · naturalness · sensitivity 泄漏可判定性 |
+
+**关键设计**：送审时把该政策的**全部** chunk 都给 Judge（gold 段给全文、其余给摘要），
+并标出哪些是已标注证据。这样 Judge 才能区分两件不同的事：
+
+- **答案本身编造**（faithfulness 低）→ 真问题，应丢弃
+- **答案没错但 gold 漏标**（sufficiency 低）→ 可修复，Judge 直接指出该补哪些 chunkIndex
+
+因此 Judge 会输出 `missingChunks` / `redundantChunks`，筛选页提供**一键采纳**把这些段落并入 gold。
+首版判据只送 gold 片段时，drop 率高达 45%（大量假阳性）；改为全文+摘要判据后 drop 降到 16%，
+edit 升至 47 且其中 39 题可通过补证据修复。
+
+### 首轮结果（100 题）
+
+| verdict | 题数 |
+|---|---|
+| keep | 37 |
+| edit | 47（其中 42 题可补证据修复） |
+| drop | 16 |
+
+证据类四维均分：可答性 4.76 · 忠实性 4.29 · **标注完整性 3.32** · 自然度 4.63
+—— 说明**答案质量没问题，短板集中在 gold 标注不全**，这正是补证据能解决的。
 
 ## 已知问题
 
@@ -102,3 +141,13 @@ LLM 调用均设置 `enable_thinking=false`（实测 qwen3.8-flash：耗时 2.4s
    **不能**当作 C 类"库外实体"使用。
 3. 所有 216 篇文档同处一个空间（`2095544464810774531`），D 类权限题依赖"非成员账号"，
    当前库有 10 个非成员账号可用。
+4. **C 类无答案题存在口径分歧（待负责人决策）**：脚本校验（DB 0 命中）确认当前库确实无此内容，
+   但 Judge 认为其中 9 题（婚姻登记/住房补贴/医保报销/护照/户籍迁入等）在真实政务知识库中
+   大概率存在，用它测拒答的泛化性存疑。现方案是**保留并单独统计子类型**：
+   - `fictional_docnum`（C-11/12/13，虚构文号）判据最硬
+   - `corpus_gap`（C-01~C-10，库覆盖缺口）真实高频但判据偏主观
+   - `near_miss`（C-14/15，库内无目标文件但有语义近邻——"民营经济"命中 22 chunk、
+     "电动自行车"命中 3 chunk）最能诱导幻觉，价值最高但也最需谨慎判定
+   当前**缺少"纯越界"对照组**（跨辖区/非政务主题），是否补充 3–5 道待定。
+5. **Judge 自身未经一致率验证**：首轮未跑 `--repeat`。如需在报告中引用 Judge 结论的稳定性，
+   应补跑一遍算一致率（预期成本与一轮相当，约 9 分钟）。

@@ -66,6 +66,16 @@ mark{background:#fde68a;padding:0 2px;border-radius:2px}
 .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .note{width:100%;margin-top:8px}
 .kbd{font:12px ui-monospace,monospace;background:#eef;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.ai{border-left:4px solid #94a3b8}
+.ai-keep{border-left-color:#16a34a}
+.ai-edit{border-left-color:#d97706}
+.ai-drop{border-left-color:#dc2626}
+.v-keep{background:#16a34a}.v-edit{background:#d97706}.v-drop{background:#dc2626}.v-error{background:#6b7280}
+.score{display:inline-block;font-size:12px;color:var(--muted);margin-right:14px}
+.score b{color:#111827;font-size:13px}
+.issue{display:inline-block;font-size:11px;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 6px;margin-right:6px}
+.sug{border:1px dashed #cbd5e1;border-radius:8px;padding:10px 12px;margin-top:8px;background:#fff}
+.sug .t{white-space:pre-wrap;font-size:12.5px;color:#475569;max-height:180px;overflow:auto}
 </style>
 </head>
 <body>
@@ -83,6 +93,10 @@ mark{background:#fde68a;padding:0 2px;border-radius:2px}
     <select id="fst" onchange="render()">
       <option value="">全部状态</option><option value="pending">待定</option>
       <option value="kept">已保留</option><option value="dropped">已删除</option></select>
+    <select id="fv" onchange="render()">
+      <option value="">AI 建议(全部)</option><option value="keep">AI:保留</option>
+      <option value="edit">AI:待修</option><option value="drop">AI:建议删</option>
+      <option value="fixable">AI:可补证据修复</option></select>
     <input type="search" id="fq" placeholder="搜索问题…" oninput="render()" style="width:150px">
     <span class="prog" id="prog"></span>
     <span style="color:var(--line)">|</span>
@@ -126,15 +140,20 @@ function render(){
   const cat = document.getElementById('fcat').value;
   const stt = document.getElementById('fst').value;
   const q   = document.getElementById('fq').value.trim();
+  const v = document.getElementById('fv').value;
   view = DATA.filter(d => (!cat || d.category===cat) && (!stt || st(d.id)===stt) &&
-                          (!q || d.question.includes(q)));
+                          (!q || d.question.includes(q)) &&
+                          (!v || (v==='fixable' ? (d.ai && d.ai.fixable)
+                                                : (d.ai && d.ai.verdict===v))));
   const L = document.getElementById('list');
   L.innerHTML = view.map((d,i)=>{
     const s = st(d.id);
+    const av = d.ai ? `<span class="tag v-${d.ai.verdict}" title="AI 建议">${d.ai.verdict}</span>` : '';
     return `<div class="item ${i===cur?'active':''}" onclick="go(${i})">
       <span class="idx">${d.id}</span>
       <span class="tag t-${d.category}">${d.category.slice(0,4)}</span>
       <span class="qq">${esc(d.question)}</span>
+      ${av}
       <span class="st-${s}">${s==='kept'?'✓':s==='dropped'?'✗':'·'}</span></div>`;
   }).join('');
   document.getElementById('prog').textContent =
@@ -152,6 +171,26 @@ function show(){
   let html = `<div class="card"><h3>问题 · ${d.id} · <span class="tag t-${d.category}">${d.category}</span></h3>
     <textarea id="eq" rows="2">${esc(q)}</textarea></div>`;
   html += `<div class="card"><h3>标准答案</h3><textarea id="ea" rows="3">${esc(a)}</textarea></div>`;
+  if(d.ai){
+    const A = d.ai;
+    const sc = Object.entries(A.scores||{}).map(([k,v])=>`<span class="score">${k} <b>${v}</b></span>`).join('');
+    const iss = (A.issues||[]).map(t=>`<span class="issue">${esc(t)}</span>`).join('');
+    html += `<div class="card ai ai-${A.verdict}"><h3>AI 评审建议 ·
+      <span class="tag v-${A.verdict}">${A.verdict}</span>${A.fixable?' <span class="tag v-edit">补证据可修复</span>':''}</h3>
+      <div style="margin-bottom:8px">${sc}</div>
+      <div style="margin-bottom:8px">${iss||'<span style="color:var(--muted)">无问题标签</span>'}</div>
+      <div class="meta"><b>理由：</b>${esc(A.reason||'')}</div>
+      ${A.suggestion?`<div class="meta"><b>修改建议：</b>${esc(A.suggestion)}</div>`:''}
+      ${A.hint?`<div class="meta" style="color:#b45309"><b>注意：</b>${esc(A.hint)}</div>`:''}`;
+    if(A.suggest && A.suggest.length){
+      html += `<div class="sug"><div class="h" style="font-size:12px;color:var(--muted);margin-bottom:6px">
+        AI 认为还应标注为证据的段落（${A.suggest.length}）</div>` +
+        A.suggest.map(x=>`<div style="margin-bottom:8px"><div style="font-size:12px;color:var(--muted)">chunkIndex ${x.chunkIndex}</div>
+          <div class="t">${esc(x.text||'')}</div></div>`).join('') +
+        `<button onclick="adopt()">采纳：把这些段落并入 gold（${A.suggest.length} 段）</button></div>`;
+    }
+    html += `</div>`;
+  }
   if(d.gold && d.gold.length){
     html += `<div class="card"><h3>证据 chunk（${d.gold.length}）</h3>` +
       d.gold.map(g=>`<div class="chunk"><div class="h">docId ${g.docId} · chunkIndex ${g.chunkIndex} · ${esc(g.why||'')}</div>
@@ -216,6 +255,23 @@ function exportJson(){
   a.click();
   alert(`导出 ${out.length} 题（已删除 ${dropped}，仍待定 ${pending}）`);
 }
+function adopt(){
+  const d = view[cur]; if(!d || !d.ai || !d.ai.suggest) return;
+  const docId = (d.gold && d.gold[0]) ? d.gold[0].docId : (d.ai.suggestDocId || 0);
+  const have = new Set((d.gold||[]).map(g=>g.chunkIndex));
+  let n = 0;
+  d.ai.suggest.forEach(x=>{
+    if(!have.has(x.chunkIndex)){
+      d.gold = d.gold || [];
+      d.gold.push({docId: docId, chunkIndex: x.chunkIndex, why: 'AI 评审补充', quote: '', text: x.text});
+      n++;
+    }
+  });
+  d.ai.suggest = [];
+  d.ai.fixable = false;
+  render();
+  alert('已采纳 ' + n + ' 段并入 gold，请重新判断是否保留本题');
+}
 function resetAll(){ if(confirm('确认清空全部筛选进度？')){ state = {}; save(); render(); } }
 document.addEventListener('keydown', e=>{
   if(/INPUT|TEXTAREA|SELECT/.test(document.target?.tagName || e.target.tagName)) return;
@@ -239,8 +295,26 @@ def main():
     src = os.path.join(EVAL_DIR, "candidates.jsonl")
     rows = [json.loads(l) for l in open(src, encoding="utf-8") if l.strip()]
 
-    # 内联 gold chunk 文本
+    # 载入 AI 评审结论
+    ai_path = os.path.join(EVAL_DIR, "ai-judge.jsonl")
+    ai_map = {}
+    if os.path.exists(ai_path):
+        for line in open(ai_path, encoding="utf-8"):
+            if line.strip():
+                x = json.loads(line)
+                ai_map[x["id"]] = x
+        print(f"载入 AI 评审 {len(ai_map)} 条")
+
+    # 内联 gold chunk 文本（含 AI 建议补充的段落）
     pairs = {(g["docId"], g["chunkIndex"]) for r in rows for g in r["gold"]}
+    for r in rows:
+        ai = ai_map.get(r["id"])
+        if not ai:
+            continue
+        did = r["gold"][0]["docId"] if r["gold"] else r.get("source", {}).get("policyDocId")
+        for ci in ai.get("missingChunks") or []:
+            if did:
+                pairs.add((int(did), int(ci)))
     text_map = {}
     if pairs:
         conn = db_conn(cfg)
@@ -255,6 +329,30 @@ def main():
     for r in rows:
         for g in r["gold"]:
             g["text"] = text_map.get(f"{g['docId']}:{g['chunkIndex']}", "")
+        ai = ai_map.get(r["id"])
+        if not ai:
+            continue
+        did = r["gold"][0]["docId"] if r["gold"] else r.get("source", {}).get("policyDocId")
+        sug = [{"chunkIndex": int(ci),
+                "text": text_map.get(f"{did}:{ci}", "")[:CHUNK_PREVIEW]}
+               for ci in (ai.get("missingChunks") or [])]
+        sc = ai.get("scores", {})
+        r["ai"] = {
+            "verdict": ai.get("verdict", "error"),
+            "scores": sc,
+            "issues": ai.get("issues", []),
+            "reason": ai.get("reason", ""),
+            "suggestion": ai.get("suggestion", ""),
+            "suggest": sug,
+            "suggestDocId": int(did) if did else 0,
+            # 答案本身站得住、只是证据标注不全 → 补 gold 即可，不必丢题
+            "fixable": bool(sug) and sc.get("answerability", 0) >= 4
+                       and sc.get("faithfulness", 0) >= 4,
+            # 建议补充的段落过多 → 说明这题的答案横跨整篇，更适合收窄问题而非堆证据
+            "hint": ("该题答案横跨整篇文档（AI 建议补充 %d 段），"
+                     "建议把问题收窄到具体条款或指标，而不是把整篇都标为证据" % len(sug))
+                    if len(sug) >= 6 else "",
+        }
 
     data = json.dumps(rows, ensure_ascii=False).replace("</", "<\\/")
     out = os.path.join(EVAL_DIR, "tools", "review.html")
