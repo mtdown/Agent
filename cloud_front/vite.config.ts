@@ -16,14 +16,14 @@ export default defineConfig({
     },
   },
   server: {
-    // 监听所有网卡：手机与电脑处于同一 WiFi 时，可用 http://<本机局域网IP>:5173 访问
+    // 监听所有网卡：手机与电脑处于同一 WiFi 时，可用 http://<本机局域网IP>:3000 访问
     host: '0.0.0.0',
-    port: 5173,
+    port: 3000,
     // Vite 6 起默认只放行 localhost / 纯 IP 的 Host，cpolar、ngrok 这类公网域名会被
     // 拦成 "Blocked request. This host is not allowed."，所以公网穿透时必须打开这项。
     allowedHosts: true,
     proxy: {
-      // 后端接口做成同源：页面和接口都走 5173 这一个端口，由 dev server 转发到后端 8123。
+      // 后端接口做成同源：页面和接口都走 3000 这一个端口，由 dev server 转发到后端 8123。
       // 好处：① 局域网访问、公网穿透都只需转发一个端口；
       //      ② 穿透给的是 https 域名时，不会出现「https 页面请求 http 接口」被浏览器拦截。
       // 注意：后端 context-path 本身就是 /api，这里不要 rewrite 掉前缀。

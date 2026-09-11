@@ -1,10 +1,26 @@
 # ============================================================
 #  start-dev.ps1 - one-click start for backend + frontend (dev)
 #  Usage:  powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+#          powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Public
 #  Starts: Spring Boot backend (127.0.0.1:8123) + Vite dev server
-#          (127.0.0.1:3000). Logs go to tmp/dev-backend.log and
-#          tmp/dev-frontend.log.
+#          (0.0.0.0:3000, LAN accessible). Logs go to tmp/dev-backend.log
+#          and tmp/dev-frontend.log.
+#
+#  -Public   also start a public tunnel so the site is reachable from
+#            outside the LAN. Front and back now share one port (the vite
+#            dev server proxies /api to 8123), so tunneling the frontend
+#            port alone is enough. Tunnel PID is written to tmp/tunnel.pid
+#            and .\stop-dev.ps1 stops it together with the dev services.
+#  -Tunnel   cpolar | cloudflared | ngrok | none  (default: auto-detect)
+#
+#  NOTE: keep every string literal ASCII-only. Windows PowerShell 5.1
+#        decodes a BOM-less .ps1 with the system ANSI code page, so
+#        non-ASCII message text can be misdecoded at parse time.
 # ============================================================
+param(
+    [switch]$Public,
+    [string]$Tunnel = 'auto'
+)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $cloudDir = Join-Path $root 'cloud'
@@ -100,10 +116,107 @@ $lanIp = (Get-NetIPAddress -AddressFamily IPv4 |
     Sort-Object InterfaceIndex | Select-Object -First 1).IPAddress
 Write-Host 'All done. (admin / 12345678)'
 Write-Host "  PC     : http://127.0.0.1:$frontPort"
-if ($lanIp) { Write-Host "  Phone  : http://$lanIp:$frontPort   (same WiFi)" }
-Write-Host ''
-Write-Host 'Need access from outside the LAN? (front & back now share one port)'
-Write-Host "  cpolar http $frontPort        # open the https://*.cpolar.cn URL it prints"
-Write-Host '  (stop the tunnel after the demo)'
+# NOTE: $($lanIp) - an unbraced `$lanIp:$frontPort` parses as a scoped variable and breaks the script
+if ($lanIp) { Write-Host "  Phone  : http://$($lanIp):$($frontPort)   (same WiFi)" }
+# ------------------------------------------------------------
+#  Public tunnel (optional, -Public)
+# ------------------------------------------------------------
+$tunnelPidFile = Join-Path $tmpDir 'tunnel.pid'
+$hostPattern = 'https?://[A-Za-z0-9\-_.]+\.(cpolar\.cn|cpolar\.io|ngrok-free\.app|ngrok\.io|trycloudflare\.com)'
+
+function Get-TunnelPublicUrl {
+    # cpolar 2.x -> 9200/api/v1/tunnels ; cpolar 1.x / ngrok -> 4040/api/tunnels
+    # The system proxy intercepts 127.0.0.1 too (shows up as a bogus 502),
+    # so neutralise the default web proxy for the duration of the call.
+    $savedProxy = [System.Net.WebRequest]::DefaultWebProxy
+    [System.Net.WebRequest]::DefaultWebProxy = New-Object System.Net.WebProxy
+    try {
+        foreach ($uri in @('http://127.0.0.1:9200/api/v1/tunnels', 'http://127.0.0.1:4040/api/tunnels')) {
+            try {
+                $resp = Invoke-RestMethod -Uri $uri -TimeoutSec 3 -ErrorAction Stop
+                $json = $resp | ConvertTo-Json -Depth 8 -Compress
+                $m = [regex]::Matches($json, $hostPattern)
+                if ($m.Count -gt 0) {
+                    $https = @($m | ForEach-Object { $_.Value } | Where-Object { $_ -like 'https*' })
+                    if ($https.Count -gt 0) { return $https[0] }
+                    return $m[0].Value
+                }
+            } catch { }
+        }
+    } finally {
+        [System.Net.WebRequest]::DefaultWebProxy = $savedProxy
+    }
+    return $null
+}
+
+function Start-PublicTunnel {
+    param([int]$Port)
+
+    $tool = $null
+    if ($Tunnel -in @('cpolar', 'cloudflared', 'ngrok')) {
+        if (Get-Command $Tunnel -ErrorAction SilentlyContinue) { $tool = $Tunnel }
+        else { Write-Host "    WARN: '$Tunnel' not found in PATH." }
+    } elseif ($Tunnel -eq 'none') {
+        return
+    } else {
+        foreach ($t in @('cpolar', 'cloudflared', 'ngrok')) {
+            if (Get-Command $t -ErrorAction SilentlyContinue) { $tool = $t; break }
+        }
+    }
+    if (-not $tool) {
+        Write-Host '    No tunnel tool found - LAN access only.'
+        Write-Host '    Install one: cpolar (https://www.cpolar.com) | cloudflared | ngrok'
+        return
+    }
+
+    $toolArgs = switch ($tool) {
+        'cloudflared' { @('tunnel', '--url', "http://127.0.0.1:$($Port)") }
+        default       { @('http', "$($Port)") }
+    }
+    $tunnelLog = Join-Path $tmpDir "tunnel-$tool.log"
+    $tunnelErr = Join-Path $tmpDir "tunnel-$tool.err.log"
+
+    Write-Host "==> Starting public tunnel via $tool on port $Port ..."
+    try {
+        $proc = Start-Process -FilePath $tool -ArgumentList $toolArgs `
+            -RedirectStandardOutput $tunnelLog -RedirectStandardError $tunnelErr `
+            -WindowStyle Minimized -PassThru -ErrorAction Stop
+    } catch {
+        Write-Host "    ERROR: failed to start $tool - $($_.Exception.Message)"
+        return
+    }
+    Set-Content -Path $tunnelPidFile -Value $proc.Id -Encoding ASCII
+    Write-Host "    tunnel PID: $($proc.Id) (log: $tunnelLog)"
+
+    $publicUrl = $null
+    for ($i = 0; $i -lt 20; $i++) {
+        Start-Sleep -Seconds 1
+        $publicUrl = Get-TunnelPublicUrl
+        if ($publicUrl) { break }
+    }
+    # cloudflared has no local API - fall back to scraping its own output
+    if (-not $publicUrl) {
+        foreach ($f in @($tunnelLog, $tunnelErr)) {
+            if (-not (Test-Path $f)) { continue }
+            $txt = Get-Content $f -Raw -ErrorAction SilentlyContinue
+            if (-not $txt) { continue }
+            $m = [regex]::Match($txt, $hostPattern)
+            if ($m.Success) { $publicUrl = $m.Value; break }
+        }
+    }
+    if ($publicUrl) {
+        Write-Host "  Public : $publicUrl" -ForegroundColor Green
+        Write-Host '           (random domain changes on every restart; keep the tunnel window open)'
+    } else {
+        Write-Host "    Tunnel started, but the public URL could not be read automatically."
+        Write-Host "    Check the minimized $tool window, or: Get-Content $tunnelLog"
+    }
+}
+
+if ($Public) {
+    Start-PublicTunnel -Port $frontPort
+} else {
+    Write-Host 'Public tunnel not started - re-run with -Public to expose it on the internet.'
+}
 Write-Host ''
 Write-Host 'Stop everything with: powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1'

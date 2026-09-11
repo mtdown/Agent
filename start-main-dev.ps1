@@ -1,3 +1,9 @@
+param(
+    # -Public: 同时启动公网穿透（参数透传给 start-dev.ps1）
+    [switch]$Public,
+    # -Stay: 不切回 main 分支，直接在当前分支启动（演示未合入 main 的功能时用）
+    [switch]$Stay
+)
 $ErrorActionPreference = 'Stop'
 
 # 项目根目录（请按需修改）
@@ -14,6 +20,14 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+if ($Stay) {
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Yellow
+    Write-Host "2-3. 已指定 -Stay：跳过切分支与拉取，保持当前分支启动。" -ForegroundColor Yellow
+    Write-Host "     （未合入 main 的功能只有这样才能演示）" -ForegroundColor Yellow
+    Write-Host "============================================================" -ForegroundColor Yellow
+    Write-Host "当前分支：$(git branch --show-current)"
+} else {
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "2. 切换到 main 分支..." -ForegroundColor Cyan
@@ -36,18 +50,29 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
+
 Write-Host "4. 正在启动本地服务..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1"
+if ($Public) {
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -Public
+} else {
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1"
+}
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[警告] 启动服务可能失败，请检查服务状态。" -ForegroundColor Yellow
 }
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
-Write-Host "服务已启动，当前运行在最新的 main 分支。" -ForegroundColor Green
+if ($Stay) {
+    Write-Host "服务已启动（保持在当前分支，未切换到 main）。" -ForegroundColor Green
+} else {
+    Write-Host "服务已启动，当前运行在最新的 main 分支。" -ForegroundColor Green
+}
 Write-Host "按回车键将停止服务并退出脚本。" -ForegroundColor Yellow
 Write-Host "如果不想停止服务，请直接关闭此窗口（服务将保持运行）。" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Green
@@ -65,6 +90,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "服务已停止，脚本将在 2 秒后退出。" -ForegroundColor Green
+Write-Host "服务已停止（公网隧道随 stop-dev.ps1 一并关闭），脚本将在 2 秒后退出。" -ForegroundColor Green
 Start-Sleep -Seconds 2
 # 脚本结束，窗口自动关闭

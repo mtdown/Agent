@@ -1,6 +1,7 @@
 # ============================================================
-#  stop-dev.ps1 - stop backend (8123) and frontend (3000) started
-#  by start-dev.ps1. Uses PowerShell native cmdlets
+#  stop-dev.ps1 - stop backend (8123), frontend (3000) and the
+#  optional public tunnel (cpolar/cloudflared/ngrok) started by
+#  start-dev.ps1 -Public. Uses PowerShell native cmdlets
 #  (Get-NetTCPConnection / Stop-Process) instead of external
 #  port-query and process-kill utilities, and re-checks every
 #  port after stopping it.
@@ -83,6 +84,30 @@ foreach ($port in $ports) {
     } else {
         Write-Host "Port $port released"
     }
+}
+
+# ------------------------------------------------------------
+#  Stop the public tunnel started by start-dev.ps1 -Public.
+#  Its PID is written to tmp/tunnel.pid at startup.
+# ------------------------------------------------------------
+$tunnelPidFile = Join-Path $PSScriptRoot 'tmp\tunnel.pid'
+if (Test-Path $tunnelPidFile) {
+    $rawPid = (Get-Content $tunnelPidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+    $tunnelPid = 0
+    if ([int]::TryParse($rawPid, [ref]$tunnelPid) -and $tunnelPid -gt 0) {
+        $tunnelProc = Get-Process -Id $tunnelPid -ErrorAction SilentlyContinue
+        if ($tunnelProc) {
+            Write-Host "Stopping public tunnel $($tunnelProc.ProcessName) (PID $tunnelPid)"
+            try {
+                Stop-Process -Id $tunnelPid -Force -ErrorAction Stop
+            } catch {
+                $failures.Add("Failed to stop tunnel PID ${tunnelPid}: $($_.Exception.Message)")
+            }
+        } else {
+            Write-Host "Tunnel PID $tunnelPid is no longer running"
+        }
+    }
+    Remove-Item $tunnelPidFile -Force -ErrorAction SilentlyContinue
 }
 
 if ($failures.Count -gt 0) {
