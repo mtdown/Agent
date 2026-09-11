@@ -234,6 +234,13 @@ function act(s){
   save();
   if(cur < view.length - 1) nav(1); else render();
 }
+// 导出时把字符串形式的雪花 ID 还原为 JSON 数字字面量（保持与原 schema 一致）
+function restoreBigInt(s){
+  s = s.replace(/"(docId|policyDocId|interpretDocId|targetSpaceId)":"(\\d{15,})"/g, '"$1":$2');
+  s = s.replace(/"(forbiddenDocIds|memberUserIds|nonMemberUserIds)":\\[([^\\]]*)\\]/g,
+      function(m,k,inner){ return '"'+k+'":['+inner.replace(/"(\\d{15,})"/g,'$1')+']'; });
+  return s;
+}
 function exportJson(){
   sync();
   const out = DATA.filter(d => st(d.id) === 'kept').map(d=>{
@@ -244,11 +251,17 @@ function exportJson(){
     o.meta.reviewState = 'kept';
     o.meta.reviewNote = s.note || '';
     o.gold.forEach(g=>{ delete g.text; });
+    // AI 评审对象含建议段落原文与未还原的 suggestDocId，不进数据集；只沉淀结论与分数
+    if(o.ai){
+      o.meta.aiVerdict = o.ai.verdict || '';
+      o.meta.aiScores = o.ai.scores || null;
+      delete o.ai;
+    }
     return o;
   });
   const dropped = DATA.filter(d => st(d.id) === 'dropped').length;
   const pending = DATA.filter(d => st(d.id) === 'pending').length;
-  const blob = new Blob([out.map(o=>JSON.stringify(o)).join('\\n') + '\\n'], {type:'application/jsonl'});
+  const blob = new Blob([out.map(o=>restoreBigInt(JSON.stringify(o))).join('\\n') + '\\n'], {type:'application/jsonl'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'golden.v1.jsonl';
@@ -288,6 +301,26 @@ render();
 </body>
 </html>
 """
+
+
+BIG_INT = 10 ** 15
+
+
+def stringify_bigints(obj):
+    """把超过 JS 安全整数范围的整数转成字符串，避免内联进 HTML 后精度丢失。
+
+    docId 是 19 位雪花 ID（如 2097637762580992002），远超 Number.MAX_SAFE_INTEGER
+    (9007199254740991)。页面用 `const DATA = ...` 直接内联时，JS 的 JSON.parse 会
+    把它静默截断成 ...992000 —— 导出后所有 gold 锚点全部失效，且不报任何错。
+    故在生成端转成字符串，页面显示/采纳逻辑不受影响，导出时再还原为数字字面量。
+    """
+    if isinstance(obj, dict):
+        return {k: stringify_bigints(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [stringify_bigints(v) for v in obj]
+    if isinstance(obj, int) and not isinstance(obj, bool) and abs(obj) >= BIG_INT:
+        return str(obj)
+    return obj
 
 
 def main():
@@ -354,7 +387,7 @@ def main():
                     if len(sug) >= 6 else "",
         }
 
-    data = json.dumps(rows, ensure_ascii=False).replace("</", "<\\/")
+    data = json.dumps(stringify_bigints(rows), ensure_ascii=False).replace("</", "<\\/")
     out = os.path.join(EVAL_DIR, "tools", "review.html")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w", encoding="utf-8").write(HTML.replace("__DATA__", data))
