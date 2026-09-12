@@ -99,13 +99,16 @@ $frontLog = Join-Path $tmpDir 'dev-frontend.log'
 $frontErr = Join-Path $tmpDir 'dev-frontend.err.log'
 if ($Preview) {
     Write-Host '==> [4/4] Building frontend bundle (npm run build) - needed for public tunnels ...'
+    # PS 5.1 Start-Process rejects identical stdout/stderr redirect files,
+    # so they must be two separate logs.
     $buildLog = Join-Path $tmpDir 'dev-frontend-build.log'
+    $buildErr = Join-Path $tmpDir 'dev-frontend-build.err.log'
     Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run build') `
         -WorkingDirectory $frontDir -RedirectStandardOutput $buildLog `
-        -RedirectStandardError $buildLog -WindowStyle Hidden -Wait
+        -RedirectStandardError $buildErr -WindowStyle Hidden -Wait
     $distIndex = Join-Path $frontDir 'dist\index.html'
     if (-not (Test-Path $distIndex)) {
-        Write-Host "    ERROR: build failed (no dist\index.html). See $buildLog"
+        Write-Host "    ERROR: build failed (no dist\index.html). See $buildLog / $buildErr"
         exit 1
     }
     Write-Host "    build ok (log: $buildLog)"
@@ -179,23 +182,29 @@ $tunnelPidFile = Join-Path $tmpDir 'tunnel.pid'
 $hostPattern = 'https?://[A-Za-z0-9\-_.]+\.(cpolar\.cn|cpolar\.io|ngrok-free\.app|ngrok\.io|trycloudflare\.com)'
 
 function Get-TunnelPublicUrl {
+    param([string]$Tool = '')
     # cpolar 2.x -> 9200/api/v1/tunnels ; cpolar 1.x / ngrok -> 4040/api/tunnels
     # The system proxy intercepts 127.0.0.1 too (shows up as a bogus 502),
     # so neutralise the default web proxy for the duration of the call.
+    # cloudflared has no local API, and a resident cpolar service answering on
+    # 9200 would shadow it - so for cloudflared skip the API probe entirely
+    # and let the caller scrape cloudflared's own output instead.
     $savedProxy = [System.Net.WebRequest]::DefaultWebProxy
     [System.Net.WebRequest]::DefaultWebProxy = New-Object System.Net.WebProxy
     try {
-        foreach ($uri in @('http://127.0.0.1:9200/api/v1/tunnels', 'http://127.0.0.1:4040/api/tunnels')) {
-            try {
-                $resp = Invoke-RestMethod -Uri $uri -TimeoutSec 3 -ErrorAction Stop
-                $json = $resp | ConvertTo-Json -Depth 8 -Compress
-                $m = [regex]::Matches($json, $hostPattern)
-                if ($m.Count -gt 0) {
-                    $https = @($m | ForEach-Object { $_.Value } | Where-Object { $_ -like 'https*' })
-                    if ($https.Count -gt 0) { return $https[0] }
-                    return $m[0].Value
-                }
-            } catch { }
+        if ($Tool -ne 'cloudflared') {
+            foreach ($uri in @('http://127.0.0.1:9200/api/v1/tunnels', 'http://127.0.0.1:4040/api/tunnels')) {
+                try {
+                    $resp = Invoke-RestMethod -Uri $uri -TimeoutSec 3 -ErrorAction Stop
+                    $json = $resp | ConvertTo-Json -Depth 8 -Compress
+                    $m = [regex]::Matches($json, $hostPattern)
+                    if ($m.Count -gt 0) {
+                        $https = @($m | ForEach-Object { $_.Value } | Where-Object { $_ -like 'https*' })
+                        if ($https.Count -gt 0) { return $https[0] }
+                        return $m[0].Value
+                    }
+                } catch { }
+            }
         }
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $savedProxy
@@ -245,7 +254,7 @@ function Start-PublicTunnel {
     $publicUrl = $null
     for ($i = 0; $i -lt 20; $i++) {
         Start-Sleep -Seconds 1
-        $publicUrl = Get-TunnelPublicUrl
+            $publicUrl = Get-TunnelPublicUrl -Tool $tool
         if ($publicUrl) { break }
         # A tool that dies at once will never serve an API (e.g. cpolar without authtoken)
         if ($i -ge 2 -and $proc.HasExited) { break }
