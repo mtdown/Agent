@@ -207,12 +207,14 @@ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 powershell -ExecutionPolicy Bypass -File .\start-main-dev.ps1
 ```
 
-该脚本会进入 main 专用工作目录，执行 `git fetch origin` 和 `git pull --ff-only origin main`，再调用该目录下的 `stop-dev.ps1` 和 `start-dev.ps1` 启动 main 分支前后端。
+该脚本直接在项目根目录执行 `git fetch origin` 和 `git pull --ff-only origin main` 切到最新 `main`，再调用项目根目录的 `start-dev.ps1` 启动 main 分支前后端（默认开启 cloudflared 公网隧道；启动完成后按回车即停止全部服务，直接关窗口则服务保留）。
 
 验收结束需要关闭 main 分支服务时，使用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\stop-main-dev.ps1
 ```
+
+`stop-main-dev.ps1` 会在项目根目录调用 `stop-dev.ps1` 回收 8123 / 3000 端口与公网隧道，效果与直接执行 `stop-dev.ps1` 一致。
 
 main 验收脚本不得提交、推送、合并或切换当前任务分支。

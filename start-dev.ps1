@@ -1,34 +1,40 @@
 # ============================================================
 #  start-dev.ps1 - one-click start for backend + frontend (dev)
 #  Usage:  powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
-#          powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Public
 #  Starts: Spring Boot backend (127.0.0.1:8123) + Vite dev server
 #          (0.0.0.0:3000, LAN accessible). Logs go to tmp/dev-backend.log
 #          and tmp/dev-frontend.log.
 #
-#  Tunnel is ON by default: if cpolar/cloudflared/ngrok is installed, the
-#  site is exposed to the internet right away (use -NoTunnel to skip).
-#  Front and back now share one port (the vite dev server proxies /api to
-#  8123), so tunneling the frontend port alone is enough. The tunnel PID
-#  is written to tmp/tunnel.pid and .\stop-dev.ps1 stops it too.
+#  Public tunnel (cloudflared quick tunnel) is ON by default; the
+#  public URL is scraped from the cloudflared log and shown in a
+#  green box together with the local port it forwards. Front and
+#  back share one port (the vite dev server proxies /api to 8123),
+#  so tunneling the frontend port alone is enough. The tunnel PID
+#  is written to tmp/tunnel.pid.
 #
-#  -Public    kept for compatibility (tunnel is already the default)
+#  If ports 8123/3000 are already occupied by leftover services,
+#  they are stopped automatically and startup continues; only an
+#  unkillable occupant aborts the run.
+#
+#  At the end the script waits for Enter:
+#    - Press Enter  -> stop backend + frontend + tunnel, then exit.
+#    - Close window -> everything keeps running (recover later
+#      with .\stop-dev.ps1).
+#
 #  -NoTunnel  stay on the LAN only, do not expose anything publicly
-#  -Tunnel    cpolar | cloudflared | ngrok | none  (default: auto-detect)
+#  -Preview   build first and serve the bundle instead of the dev
+#             server (far fewer requests through the tunnel)
+#  -NoPause   do not wait for Enter at the end (used by parent
+#             scripts; services then keep running)
 #
 #  NOTE: keep every string literal ASCII-only. Windows PowerShell 5.1
 #        decodes a BOM-less .ps1 with the system ANSI code page, so
 #        non-ASCII message text can be misdecoded at parse time.
 # ============================================================
 param(
-    # Kept for compatibility: the tunnel now starts by default.
-    [switch]$Public,
-    [string]$Tunnel = 'auto',
-    # -NoTunnel / -Tunnel none : stay on the LAN only (no public exposure)
+    # -NoTunnel / : stay on the LAN only (no public exposure)
     [switch]$NoTunnel,
     # -Preview: build first and serve the bundle instead of the dev server.
-    # Use this for public tunnels - the dev server fires hundreds of module
-    # requests and each one pays a round trip through the tunnel.
     [switch]$Preview,
     # -NoPause: do not wait for Enter at the end (used by parent scripts)
     [switch]$NoPause
@@ -42,6 +48,7 @@ New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
 $backendPort = 8123
 $frontPort = 3000
+$tunnelPidFile = Join-Path $tmpDir 'tunnel.pid'
 
 function Find-Java {
     $candidates = @()
@@ -54,27 +61,96 @@ function Find-Java {
     return $null
 }
 
+function Get-PortListenerPids {
+    param([Parameter(Mandatory = $true)][int]$Port)
+    $conns = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    return @($conns | ForEach-Object { $_.OwningProcess } | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+}
+
 function Port-InUse($port) {
     return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+}
+
+function Stop-DevTunnel {
+    if (-not (Test-Path $tunnelPidFile)) { return }
+    $rawTunnelPid = (Get-Content $tunnelPidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+    $tunnelProcId = 0
+    if ([int]::TryParse($rawTunnelPid, [ref]$tunnelProcId) -and $tunnelProcId -gt 0) {
+        $tunnelProc = Get-Process -Id $tunnelProcId -ErrorAction SilentlyContinue
+        if ($tunnelProc) {
+            Write-Host "    Stopping public tunnel $($tunnelProc.ProcessName) (PID $tunnelProcId)"
+            try { Stop-Process -Id $tunnelProcId -Force -ErrorAction Stop }
+            catch { Write-Host "    WARN: could not stop tunnel PID ${tunnelProcId}: $($_.Exception.Message)" }
+        } else {
+            Write-Host "    Tunnel PID $tunnelProcId is no longer running"
+        }
+    }
+    Remove-Item $tunnelPidFile -Force -ErrorAction SilentlyContinue
+}
+
+# Stop whatever listens on one port; returns $true only when the port
+# ended up free (or nothing was listening in the first place).
+function Clear-DevPort {
+    param([Parameter(Mandatory = $true)][int]$Port)
+    $listenerPids = Get-PortListenerPids -Port $Port
+    if ($listenerPids.Count -eq 0) { return $true }
+    foreach ($procId in $listenerPids) {
+        $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+        $procName = if ($proc) { $proc.ProcessName } else { '<unknown>' }
+        Write-Host "    Port $Port in use by $procName (PID $procId) - stopping it ..."
+        try { Stop-Process -Id $procId -Force -ErrorAction Stop }
+        catch { Write-Host "    ERROR: cannot stop $procName (PID $procId): $($_.Exception.Message)" }
+    }
+    Start-Sleep -Seconds 2
+    if ((Get-PortListenerPids -Port $Port).Count -gt 0) {
+        Write-Host "    ERROR: port $Port still occupied after cleanup - stop the process manually and rerun."
+        return $false
+    }
+    Write-Host "    Port $Port released"
+    return $true
+}
+
+# Full stop used by the Enter handler: backend + frontend + tunnel.
+function Stop-DevServices {
+    Write-Host '==> Stopping dev services (backend, frontend, tunnel) ...'
+    foreach ($port in @($backendPort, $frontPort)) {
+        $listenerPids = Get-PortListenerPids -Port $port
+        if ($listenerPids.Count -eq 0) {
+            Write-Host "    Port $port has no listener"
+            continue
+        }
+        foreach ($procId in $listenerPids) {
+            $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            $procName = if ($proc) { $proc.ProcessName } else { '<unknown>' }
+            Write-Host "    Stopping $procName (PID $procId) on port $port"
+            try { Stop-Process -Id $procId -Force -ErrorAction Stop }
+            catch { Write-Host "    ERROR: failed to stop $procName (PID $procId): $($_.Exception.Message)" }
+        }
+    }
+    Stop-DevTunnel
+    Start-Sleep -Seconds 2
+    $busy = @()
+    foreach ($port in @($backendPort, $frontPort)) {
+        if ((Get-PortListenerPids -Port $port).Count -gt 0) { $busy += $port }
+    }
+    if ($busy.Count -eq 0) {
+        Write-Host 'All dev services stopped.'
+    } else {
+        Write-Host "    ERROR: ports still busy: $($busy -join ', '). Run .\stop-dev.ps1 or stop them manually."
+    }
 }
 
 Write-Host "==> [1/4] Checking prerequisites ..."
 if (-not (Port-InUse 3307)) { Write-Host '    WARN: MySQL (3307) not listening. Start the Docker MySQL container first.' }
 if (-not (Port-InUse 6379)) { Write-Host '    WARN: Redis (6379) not listening. Start the Docker Redis container first.' }
-function Assert-PortFree($port) {
-    $owner = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $owner) {
-        return
-    }
-    $proc = Get-Process -Id $owner.OwningProcess -ErrorAction SilentlyContinue
-    $procName = if ($proc) { $proc.ProcessName } else { '<unknown>' }
-    Write-Host "    ERROR: port $port already in use by $procName (PID $($owner.OwningProcess))."
-    Write-Host '           Run .\stop-dev.ps1 first, or stop that process manually, then rerun. Aborting.'
-    exit 1
+# Leftover services from a previous run are cleaned automatically;
+# a leftover tunnel would point at a dead port, so it is killed too.
+Stop-DevTunnel
+$portsClear = $true
+foreach ($p in @($backendPort, $frontPort)) {
+    if (-not (Clear-DevPort -Port $p)) { $portsClear = $false }
 }
-
-Assert-PortFree $backendPort
-Assert-PortFree $frontPort
+if (-not $portsClear) { exit 1 }
 $javaExe = Find-Java
 if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
 
@@ -109,6 +185,7 @@ if ($Preview) {
     $distIndex = Join-Path $frontDir 'dist\index.html'
     if (-not (Test-Path $distIndex)) {
         Write-Host "    ERROR: build failed (no dist\index.html). See $buildLog / $buildErr"
+        Stop-DevServices
         exit 1
     }
     Write-Host "    build ok (log: $buildLog)"
@@ -141,7 +218,9 @@ for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 1
 }
 if (-not $backendUp) {
-    Write-Host '    ERROR: backend did not start in time. See tmp/dev-backend.log'; exit 1
+    Write-Host '    ERROR: backend did not start in time. See tmp/dev-backend.log'
+    Stop-DevServices
+    exit 1
 }
 if (-not $frontUp) {
     Write-Host '    WARN: frontend not up yet, check tmp/dev-frontend.log'
@@ -176,66 +255,23 @@ if ($lanIp) {
     Write-Host "  Phone  : http://$($lanIp):$($frontPort)   (same WiFi$(if ($lanAdapter) { " / via '$lanAdapter'" }))"
 }
 # ------------------------------------------------------------
-#  Public tunnel (optional, -Public)
+#  Public tunnel via cloudflared (quick tunnel, registration-free).
+#  cloudflared has no local API to query, so the public URL is
+#  scraped from its own log output.
 # ------------------------------------------------------------
-$tunnelPidFile = Join-Path $tmpDir 'tunnel.pid'
-$hostPattern = 'https?://[A-Za-z0-9\-_.]+\.(cpolar\.cn|cpolar\.io|ngrok-free\.app|ngrok\.io|trycloudflare\.com)'
-
-function Get-TunnelPublicUrl {
-    param([string]$Tool = '')
-    # cpolar 2.x -> 9200/api/v1/tunnels ; cpolar 1.x / ngrok -> 4040/api/tunnels
-    # The system proxy intercepts 127.0.0.1 too (shows up as a bogus 502),
-    # so neutralise the default web proxy for the duration of the call.
-    # cloudflared has no local API, and a resident cpolar service answering on
-    # 9200 would shadow it - so for cloudflared skip the API probe entirely
-    # and let the caller scrape cloudflared's own output instead.
-    $savedProxy = [System.Net.WebRequest]::DefaultWebProxy
-    [System.Net.WebRequest]::DefaultWebProxy = New-Object System.Net.WebProxy
-    try {
-        if ($Tool -ne 'cloudflared') {
-            foreach ($uri in @('http://127.0.0.1:9200/api/v1/tunnels', 'http://127.0.0.1:4040/api/tunnels')) {
-                try {
-                    $resp = Invoke-RestMethod -Uri $uri -TimeoutSec 3 -ErrorAction Stop
-                    $json = $resp | ConvertTo-Json -Depth 8 -Compress
-                    $m = [regex]::Matches($json, $hostPattern)
-                    if ($m.Count -gt 0) {
-                        $https = @($m | ForEach-Object { $_.Value } | Where-Object { $_ -like 'https*' })
-                        if ($https.Count -gt 0) { return $https[0] }
-                        return $m[0].Value
-                    }
-                } catch { }
-            }
-        }
-    } finally {
-        [System.Net.WebRequest]::DefaultWebProxy = $savedProxy
-    }
-    return $null
-}
+$hostPattern = 'https?://[A-Za-z0-9\-_.]+\.trycloudflare\.com'
 
 function Start-PublicTunnel {
     param([int]$Port)
 
-    $tool = $null
-    if ($Tunnel -in @('cpolar', 'cloudflared', 'ngrok')) {
-        if (Get-Command $Tunnel -ErrorAction SilentlyContinue) { $tool = $Tunnel }
-        else { Write-Host "    WARN: '$Tunnel' not found in PATH." }
-    } elseif ($Tunnel -eq 'none') {
-        return
-    } else {
-        foreach ($t in @('cpolar', 'cloudflared', 'ngrok')) {
-            if (Get-Command $t -ErrorAction SilentlyContinue) { $tool = $t; break }
-        }
-    }
-    if (-not $tool) {
-        Write-Host '    No tunnel tool found - LAN access only.'
-        Write-Host '    Install one: cpolar (https://www.cpolar.com) | cloudflared | ngrok'
-        return
+    $tool = 'cloudflared'
+    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+        Write-Host '    cloudflared not found in PATH - no public tunnel, LAN access only.'
+        Write-Host '    Install once:  winget install Cloudflare.cloudflared'
+        return $null
     }
 
-    $toolArgs = switch ($tool) {
-        'cloudflared' { @('tunnel', '--url', "http://127.0.0.1:$($Port)") }
-        default       { @('http', "$($Port)") }
-    }
+    $toolArgs = @('tunnel', '--url', "http://127.0.0.1:$($Port)")
     $tunnelLog = Join-Path $tmpDir "tunnel-$tool.log"
     $tunnelErr = Join-Path $tmpDir "tunnel-$tool.err.log"
 
@@ -246,21 +282,15 @@ function Start-PublicTunnel {
             -WindowStyle Minimized -PassThru -ErrorAction Stop
     } catch {
         Write-Host "    ERROR: failed to start $tool - $($_.Exception.Message)"
-        return
+        return $null
     }
     Set-Content -Path $tunnelPidFile -Value $proc.Id -Encoding ASCII
     Write-Host "    tunnel PID: $($proc.Id) (log: $tunnelLog)"
 
     $publicUrl = $null
-    for ($i = 0; $i -lt 20; $i++) {
+    for ($i = 0; $i -lt 25; $i++) {
         Start-Sleep -Seconds 1
-            $publicUrl = Get-TunnelPublicUrl -Tool $tool
-        if ($publicUrl) { break }
-        # A tool that dies at once will never serve an API (e.g. cpolar without authtoken)
-        if ($i -ge 2 -and $proc.HasExited) { break }
-    }
-    # cloudflared has no local API - fall back to scraping its own output
-    if (-not $publicUrl) {
+        if ($proc.HasExited) { break }
         foreach ($f in @($tunnelLog, $tunnelErr)) {
             if (-not (Test-Path $f)) { continue }
             $txt = Get-Content $f -Raw -ErrorAction SilentlyContinue
@@ -268,38 +298,24 @@ function Start-PublicTunnel {
             $m = [regex]::Match($txt, $hostPattern)
             if ($m.Success) { $publicUrl = $m.Value; break }
         }
+        if ($publicUrl) { break }
     }
     if ($publicUrl) {
         Write-Host "  Public : $publicUrl" -ForegroundColor Green
-        Write-Host '           (random domain changes on every restart; keep the tunnel window open)'
     } else {
-        Write-Host "    Tunnel process started, but no public URL was obtained."
-        $joined = ''
-        foreach ($f in @($tunnelLog, $tunnelErr)) {
-            if (Test-Path $f) { $joined += (Get-Content $f -Raw -ErrorAction SilentlyContinue) }
-        }
+        Write-Host '    Tunnel process started, but no public URL was obtained.'
         if ($proc.HasExited) {
-            Write-Host "    NOTE: $tool exited immediately (exit code $($proc.ExitCode))." -ForegroundColor Yellow
+            Write-Host "    NOTE: cloudflared exited immediately (exit code $($proc.ExitCode))." -ForegroundColor Yellow
         }
-        if ($joined -match 'authtoken') {
-            Write-Host "    => $tool is not authenticated yet (log says: $($joined.Trim()))." -ForegroundColor Yellow
-            Write-Host "       Fix once :  cpolar authtoken <your-token>" -ForegroundColor Yellow
-            Write-Host "       Token    :  https://dashboard.cpolar.com (free signup)" -ForegroundColor Yellow
-            Write-Host "       No account? use the registration-free tool instead:" -ForegroundColor Yellow
-            Write-Host "         winget install Cloudflare.cloudflared" -ForegroundColor Yellow
-            Write-Host "         then rerun: .\\start-dev.ps1 -Tunnel cloudflared" -ForegroundColor Yellow
-        } else {
-            Write-Host "    Check the minimized $tool window, or: Get-Content $tunnelLog"
-        }
+        Write-Host "    Check the minimized cloudflared window, or: Get-Content $tunnelErr"
     }
     return $publicUrl
 }
 
 $publicUrl = $null
-$wantTunnel = -not ($NoTunnel -or $Tunnel -eq 'none')
-if ($wantTunnel) {
-    # Default is ON: if a tunnel tool is installed the site goes public.
-    # Use -NoTunnel to keep it on the LAN only.
+if (-not $NoTunnel) {
+    # Default is ON: the site is exposed via cloudflared. Use -NoTunnel
+    # to keep it on the LAN only.
     $publicUrl = Start-PublicTunnel -Port $frontPort
 } else {
     Write-Host 'Public tunnel disabled (-NoTunnel) - LAN access only.'
@@ -308,11 +324,19 @@ Write-Host ''
 if ($publicUrl) {
     Write-Host '================================================================' -ForegroundColor Green
     Write-Host "  Public URL (share this) : $publicUrl" -ForegroundColor Green
+    Write-Host "  Forwards to local port  : $frontPort (frontend; /api proxied to backend)" -ForegroundColor Green
+    Write-Host '  (random domain changes on every restart)' -ForegroundColor Green
     Write-Host '================================================================' -ForegroundColor Green
 }
 Write-Host ''
-Write-Host 'Stop everything with: powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1'
-if (-not $NoPause) {
+if ($NoPause) {
+    Write-Host 'Services keep running (started with -NoPause).'
+    Write-Host 'Stop later with: powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1'
+} else {
+    Write-Host 'Press Enter to STOP all services (backend + frontend + tunnel).'
+    Write-Host 'Close this window directly to KEEP everything running'
+    Write-Host '(recover later with .\stop-dev.ps1).'
+    Read-Host 'Press Enter to stop' | Out-Null
     Write-Host ''
-    Read-Host 'Press Enter to close this window (services keep running)'
+    Stop-DevServices
 }

@@ -1,6 +1,6 @@
 param(
-    # -Public: 允许启动公网穿透（透传给 start-dev.ps1）；不带则只走局域网
-    [switch]$Public,
+    # -NoTunnel：不开启公网隧道，只走局域网（默认开启 cloudflared 隧道）
+    [switch]$NoTunnel,
     # -Stay: 不切回 main 分支，直接在当前分支启动（演示未合入 main 的功能时用）
     [switch]$Stay
 )
@@ -57,10 +57,12 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 Write-Host "4. 正在启动本地服务..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-if ($Public) {
-    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -Public -NoPause
+# 默认开启 cloudflared 公网隧道；启动完成后的"按回车停止全部服务"
+# 由 start-dev.ps1 自身负责，本脚本不再单独处理回车与停止。
+if ($NoTunnel) {
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -NoTunnel
 } else {
-    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1" -NoPause -NoTunnel
+    powershell -ExecutionPolicy Bypass -File "$ProjectRoot\start-dev.ps1"
 }
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[警告] 启动服务可能失败，请检查服务状态。" -ForegroundColor Yellow
@@ -69,27 +71,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 if ($Stay) {
-    Write-Host "服务已启动（保持在当前分支，未切换到 main）。" -ForegroundColor Green
+    Write-Host "流程结束（本次保持在当前分支，未切换到 main）。" -ForegroundColor Green
 } else {
-    Write-Host "服务已启动，当前运行在最新的 main 分支。" -ForegroundColor Green
+    Write-Host "流程结束（本次运行在最新的 main 分支）。" -ForegroundColor Green
 }
-Write-Host "按回车键将停止服务并退出脚本。" -ForegroundColor Yellow
-Write-Host "如果不想停止服务，请直接关闭此窗口（服务将保持运行）。" -ForegroundColor Yellow
+Write-Host "如服务仍在运行，可执行 stop-dev.ps1 或 stop-main-dev.ps1 回收。" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
-
-# 等待用户按回车
-Read-Host
-
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "正在停止服务..." -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-powershell -ExecutionPolicy Bypass -File "$ProjectRoot\stop-dev.ps1"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[警告] 停止服务可能失败，请检查服务状态。" -ForegroundColor Yellow
-}
-
-Write-Host ""
-Write-Host "服务已停止（公网隧道随 stop-dev.ps1 一并关闭），脚本将在 2 秒后退出。" -ForegroundColor Green
-Start-Sleep -Seconds 2
-# 脚本结束，窗口自动关闭

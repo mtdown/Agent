@@ -54,13 +54,25 @@ test('dev scripts stay ASCII-only so PowerShell 5.1 cannot misdecode them', () =
   }
 })
 
-test('start script checks both the backend and the frontend port', () => {
-  assert.match(startSource, /function Assert-PortFree/)
-  assert.match(startSource, /Assert-PortFree \$backendPort/)
-  assert.match(startSource, /Assert-PortFree \$frontPort/)
-  assert.match(startSource, /port \$port already in use/)
-  assert.match(startSource, /Run \.\\stop-dev\.ps1 first/)
-  assert.match(startSource, /exit 1/)
+test('start script auto-cleans occupied dev ports before starting', () => {
+  assert.match(startSource, /function Clear-DevPort/)
+  assert.match(startSource, /foreach \(\$p in @\(\$backendPort, \$frontPort\)\)/)
+  assert.match(startSource, /Port \$Port in use by/)
+  assert.match(startSource, /Stop-Process -Id \$procId -Force/)
+  assert.match(startSource, /still occupied after cleanup/)
+  assert.match(startSource, /if \(-not \$portsClear\) \{ exit 1 \}/)
+})
+
+test('start script tunnels via cloudflared only', () => {
+  assert.doesNotMatch(startSource, /cpolar|ngrok|authtoken/i)
+  assert.match(startSource, /trycloudflare/)
+  assert.match(startSource, /winget install Cloudflare\.cloudflared/)
+})
+
+test('start script stops everything on Enter', () => {
+  assert.match(startSource, /function Stop-DevServices/)
+  assert.match(startSource, /Press Enter to STOP all services/)
+  assert.match(startSource, /Stop-DevTunnel/)
 })
 
 test('start script keeps the maven invocation untouched', () => {

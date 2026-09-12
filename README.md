@@ -145,12 +145,13 @@ npm run dev
 
 ### 3. 本地开发一键启停
 
-项目根目录提供启停脚本（先停后启）：
+项目根目录提供一键启动脚本（默认开启 cloudflared 公网隧道并在控制台展示公网地址；启动前自动清理遗留服务，无需先手动停止）：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
 powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 ```
+
+启动完成后按回车即停止全部服务（后端 + 前端 + 隧道）；直接关闭窗口则服务保留，之后可用 `stop-dev.ps1` 回收。仅局域网访问时加 `-NoTunnel`。
 
 ## 访问地址
 
