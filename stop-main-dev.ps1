@@ -1,24 +1,17 @@
-param(
-    [string]$MainWorktree = (Join-Path $env:USERPROFILE '.config\superpowers\worktrees\Agent\main-theme-integration')
-)
-
+# ============================================================
+#  stop-main-dev.ps1 - stop the services started by
+#  start-main-dev.ps1 (backend 8123 + frontend 3000 + tunnel).
+#
+#  main acceptance runs directly in the project root
+#  (start-main-dev.ps1 checks out main there), so stopping is
+#  simply delegating to the root stop-dev.ps1, which also stops
+#  the public tunnel recorded in tmp/tunnel.pid.
+#
+#  All output is ASCII-only (see start-dev.ps1 for the reason).
+# ============================================================
 $ErrorActionPreference = 'Stop'
+$ProjectRoot = "C:\Users\origin\IdeaProjects\Agent"
+Set-Location $ProjectRoot
 
-if (-not (Test-Path $MainWorktree)) {
-    throw "Main worktree not found: $MainWorktree"
-}
-
-Push-Location $MainWorktree
-try {
-    $branch = (& git branch --show-current).Trim()
-    if ($branch -ne 'main') {
-        throw "Main preview worktree must be on main, current branch is: $branch"
-    }
-
-    powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Failed to stop main dev services.'
-    }
-} finally {
-    Pop-Location
-}
+powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
+exit $LASTEXITCODE
