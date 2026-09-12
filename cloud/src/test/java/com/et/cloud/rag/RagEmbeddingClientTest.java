@@ -106,4 +106,57 @@ class RagEmbeddingClientTest {
         assertEquals(2, vectors.size());
         assertEquals(false, lastRequestHadAuthHeader);
     }
+
+    @Test
+    void connectFailureProducesReadableMessageEvenWhenCauseMessageIsNull() {
+        // 端口 1 几乎必然无监听：ConnectException 在 Windows 上 message 可能为 null，
+        // 报错必须兜底拼异常类名与端点，否则出现"embedding 请求失败: null"这种不可定位信息；
+        // 传输层失败会自动重试 2 次，重试耗尽后的报错需带上重试次数
+        properties.getEmbedding().setBaseUrl("http://127.0.0.1:1/v1");
+        RagEmbeddingClient client = new RagEmbeddingClient(properties);
+        long start = System.currentTimeMillis();
+        RagEmbeddingUnavailableException ex = assertThrows(RagEmbeddingUnavailableException.class,
+                () -> client.embed(List.of("文本")));
+        assertTrue(ex.getMessage().contains("embedding 请求失败"),
+                "message was: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("http://127.0.0.1:1/v1"),
+                "message was: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("已重试 2 次"),
+                "message was: " + ex.getMessage());
+        // 300ms + 1000ms 退避确实执行过
+        assertTrue(System.currentTimeMillis() - start >= 1300, "backoff delays were skipped");
+    }
+
+    @Test
+    void retriesTransportFailureAndSucceeds() throws Exception {
+        // 第一发踩中已被服务端关闭的池化连接（handler 异常 → 连接被掐，客户端读不到响应头），
+        // 第二发新建连接成功 —— 对应云端网关静默回收 keep-alive 连接的场景
+        HttpServer flaky = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
+        flaky.createContext("/v1/embeddings", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            if (hits.incrementAndGet() == 1) {
+                throw new RuntimeException("simulated stale connection");
+            }
+            String response = "{\"data\":[{\"index\":0,\"embedding\":[0.1,0.2]}]}";
+            byte[] out = response.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, out.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(out);
+            }
+        });
+        flaky.start();
+        try {
+            properties.getEmbedding().setBaseUrl(
+                    "http://127.0.0.1:" + flaky.getAddress().getPort() + "/v1");
+            RagEmbeddingClient client = new RagEmbeddingClient(properties);
+            List<float[]> vectors = client.embed(List.of("文本"));
+            assertEquals(1, vectors.size());
+            assertEquals(2, vectors.get(0).length);
+            assertEquals(2, hits.get(), "first attempt died on the stale connection, retry succeeded");
+        } finally {
+            flaky.stop(0);
+        }
+    }
 }

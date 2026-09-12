@@ -226,7 +226,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
     }
 
     @Override
-    public RagRebuildReport rebuildAll() {
+    public RagRebuildReport rebuildAll(boolean force) {
         RagRebuildReport report = new RagRebuildReport();
         QueryWrapper<DocumentWiki> wrapper = new QueryWrapper<>();
         wrapper.eq("isDelete", 0).eq("contentFormat", CONTENT_FORMAT_MARKDOWN);
@@ -238,7 +238,8 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
         }
         for (DocumentWiki doc : docs) {
             try {
-                if (isUpToDate(doc)) {
+                // force=true（换 embedding 模型后）：跳过 isUpToDate，全部文档用当前模型重嵌
+                if (!force && isUpToDate(doc)) {
                     report.setSkipped(report.getSkipped() + 1);
                     continue;
                 }

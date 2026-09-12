@@ -31,6 +31,14 @@ public class RagAskServiceImpl implements RagAskService {
     /** Named event channel: meta / reason / delta / done / error. */
     interface EventSink {
         void emit(String name, Object payload);
+
+        /**
+         * Terminal signal: no more events will be emitted. The SSE adapter
+         * closes the emitter here — without it the connection hangs until the
+         * 120s timeout and the frontend await never resolves.
+         */
+        default void complete() {
+        }
     }
 
     static final String SYSTEM_PROMPT =
@@ -66,31 +74,48 @@ public class RagAskServiceImpl implements RagAskService {
     }
 
     private static EventSink sseSink(SseEmitter emitter) {
-        return (name, payload) -> {
-            try {
-                emitter.send(SseEmitter.event().name(name).data(payload));
-            } catch (Exception e) {
-                // client disconnected or emitter already completed; stop caring, later sends fail the same way
-                log.debug("SSE send failed (client likely disconnected): {}", e.getMessage());
+        return new EventSink() {
+            @Override
+            public void emit(String name, Object payload) {
+                try {
+                    emitter.send(SseEmitter.event().name(name).data(payload));
+                } catch (Exception e) {
+                    // client disconnected or emitter already completed; stop caring, later sends fail the same way
+                    log.debug("SSE send failed (client likely disconnected): {}", e.getMessage());
+                }
+            }
+
+            @Override
+            public void complete() {
+                try {
+                    emitter.complete();
+                } catch (Exception e) {
+                    log.debug("SSE complete failed (already closed?): {}", e.getMessage());
+                }
             }
         };
     }
 
     /** Full ask flow against any sink. Sends terminal done/error itself. */
     void runAsk(User loginUser, RagAskRequest request, EventSink sink) {
+        long startedAt = System.currentTimeMillis();
         try {
             // 1. permission-filtered retrieval (hard filter inside RagSearchService)
             RagSearchRequest searchRequest = new RagSearchRequest();
             searchRequest.setQuery(request.getQuery());
             searchRequest.setSpaceIds(request.getSpaceIds());
             searchRequest.setTopK(request.getTopK());
+            long retrievalStart = System.currentTimeMillis();
             RagSearchResult search = ragSearchService.search(loginUser, searchRequest);
+            long retrievalMs = System.currentTimeMillis() - retrievalStart;
+            SearchTimings steps = search.getTimings();
             List<ChunkHit> hits = search.getHits() == null ? new ArrayList<>() : search.getHits();
             Set<Long> effectiveSpaces = search.getEffectiveSpaceIds() == null
                     ? new LinkedHashSet<>() : search.getEffectiveSpaceIds();
             long docCount = search.getAuthorizedDocCount();
 
             // 2. meta first: scope + citations (LLM markers map onto these)
+            long promptStart = System.currentTimeMillis();
             List<RagCitation> citations = new ArrayList<>();
             StringBuilder materials = new StringBuilder();
             for (int i = 0; i < hits.size(); i++) {
@@ -113,28 +138,46 @@ public class RagAskServiceImpl implements RagAskService {
                         .append("\n---\n");
             }
             sink.emit("meta", new MetaPayload(effectiveSpaces, docCount, citations));
+            String prompt = "问题：" + request.getQuery().trim() + "\n\n资料：\n" + materials;
+            long promptMs = System.currentTimeMillis() - promptStart;
 
             // 3. zero-hit short circuit: refuse without calling the LLM
             if (hits.isEmpty()) {
                 sink.emit("delta", new DeltaPayload(
                         String.format(NO_HIT_REPLY, effectiveSpaces.size(), docCount)));
-                sink.emit("done", new DonePayload("stop", 0L, 0L, null));
+                long now = System.currentTimeMillis();
+                DonePayload done = new DonePayload("stop", 0L, 0L, null);
+                done.startedAt = startedAt;
+                done.finishedAt = now;
+                done.totalMs = now - startedAt;
+                done.retrievalMs = retrievalMs;
+                done.promptMs = promptMs;
+                done.llmMs = 0L;
+                done.steps = steps;
+                sink.emit("done", done);
+                sink.complete();
                 return;
             }
 
             // 4. stream the LLM answer (timing: thinking = until first content delta)
             boolean deepThinking = Boolean.TRUE.equals(request.getDeepThinking());
-            String prompt = "问题：" + request.getQuery().trim() + "\n\n资料：\n" + materials;
             long llmStart = System.currentTimeMillis();
+            long[] firstTokenAt = {0L};
             long[] firstContentAt = {0L};
             ragLlmClient.streamChat(SYSTEM_PROMPT, prompt, deepThinking, new RagLlmClient.StreamCallback() {
                 @Override
                 public void onReasoningDelta(String text) {
+                    if (firstTokenAt[0] == 0L) {
+                        firstTokenAt[0] = System.currentTimeMillis();
+                    }
                     sink.emit("reason", new DeltaPayload(text));
                 }
 
                 @Override
                 public void onContentDelta(String text) {
+                    if (firstTokenAt[0] == 0L) {
+                        firstTokenAt[0] = System.currentTimeMillis();
+                    }
                     if (firstContentAt[0] == 0L) {
                         firstContentAt[0] = System.currentTimeMillis();
                     }
@@ -148,21 +191,42 @@ public class RagAskServiceImpl implements RagAskService {
                             ? now - llmStart : firstContentAt[0] - llmStart;
                     long answerMs = firstContentAt[0] == 0L
                             ? 0L : now - firstContentAt[0];
-                    sink.emit("done", new DonePayload(finishReason, thinkingMs, answerMs,
+                    DonePayload done = new DonePayload(finishReason, thinkingMs, answerMs,
                             usage == null ? null : new DonePayload.Usage(
-                                    usage.promptTokens, usage.completionTokens)));
+                                    usage.promptTokens, usage.completionTokens));
+                    done.startedAt = startedAt;
+                    done.finishedAt = now;
+                    done.totalMs = now - startedAt;
+                    done.retrievalMs = retrievalMs;
+                    done.promptMs = promptMs;
+                    done.firstTokenMs = firstTokenAt[0] == 0L ? null : firstTokenAt[0] - llmStart;
+                    done.llmMs = now - llmStart;
+                    done.steps = steps;
+                    log.info("RAG ask done: total={}ms (retrieval={}ms [perm={} docCount={} docNum={} embed={} vector={}], "
+                                    + "prompt={}ms, llm={}ms [firstToken={}ms thinking={}ms answer={}ms])",
+                            done.totalMs, retrievalMs,
+                            steps == null ? null : steps.getPermissionMs(),
+                            steps == null ? null : steps.getDocCountMs(),
+                            steps == null ? null : steps.getDocNumberMs(),
+                            steps == null ? null : steps.getEmbedMs(),
+                            steps == null ? null : steps.getVectorMs(),
+                            promptMs, done.llmMs, done.firstTokenMs, thinkingMs, answerMs);
+                    sink.emit("done", done);
+                    sink.complete();
                 }
 
                 @Override
                 public void onError(String message) {
                     log.error("RAG ask LLM error: {}", message);
                     sink.emit("error", new ErrorPayload(message));
+                    sink.complete();
                 }
             });
         } catch (Exception e) {
             log.error("RAG ask failed", e);
             sink.emit("error", new ErrorPayload(
                     e.getMessage() == null ? "问答服务异常" : e.getMessage()));
+            sink.complete();
         }
     }
 
@@ -193,6 +257,23 @@ public class RagAskServiceImpl implements RagAskService {
         public Long thinkingMs;
         public Long answerMs;
         public Usage usage;
+        // ---- 调用明细（switch-embedding-dashscope）：均为增量字段，旧消费方可忽略 ----
+        /** 问答开始的墙钟时间（epoch ms）。 */
+        public Long startedAt;
+        /** 问答结束的墙钟时间（epoch ms）。 */
+        public Long finishedAt;
+        /** 全链路总耗时（含检索、构造、LLM）。 */
+        public Long totalMs;
+        /** 检索阶段总耗时。 */
+        public Long retrievalMs;
+        /** 引用与 prompt 构造耗时。 */
+        public Long promptMs;
+        /** LLM 首个输出 delta（reason 或 content）相对 LLM 开始的耗时；未产出为 null。 */
+        public Long firstTokenMs;
+        /** LLM 流式调用总耗时。 */
+        public Long llmMs;
+        /** 检索子步骤耗时明细。 */
+        public SearchTimings steps;
 
         public DonePayload(String finishReason, Long thinkingMs, Long answerMs, Usage usage) {
             this.finishReason = finishReason;

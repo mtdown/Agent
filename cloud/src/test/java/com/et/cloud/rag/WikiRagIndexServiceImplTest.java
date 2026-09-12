@@ -209,7 +209,7 @@ class WikiRagIndexServiceImplTest {
         // legacy normalization update for stale doc
         when(documentWikiMapper.updateById(any(DocumentWiki.class))).thenReturn(1);
 
-        RagRebuildReport report = indexService.rebuildAll();
+        RagRebuildReport report = indexService.rebuildAll(false);
 
         assertEquals(2, report.getTotal());
         assertEquals(1, report.getSkipped());
@@ -218,12 +218,31 @@ class WikiRagIndexServiceImplTest {
     }
 
     @Test
+    void rebuildAllForceReembedsUpToDateDocs() {
+        // 换 embedding 模型后的场景：文档向量已"最新"，但 force 必须跳过 isUpToDate 全部重嵌
+        DocumentWiki upToDate = markdownDoc(1L, 10L, 2, "# a\n\n正文一");
+        when(documentWikiMapper.selectList(any(Wrapper.class))).thenReturn(List.of(upToDate));
+        when(embeddingClient.isConfigured()).thenReturn(true);
+        when(documentWikiMapper.selectById(1L)).thenReturn(upToDate);
+        when(wikiChunkMapper.invalidateByDocId(anyLong())).thenReturn(0);
+        when(embeddingClient.embed(anyList())).thenReturn(List.of(new float[]{0.1f}));
+        when(wikiChunkService.saveBatch(anyList())).thenReturn(true);
+
+        RagRebuildReport report = indexService.rebuildAll(true);
+
+        assertEquals(1, report.getTotal());
+        assertEquals(0, report.getSkipped());
+        assertEquals(1, report.getCreated());
+        verify(wikiChunkMapper, never()).selectCount(any(Wrapper.class));
+    }
+
+    @Test
     void rebuildAllReportsUnconfiguredEmbedding() {
         when(documentWikiMapper.selectList(any(Wrapper.class)))
                 .thenReturn(List.of(markdownDoc(1L, 10L, 1, "# a\n\n正文")));
         when(embeddingClient.isConfigured()).thenReturn(false);
 
-        RagRebuildReport report = indexService.rebuildAll();
+        RagRebuildReport report = indexService.rebuildAll(false);
 
         assertEquals(1, report.getTotal());
         assertEquals(0, report.getCreated());
@@ -247,7 +266,7 @@ class WikiRagIndexServiceImplTest {
                 .thenReturn(List.of(new float[]{0.2f}));
         when(wikiChunkService.saveBatch(anyList())).thenReturn(true);
 
-        RagRebuildReport report = indexService.rebuildAll();
+        RagRebuildReport report = indexService.rebuildAll(false);
 
         assertEquals(2, report.getTotal());
         assertEquals(1, report.getCreated());

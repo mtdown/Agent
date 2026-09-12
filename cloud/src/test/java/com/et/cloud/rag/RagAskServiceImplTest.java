@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -68,10 +69,11 @@ class RagAskServiceImplTest {
         return request;
     }
 
-    /** Recording sink: captures (name, payload) pairs in order. */
+    /** Recording sink: captures (name, payload) pairs in order + completion. */
     private static class RecordingSink implements RagAskServiceImpl.EventSink {
         final List<String> names = new ArrayList<>();
         final List<Object> payloads = new ArrayList<>();
+        boolean completed = false;
 
         @Override
         public void emit(String name, Object payload) {
@@ -79,10 +81,24 @@ class RagAskServiceImplTest {
             payloads.add(payload);
         }
 
+        @Override
+        public void complete() {
+            completed = true;
+        }
+
         RagAskServiceImpl.MetaPayload meta() {
             for (Object p : payloads) {
                 if (p instanceof RagAskServiceImpl.MetaPayload) {
                     return (RagAskServiceImpl.MetaPayload) p;
+                }
+            }
+            return null;
+        }
+
+        RagAskServiceImpl.DonePayload done() {
+            for (int i = payloads.size() - 1; i >= 0; i--) {
+                if (payloads.get(i) instanceof RagAskServiceImpl.DonePayload) {
+                    return (RagAskServiceImpl.DonePayload) payloads.get(i);
                 }
             }
             return null;
@@ -110,6 +126,16 @@ class RagAskServiceImplTest {
                 (RagAskServiceImpl.DeltaPayload) sink.payloads.get(1);
         assertTrue(reply.content.contains("未能找到"));
         assertTrue(reply.content.contains("1 个空间"));
+        // 零命中短路同样携带完整时间线（生成段为 0）
+        RagAskServiceImpl.DonePayload done = sink.done();
+        assertNotNull(done.startedAt);
+        assertNotNull(done.finishedAt);
+        assertNotNull(done.totalMs);
+        assertNotNull(done.retrievalMs);
+        assertEquals(0L, done.llmMs);
+        assertNotNull(done.steps);
+        assertTrue(done.finishedAt >= done.startedAt);
+        assertTrue(sink.completed, "zero-hit short circuit must complete the sink (close SSE)");
     }
 
     @Test
@@ -146,6 +172,19 @@ class RagAskServiceImplTest {
         assertTrue(prompt.contains("问题：某政策问题"));
         // system prompt passed through
         verify(ragLlmClient).streamChat(eq(RagAskServiceImpl.SYSTEM_PROMPT), anyString(), anyBoolean(), any());
+        // 完整问答的 done 携带调用明细：墙钟时间 + 各阶段耗时
+        RagAskServiceImpl.DonePayload done = sink.done();
+        assertNotNull(done.startedAt);
+        assertNotNull(done.finishedAt);
+        assertNotNull(done.totalMs);
+        assertNotNull(done.retrievalMs);
+        assertNotNull(done.promptMs);
+        assertNotNull(done.firstTokenMs, "first reasoning delta marks first token");
+        assertNotNull(done.llmMs);
+        assertNotNull(done.steps);
+        assertTrue(done.finishedAt >= done.startedAt);
+        assertTrue(done.totalMs >= done.retrievalMs + done.promptMs);
+        assertTrue(sink.completed, "finished stream must complete the sink (close SSE)");
     }
 
     @Test
@@ -166,6 +205,7 @@ class RagAskServiceImplTest {
         RagAskServiceImpl.ErrorPayload error = (RagAskServiceImpl.ErrorPayload)
                 sink.payloads.get(sink.payloads.size() - 1);
         assertTrue(error.message.contains("RAG_LLM_API_KEY"));
+        assertTrue(sink.completed, "LLM error must complete the sink (close SSE)");
     }
 
     @Test
@@ -178,5 +218,6 @@ class RagAskServiceImplTest {
 
         assertEquals(List.of("error"), sink.names);
         assertTrue(((RagAskServiceImpl.ErrorPayload) sink.payloads.get(0)).message.contains("embedding down"));
+        assertTrue(sink.completed, "retrieval failure must complete the sink (close SSE)");
     }
 }

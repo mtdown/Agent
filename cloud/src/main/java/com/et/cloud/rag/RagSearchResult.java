@@ -24,4 +24,9 @@ public class RagSearchResult {
      * Distinct authorized documents indexed in the effective spaces.
      */
     private long authorizedDocCount;
+
+    /**
+     * Per-phase timings of this search call (never null; unexecuted phases stay null).
+     */
+    private SearchTimings timings = new SearchTimings();
 }

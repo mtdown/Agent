@@ -81,12 +81,13 @@ aliYunAi:
 # RAG 配置（add-wiki-rag-pipeline）。api-key 未配置时索引流程降级跳过，不阻塞文档保存
 rag:
   embedding:
-    # 默认本地 Ollama（OpenAI 兼容端点，无需 api-key）；云端切换示例：
-    # RAG_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-    # RAG_EMBEDDING_MODEL=text-embedding-v3  RAG_EMBEDDING_API_KEY=sk-xxx
-    base-url: ${RAG_EMBEDDING_BASE_URL:http://localhost:11434/v1}
+    # 默认云端 DashScope compatible-mode（qwen3.7-text-embedding-flash）；api-key 经环境变量
+    # RAG_EMBEDDING_API_KEY 注入（start-dev.ps1 会读取根目录 .env.dev）。
+    # 切回本地 Ollama 示例：RAG_EMBEDDING_BASE_URL=http://localhost:11434/v1
+    # RAG_EMBEDDING_MODEL=qwen3-embedding:4b（本地端点无需 api-key）
+    base-url: ${RAG_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
     api-key: ${RAG_EMBEDDING_API_KEY:}
-    model: ${RAG_EMBEDDING_MODEL:qwen3-embedding:4b}
+    model: ${RAG_EMBEDDING_MODEL:qwen3.7-text-embedding-flash}
     timeout-seconds: 30
   retrieval:
     top-k: 6

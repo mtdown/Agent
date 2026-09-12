@@ -49,7 +49,13 @@ public class RagSearchServiceImpl implements RagSearchService {
         ThrowUtils.throwIf(request == null || StrUtil.isBlank(request.getQuery()),
                 ErrorCode.PARAMS_ERROR, "查询内容不能为空");
 
+        long totalStart = System.currentTimeMillis();
+        SearchTimings timings = new SearchTimings();
+        RagSearchResult result = new RagSearchResult();
+        result.setTimings(timings);
+
         // 1. permission filter FIRST: effective = visible ∩ requested
+        long phaseStart = System.currentTimeMillis();
         List<Long> visibleSpaceIds = wikiSpaceService.listVisibleSpaceIds(loginUser);
         Set<Long> effectiveSpaceIds = new LinkedHashSet<>();
         if (CollUtil.isEmpty(request.getSpaceIds())) {
@@ -62,23 +68,28 @@ public class RagSearchServiceImpl implements RagSearchService {
                 }
             }
         }
+        timings.setPermissionMs(System.currentTimeMillis() - phaseStart);
 
-        RagSearchResult result = new RagSearchResult();
         result.setEffectiveSpaceIds(new LinkedHashSet<>(effectiveSpaceIds));
         if (effectiveSpaceIds.isEmpty()) {
             // requested scope contains no visible space: nothing is searchable
+            timings.setTotalMs(System.currentTimeMillis() - totalStart);
             return result;
         }
 
         // 2. authorized document count within the effective scope
+        phaseStart = System.currentTimeMillis();
         result.setAuthorizedDocCount(countActiveDocs(effectiveSpaceIds));
+        timings.setDocCountMs(System.currentTimeMillis() - phaseStart);
 
         int topK = request.getTopK() != null && request.getTopK() > 0
                 ? request.getTopK() : ragProperties.getRetrieval().getTopK();
 
         // 3. doc-number exact-match layer: 纯向量对文号精确查询不敏感（实测〔2026〕24号排在 14/6/34 号之后），
         //    查询里出现文号时先按 docNumber 精确命中，向量检索只补剩余名额 —— 轻量混合检索，无需 BM25
+        phaseStart = System.currentTimeMillis();
         List<ChunkHit> exactHits = findDocNumberHits(request.getQuery(), effectiveSpaceIds, topK);
+        timings.setDocNumberMs(System.currentTimeMillis() - phaseStart);
 
         // 4. embed the query and search only within authorized spaces
         List<ChunkHit> hits = new ArrayList<>();
@@ -90,9 +101,13 @@ public class RagSearchServiceImpl implements RagSearchService {
             }
         }
         if (hits.size() < topK) {
+            phaseStart = System.currentTimeMillis();
             List<float[]> vectors = ragEmbeddingClient.embed(List.of(request.getQuery().trim()));
+            timings.setEmbedMs(System.currentTimeMillis() - phaseStart);
             float[] queryVector = vectors.get(0);
+            phaseStart = System.currentTimeMillis();
             List<ChunkHit> vectorHits = vectorStore.search(queryVector, effectiveSpaceIds, topK);
+            timings.setVectorMs(System.currentTimeMillis() - phaseStart);
             for (ChunkHit hit : vectorHits) {
                 if (hits.size() >= topK) {
                     break;
@@ -103,6 +118,7 @@ public class RagSearchServiceImpl implements RagSearchService {
             }
         }
         result.setHits(hits);
+        timings.setTotalMs(System.currentTimeMillis() - totalStart);
         return result;
     }
 

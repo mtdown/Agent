@@ -154,6 +154,43 @@ if (-not $portsClear) { exit 1 }
 $javaExe = Find-Java
 if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
 
+# Load local secrets (.env.dev, git-ignored): each KEY=VALUE line becomes a
+# process env var so the backend jar started below inherits it. Values may be
+# quoted ("v" or 'v'); blank lines and # comments are skipped. Only variable
+# NAMES are printed - never the values.
+function Import-DevEnvFile {
+    $envFile = Join-Path $root '.env.dev'
+    if (-not (Test-Path $envFile)) {
+        Write-Host '    NOTE: .env.dev not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
+        return
+    }
+    $loaded = @()
+    # ReadAllLines (UTF-8) instead of Get-Content (ANSI in PS 5.1): non-ASCII
+    # bytes must never corrupt line splitting here, or keys get silently lost.
+    foreach ($line in [System.IO.File]::ReadAllLines($envFile)) {
+        $trimmed = $line.Trim()
+        if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#')) { continue }
+        $idx = $trimmed.IndexOf('=')
+        if ($idx -le 0) { continue }
+        $key = $trimmed.Substring(0, $idx).Trim()
+        $value = $trimmed.Substring($idx + 1).Trim()
+        if ($value.Length -ge 2 -and
+            (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+             ($value.StartsWith("'") -and $value.EndsWith("'")))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        if ($key.Length -eq 0) { continue }
+        Set-Item -Path ("Env:" + $key) -Value $value
+        $loaded += $key
+    }
+    if ($loaded.Count -gt 0) {
+        Write-Host ("    .env.dev injected env vars: " + ($loaded -join ', '))
+    } else {
+        Write-Host '    WARN: .env.dev exists but contains no KEY=VALUE entries.'
+    }
+}
+Import-DevEnvFile
+
 Write-Host "==> [2/4] Building backend jar (mvn -DskipTests package) ..."
 Push-Location $cloudDir
 try { mvn -DskipTests package -q; if ($LASTEXITCODE -ne 0) { throw 'maven build failed' } }
