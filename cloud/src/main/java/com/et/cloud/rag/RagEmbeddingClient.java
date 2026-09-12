@@ -6,6 +6,7 @@ import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -21,6 +22,15 @@ import java.util.List;
 @Component
 @Slf4j
 public class RagEmbeddingClient {
+
+    /**
+     * 1 次原始请求 + 2 次重试。embedding 是幂等 POST，可安全重试；
+     * 云端网关会静默回收空闲 keep-alive 连接，空闲后第一发常踩死连接
+     * 得到 Connection reset，重试即新建连接恢复 —— 不重试则直接对用户报错。
+     */
+    private static final int MAX_ATTEMPTS = 3;
+
+    private static final long[] BACKOFF_MS = {300L, 1000L};
 
     private final RagProperties ragProperties;
 
@@ -42,6 +52,7 @@ public class RagEmbeddingClient {
 
     /**
      * Embeds a batch of texts. Order of returned vectors matches input order.
+     * Retries transport-level failures (stale pooled connection etc.) twice.
      *
      * @throws RagEmbeddingUnavailableException when not configured or the endpoint fails
      */
@@ -52,8 +63,39 @@ public class RagEmbeddingClient {
         RagProperties.Embedding config = ragProperties.getEmbedding();
         if (!config.isConfigured()) {
             throw new RagEmbeddingUnavailableException(
-                    "RAG embedding 未配置：云端需设置 RAG_EMBEDDING_API_KEY，本地 Ollama 需将 base-url 指向 http://localhost:11434/v1");
+                    "RAG embedding 未配置：云端需设置 RAG_EMBEDDING_API_KEY（start-dev.ps1 读取根目录 .env.dev），"
+                            + "本地 Ollama 则将 base-url 指向 http://localhost:11434/v1");
         }
+        HttpRequest request = buildRequest(config, texts);
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                HttpResponse<String> response =
+                        httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() != 200) {
+                    // HTTP 层错误（鉴权/限流/参数）重试无益，直接抛
+                    throw new RagEmbeddingUnavailableException(
+                            "embedding 响应异常 HTTP " + response.statusCode() + ": " + truncate(response.body()));
+                }
+                return parseVectors(response.body(), texts.size());
+            } catch (IOException e) {
+                lastFailure = e;
+                log.warn("embedding 第 {}/{} 次尝试失败: {}（端点 {}）",
+                        attempt, MAX_ATTEMPTS, describe(e), config.getBaseUrl());
+                if (attempt < MAX_ATTEMPTS && !sleepQuietly(BACKOFF_MS[attempt - 1])) {
+                    throw new RagEmbeddingUnavailableException("embedding 请求被中断", e);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RagEmbeddingUnavailableException("embedding 请求被中断", e);
+            }
+        }
+        throw new RagEmbeddingUnavailableException(
+                "embedding 请求失败: " + describe(lastFailure)
+                        + "（端点 " + config.getBaseUrl() + "，已重试 " + (MAX_ATTEMPTS - 1) + " 次）", lastFailure);
+    }
+
+    private HttpRequest buildRequest(RagProperties.Embedding config, List<String> texts) {
         JSONObject body = new JSONObject();
         body.set("model", config.getModel());
         body.set("input", texts);
@@ -66,20 +108,30 @@ public class RagEmbeddingClient {
         if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
             requestBuilder.header("Authorization", "Bearer " + config.getApiKey());
         }
-        HttpRequest request = requestBuilder
+        return requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
-        HttpResponse<String> response;
+    }
+
+    /** @return false when the sleep was interrupted (caller should abort the retry loop) */
+    private static boolean sleepQuietly(long millis) {
         try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (Exception e) {
-            throw new RagEmbeddingUnavailableException("embedding 请求失败: " + e.getMessage(), e);
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         }
-        if (response.statusCode() != 200) {
-            throw new RagEmbeddingUnavailableException(
-                    "embedding 响应异常 HTTP " + response.statusCode() + ": " + truncate(response.body()));
+    }
+
+    /** Windows 下 ConnectException.getMessage() 常为 null，兜底用异常类名描述 */
+    private static String describe(Exception e) {
+        if (e == null) {
+            return "unknown";
         }
-        return parseVectors(response.body(), texts.size());
+        return e.getMessage() == null || e.getMessage().isBlank()
+                ? e.getClass().getSimpleName()
+                : e.getMessage();
     }
 
     private List<float[]> parseVectors(String responseBody, int expectedCount) {

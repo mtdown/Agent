@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -126,6 +128,48 @@ class RagSearchServiceImplTest {
         ragSearchService.search(user(), request);
 
         verify(vectorStore).search(any(float[].class), anySet(), org.mockito.ArgumentMatchers.eq(6));
+    }
+
+    @Test
+    void searchFillsPhaseTimings() {
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(1L));
+        when(embeddingClient.embed(anyList())).thenReturn(List.of(new float[]{0.1f}));
+        when(vectorStore.search(any(float[].class), anySet(), anyInt())).thenReturn(List.of());
+
+        RagSearchRequest request = new RagSearchRequest();
+        request.setQuery("低保怎么申请");
+        RagSearchResult result = ragSearchService.search(user(), request);
+
+        SearchTimings t = result.getTimings();
+        assertNotNull(t, "timings must always be present (null-safe for consumers)");
+        assertNotNull(t.getPermissionMs());
+        assertNotNull(t.getDocCountMs());
+        assertNotNull(t.getDocNumberMs());
+        assertNotNull(t.getEmbedMs());
+        assertNotNull(t.getVectorMs());
+        assertNotNull(t.getTotalMs());
+    }
+
+    @Test
+    void docNumberSaturationLeavesEmbedAndVectorTimingsNull() {
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(10L));
+        when(wikiChunkMapper.selectList(any())).thenReturn(
+                List.of(chunk(100L, 10L, 0, "渝府办发〔2026〕24号"),
+                        chunk(101L, 10L, 1, "渝府办发〔2026〕24号"),
+                        chunk(102L, 10L, 2, "渝府办发〔2026〕24号")));
+
+        RagSearchRequest request = new RagSearchRequest();
+        request.setQuery("渝府办发〔2026〕24号的主要内容");
+        request.setTopK(3);
+        RagSearchResult result = ragSearchService.search(user(), request);
+
+        SearchTimings t = result.getTimings();
+        assertNotNull(t.getDocNumberMs());
+        assertNull(t.getEmbedMs(), "unexecuted phases stay null, not a misleading 0");
+        assertNull(t.getVectorMs());
+        assertNotNull(t.getTotalMs());
     }
 
     @Test

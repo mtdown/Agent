@@ -50,9 +50,10 @@ public class RagProperties {
 
     @Data
     public static class Embedding {
+        // 与 application.yml 默认保持一致：云端 DashScope；本地 Ollama 需显式覆盖 base-url
         private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
         private String apiKey = "";
-        private String model = "text-embedding-v3";
+        private String model = "qwen3.7-text-embedding-flash";
         private int timeoutSeconds = 30;
 
         public boolean isConfigured() {

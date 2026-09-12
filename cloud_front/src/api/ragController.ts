@@ -57,11 +57,38 @@ export interface RagAskUsage {
   completionTokens?: number
 }
 
+/** 检索子步骤耗时（未执行的阶段为 null，如文号命中占满 topK 时跳过向量化） */
+export interface RagSearchTimings {
+  permissionMs?: number | null
+  docCountMs?: number | null
+  docNumberMs?: number | null
+  embedMs?: number | null
+  vectorMs?: number | null
+  totalMs?: number | null
+}
+
 export interface RagAskDone {
   finishReason: string
   thinkingMs?: number
   answerMs?: number
   usage?: RagAskUsage | null
+  // ---- 调用明细（增量字段，旧消费方可忽略）----
+  /** 问答开始墙钟时间（epoch ms） */
+  startedAt?: number
+  /** 问答结束墙钟时间（epoch ms） */
+  finishedAt?: number
+  /** 全链路总耗时 */
+  totalMs?: number
+  /** 检索阶段总耗时 */
+  retrievalMs?: number
+  /** 引用与 prompt 构造耗时 */
+  promptMs?: number
+  /** LLM 首个输出 delta 的耗时（未产出为 null） */
+  firstTokenMs?: number | null
+  /** LLM 流式调用总耗时 */
+  llmMs?: number
+  /** 检索子步骤耗时明细 */
+  steps?: RagSearchTimings | null
 }
 
 export interface RagAskMeta {

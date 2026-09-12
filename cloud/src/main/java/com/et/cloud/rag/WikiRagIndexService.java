@@ -36,11 +36,12 @@ public interface WikiRagIndexService {
     void deleteSpaceChunks(Long spaceId);
 
     /**
-     * Admin backfill: (re)build indexes for all live Markdown documents.
+     * Admin backfill: (re)builds indexes for all live Markdown documents.
      * Idempotent — documents whose ACTIVE chunks already match their content
-     * version are skipped.
+     * version are skipped, unless force is set (used after switching the
+     * embedding model: all vectors must be regenerated with the new model).
      */
-    RagRebuildReport rebuildAll();
+    RagRebuildReport rebuildAll(boolean force);
 
     /**
      * Daily reconciliation: invalidate ACTIVE chunks whose document is gone

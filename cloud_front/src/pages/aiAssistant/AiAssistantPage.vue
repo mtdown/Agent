@@ -102,6 +102,7 @@
                 </div>
                 <!-- 耗时与 token 统计 -->
                 <div v-if="msg.stats" class="stats-line">
+                  <span v-if="msg.trace?.totalMs != null">总计 {{ formatMs(msg.trace.totalMs) }}</span>
                   <span v-if="msg.stats.thinkingMs != null">思考 {{ formatMs(msg.stats.thinkingMs) }}</span>
                   <span v-if="msg.stats.answerMs != null">回答 {{ formatMs(msg.stats.answerMs) }}</span>
                   <span v-if="msg.stats.usage">
@@ -110,6 +111,23 @@
                     }}
                   </span>
                   <span v-if="msg.stats.deepThinking" class="stats-mode">深度思考模式</span>
+                </div>
+                <!-- 调用明细：分步耗时时间线（默认收起） -->
+                <div v-if="msg.trace" class="trace-panel">
+                  <a-collapse ghost>
+                    <a-collapse-panel key="t" :header="`调用明细 · 总耗时 ${formatMs(msg.trace.totalMs ?? 0)}`">
+                      <div class="trace-timeline">
+                        <div class="trace-row trace-time">开始 {{ formatClock(msg.trace.startedAt) }}</div>
+                        <div v-for="s in traceSteps(msg)" :key="s.label" class="trace-row">
+                          <span class="trace-label">{{ s.label }}</span>
+                          <span class="trace-value" :class="{ skipped: s.skipped }">
+                            {{ s.skipped ? '跳过' : formatMs(s.ms ?? 0) }}
+                          </span>
+                        </div>
+                        <div class="trace-row trace-end">结束 {{ formatClock(msg.trace.finishedAt) }}</div>
+                      </div>
+                    </a-collapse-panel>
+                  </a-collapse>
                 </div>
                 <div v-if="msg.stopped" class="stopped-text">已手动停止生成</div>
                 <div v-if="msg.status === 'error'" class="error-text">
@@ -239,7 +257,7 @@
               <span v-if="k.createTime">{{ formatKeyTime(k.createTime) }}</span>
             </div>
           </div>
-          <a-popconfirm title="删除后立即失效，确定？" @confirm="deleteKey(k.id)">
+          <a-popconfirm title="删除后立即失效，确定？" @confirm="deleteKey(k.id!)">
             <a-button type="link" danger size="small">删除</a-button>
           </a-popconfirm>
         </div>
@@ -271,7 +289,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import {
   ApiOutlined,
   CloseOutlined,
@@ -287,6 +305,7 @@ import {
   type RagAskMeta,
   type RagAskUsage,
   type RagCitation,
+  type RagSearchTimings,
 } from '@/api/ragController'
 import {
   createRagApiKeyUsingPost,
@@ -347,6 +366,17 @@ interface ChatStats {
   usage?: RagAskUsage | null
   deepThinking?: boolean
 }
+/** 一轮问答的调用明细（SSE done 携带的分步耗时时间线） */
+interface ChatTrace {
+  startedAt?: number
+  finishedAt?: number
+  totalMs?: number
+  retrievalMs?: number
+  promptMs?: number
+  firstTokenMs?: number | null
+  llmMs?: number
+  steps?: RagSearchTimings | null
+}
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -357,6 +387,7 @@ interface ChatMessage {
   truncated?: boolean
   stopped?: boolean
   stats?: ChatStats
+  trace?: ChatTrace
 }
 
 const messages = ref<ChatMessage[]>([])
@@ -390,6 +421,33 @@ const formatMs = (ms: number) => {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
+/** epoch ms -> HH:mm:ss.mmm（本地时区），用于时间线的开始/结束时间 */
+const formatClock = (epochMs?: number | string) => {
+  // 后端把 Long 序列化为字符串，必须 Number() 归一化，否则 new Date("1789…") 是 Invalid Date
+  const n = Number(epochMs)
+  if (epochMs == null || !Number.isFinite(n)) return '-'
+  const d = new Date(n)
+  const pad = (v: number, w = 2) => String(v).padStart(w, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
+}
+
+/** 明细面板的步骤行：固定顺序；值为 null 表示该步未执行（如文号命中占满 topK 跳过向量化） */
+const traceSteps = (msg: ChatMessage): { label: string; ms?: number | null; skipped: boolean }[] => {
+  const t = msg.trace
+  if (!t) return []
+  const s = t.steps ?? {}
+  const rows = [
+    { label: '检索 · 权限范围过滤', ms: s.permissionMs },
+    { label: '检索 · 授权文档计数', ms: s.docCountMs },
+    { label: '检索 · 文号精确匹配', ms: s.docNumberMs },
+    { label: '检索 · 查询向量化（embedding）', ms: s.embedMs },
+    { label: '检索 · 向量相似搜索', ms: s.vectorMs },
+    { label: '构造引用与提示词', ms: t.promptMs },
+    { label: 'LLM 首 token', ms: t.firstTokenMs },
+  ]
+  return rows.map((r) => ({ ...r, skipped: r.ms == null }))
+}
+
 // ---- 发送与流式接收 ----
 const send = async () => {
   const query = inputText.value.trim()
@@ -399,7 +457,13 @@ const send = async () => {
   abortController.value = new AbortController()
 
   messages.value.push({ role: 'user', content: query })
-  const assistantMsg: ChatMessage = { role: 'assistant', content: '', status: 'streaming' }
+  // reactive() 是必须的：push 进响应式数组的是原始引用，后续 content += 若直接改原始对象
+  // 会绕过 Vue3 Proxy，流式 delta 不触发重渲染（表现为文字积压、点一下才整段蹦出）
+  const assistantMsg: ChatMessage = reactive({
+    role: 'assistant',
+    content: '',
+    status: 'streaming',
+  })
   messages.value.push(assistantMsg)
   await scrollToBottom()
 
@@ -434,6 +498,27 @@ const send = async () => {
             answerMs: done.answerMs ?? undefined,
             usage: done.usage ?? null,
             deepThinking: deepThinking.value,
+          }
+          // 后端 Long 一律序列化为字符串（防 JS 精度丢失），前端统一 Number() 归一化；
+          // steps 里 null 表示该步未执行（如文号命中占满 topK 跳过向量化），必须保留 null 而非 Number(null)=0
+          const num = (v?: number | string | null): number | null | undefined =>
+            v == null ? v : Number(v)
+          assistantMsg.trace = {
+            startedAt: num(done.startedAt) ?? undefined,
+            finishedAt: num(done.finishedAt) ?? undefined,
+            totalMs: num(done.totalMs) ?? undefined,
+            retrievalMs: num(done.retrievalMs) ?? undefined,
+            promptMs: num(done.promptMs) ?? undefined,
+            firstTokenMs: num(done.firstTokenMs),
+            llmMs: num(done.llmMs) ?? undefined,
+            steps: {
+              permissionMs: num(done.steps?.permissionMs),
+              docCountMs: num(done.steps?.docCountMs),
+              docNumberMs: num(done.steps?.docNumberMs),
+              embedMs: num(done.steps?.embedMs),
+              vectorMs: num(done.steps?.vectorMs),
+              totalMs: num(done.steps?.totalMs),
+            },
           }
         },
         onError: (msg) => {
@@ -1067,6 +1152,54 @@ onMounted(() => {
 
 .stats-mode {
   color: #e07a2d;
+}
+
+/* 调用明细时间线 */
+.trace-panel {
+  margin-top: 2px;
+}
+
+.trace-panel :deep(.ant-collapse-header) {
+  padding: 2px 0 !important;
+  color: #a08c68 !important;
+  font-size: 12px;
+}
+
+.trace-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.trace-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.trace-label {
+  color: #8a7a5f;
+}
+
+.trace-value {
+  color: #6b4f1d;
+  font-variant-numeric: tabular-nums;
+}
+
+.trace-value.skipped {
+  color: #c9bda3;
+}
+
+.trace-time {
+  color: #a08c68;
+}
+
+.trace-end {
+  color: #a08c68;
+  border-top: 1px dashed #d8c9ab;
+  padding-top: 4px;
+  margin-top: 4px;
 }
 
 .stopped-text {

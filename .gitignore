@@ -42,6 +42,9 @@ build/
 eval/tmp/
 eval/.env
 
+### Local secrets (injected by start-dev.ps1) ###
+.env.dev
+
 ### Local runtime and diagnostics ###
 .workbuddy/
 tmp/
