@@ -27,4 +27,4 @@
 
 ## 5. 过程中的问题
 
-- [x] 5.1 **`git rm` 在本机环境会连带删除整个目录**：删除 2 个结果文件后，`eval/` 下全部 40 个文件从工作区消失；`git status` 显示其中 38 个是**未暂存的** ` D`（只有指定的 2 个被暂存），说明并非 git 按指令执行，而是目录被整体清掉。已用 `git restore --source=HEAD --staged --worktree eval/` 完整恢复，随后改用 `rm` + `git add -A` 完成删除并逐项验证目录完整性。已记入 `IssueLog.xlsx`。
+- [x] 5.1 **工作区内的 `git rm` 会删掉该路径第一层目录的整棵子树**（2026-09-14 已 A/B 复现，归因经修正）：`git rm eval/results/*.json` ×2 后，`eval/` 全部 40 个文件从工作区消失，`cloud/` `openspec/` `docs/` 未受影响；`git status` 显示 38 个**未暂存的** ` D`、仅指定的 2 个为暂存。对照实验（同命令、同 git 二进制，唯一变量=位置）：`/tmp` 下仅删目标文件（行为正常）；工作区内 `git rm aa/bb/cc/f.json` 会删掉整个 `aa/`（**含未出现在命令中的 `aa/other/keep.txt`**），同级 `zz/` 与根文件存活 → **影响范围 = 被删路径的第一层目录，非整个工作区**，根因是「工作区路径 + 沙箱」组合行为而非 git 语义。已用 `git restore --source=HEAD --staged --worktree eval/` 完整恢复，改用 `rm` + `git add -A` 完成删除。附带损失：`eval/tmp/`（gitignored）同批丢失且无法从 git 恢复。已记入 `IssueLog.xlsx`。
