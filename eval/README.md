@@ -13,6 +13,30 @@
 3. **全程只读。** 本目录下所有脚本不写业务库、不改后端、不触发索引重建。
    执行前后 `wiki_chunk` 应恒为 2061 行、全 ACTIVE。
 
+## 端到端流程
+
+评测从语料走到报告分四个阶段。**日常重跑只需第 3 阶段**；第 1、2 阶段仅在换语料或改题型时才需要整条重走。
+
+```text
+  1. 语料准备            2. 数据集构建              3. 运行评测           4. 产出报告
+  -------------          -----------------          -------------         -------------
+  政务文档入库           出题（5 类题型）           golden.v1.jsonl       逐题明细 JSON
+       |                      |                         |                     |
+       v                      v                         v                     v
+  切片 + 向量化           摘抄校验 + 去重            检索 top10            results/*.json
+  wiki_chunk              AI 预筛 + 人工复核         本地截断算 K          audit/baseline-report.md
+  （216 篇 / 2061 块）    golden.v1.jsonl            recall / mrr / 泄漏
+```
+
+| 阶段 | 输入 | 关键命令 | 产出物 | 是否进版本库 |
+|---|---|---|---|---|
+| **1 语料准备** | 政务文档（当前 216 篇） | 站内导入接口；`corpus_audit.py` 体检 | 库内 `wiki_chunk`（2061 块 + 向量） | 否（在库） |
+| **2 数据集构建** | 库内语料 + 政策↔解读配对 | `generate_*.py` → `merge_candidates.py` → `llm_judge.py` → `validate.py` → `gen_manifest.py` | `golden.v1.jsonl`（99 题） | 是 |
+| **3 运行评测** | `golden.v1.jsonl` + 已启动的后端 | `run_eval.py`（`--probe` 预检） | `results/baseline-<ts>-<mode>.json` | 是（**仅保留当前基线**） |
+| **4 产出报告** | 第 3 阶段的结果 JSON | 由 `run_eval.py` 自动生成 | `audit/baseline-report.md` | 是 |
+
+各阶段的完整命令见下文「脚本」与「跑评测」两节；想改某一步时该动哪些文件，见「改动影响面」。
+
 ## 目录
 
 | 路径 | 说明 |
@@ -23,8 +47,9 @@
 | `audit/human-review-report.md` | 人工评测报告：核验方法、与 AI 预评审的差异、100 题逐题处置表 |
 | `manifest.json` | 数据集快照：语料 hash、chunk 统计、模型版本、题量配比 |
 | `pairs.json` | 政策 ↔ 官方解读配对（31 组） |
-| `pair-audit.md` / `corpus-audit.md` | 语料体检与配对审计 |
-| `scripts/` | 构建脚本（见下） |
+| `results/` | 评测结果 JSON，**只保留当前对外基线**（唯一一份，见「当前对外基线」） |
+| `audit/` | 审计与报告：语料体检、配对审计、人工复核、AI 预筛报告、`baseline-report.md`（评测报告） |
+| `scripts/` | 构建与评测脚本（见下） |
 | `tools/review.html` | 人工筛选页（离线可用，进度存 localStorage） |
 | `tmp/` | 中间产物与缓存，**已 gitignore** |
 | `.env` | 密钥与模型配置，**已 gitignore** |
@@ -142,7 +167,73 @@ python eval/scripts/run_eval.py --retriever offline --offline-vector recompute
   offline 模式无权限过滤，会标记 `notApplicable` 而不是产出假的 0 泄漏
 - 两种 retriever 的分数**不可混合平均**，结果 JSON 记录了 `retriever` 与 `embeddingModel`
 
-产物：`eval/results/baseline-<ts>-<mode>.json`（逐题明细）+ `eval/audit/baseline-report.md`。
+产物：`eval/results/baseline-<ts>-<mode>.json`（逐题明细）+ `eval/audit/baseline-report.md`
+（单次快照，每次跑都覆盖，只反映最近一轮）。
+
+### 当前对外基线
+
+对外引用的指标一律取自下表这一份，`results/` 中不再保留其他结果。
+
+| 项 | 值 |
+|---|---|
+| 文件 | `eval/results/baseline-20260912-151958-http.json` |
+| 运行 ID | `baseline-20260912-151958-http` |
+| 通道 | `http` → `POST http://localhost:8123/api/open/rag/search` |
+| embedding | DashScope `qwen3.7-text-embedding-flash`，**1024 维** |
+| 数据集 | `golden.v1.jsonl` · sha256 `7f37862f…` |
+| 采集时间 | 2026-09-12 15:19:38 → 15:19:58 |
+
+> **模型归属说明**：该结果 JSON 内 `config.embeddingModel` 为 `null`——`run_eval.py` 有意不读后端配置，
+> 以免拿 offline 模式的模型名冒名顶替。上表的模型归属来自**人工核对**（非程序探测），依据为
+> `openspec/changes/switch-embedding-dashscope/tasks.md` 的 5.3（`force=true` 全量重嵌入 216 篇、
+> 核对库内维度 1024）与 5.4（随后以 http 模式跑出该结果），以及 `application.yml` 的
+> `rag.embedding.model` 默认值。
+
+**整体指标**（75 题计入召回）
+
+| 指标 | 值 |
+|---|---|
+| recall@6 | 0.4338 |
+| docRecall@6 | 0.8533 |
+| docRecall@1 | 0.4667 |
+| mrr | 0.3975 |
+| hitRate@6 | 0.7200 |
+
+**分类指标**
+
+| 类别 | 题数 | recall@6 | docRecall@6 | mrr |
+|---|---|---|---|---|
+| A 配对 | 54 | 0.2992 | 0.7963 | 0.3360 |
+| B 文号 | 9 | 0.6525 | 1.0000 | 0.6852 |
+| E 合成 | 12 | 0.8750 | 1.0000 | 0.4583 |
+
+**其他口径**
+
+- C 类无答案 14 题：`nonEmptyReturnRate = 1.0`——**全部返回了内容**，说明拒答不能只靠检索层阈值
+- D 类权限 10 题：`leakCount = 0`（非成员零泄漏），成员侧镜像 `recall@6 = 0.3331`，未因权限过滤误伤
+
+两条最该记住的信号：`docRecall@6 = 0.8533` 而 `recall@6 = 0.4338` → **找得到文件、定不准段落**，
+对症手段是精排而非换模型；B 类 `docRecall@6 = 1.0` → 文号精确匹配层确实生效。
+
+## 改动影响面
+
+想动评测链路的某一环时，先查这张表：它给出该改哪些文件、是否必须重建索引、是否必须重新对齐 gold。
+
+| 想改什么 | 涉及文件 | 重建索引 | 重对齐 gold | 说明 |
+|---|---|---|---|---|
+| **切块参数**（大小/重叠） | `cloud/src/main/java/com/et/cloud/rag/MarkdownChunker.java` 的 `MAX_CHUNK_LENGTH` / `MIN_CHUNK_LENGTH` / `OVERLAP_LENGTH` | ✅ 必须（全量） | ⚠️ 视情况 | 三个值是 `static final` **硬编码**，改完需重编译 + 全量重建；`chunkIndex` 会变，而 `gold[].quote` 是唯一能跨切块方案存活的锚点（当前覆盖率仅 37%） |
+| **embedding 模型** | `cloud/src/main/resources/application.yml` 的 `rag.embedding.model`；`RagProperties.Embedding` | ✅ 必须（`POST /admin/rag/rebuild?force=true`） | ❌ | 换模型必须全量回填，否则维度与语义都不匹配。`rebuildAll` 默认按 `isUpToDate` 跳过，**不加 `force` 不会重算** |
+| **题型配比 / 出题口径** | `eval/scripts/generate_*.py`、`merge_candidates.py`、`llm_judge.py`、`validate.py`、`gen_manifest.py` | ❌ | ❌ | 走「出题 → 汇总 → 预筛 → 人工复核 → 校验 → 快照」，冻结 `golden.v1.jsonl` 前必须过摘抄校验 |
+| **指标口径** | `eval/scripts/run_eval.py`（指标计算段与 `METRIC_KEYS`） | ❌ | ❌ | 改口径会让**所有历史结果失去可比性**，须同步重跑并替换基线 |
+| **检索参数** | `eval/scripts/run_eval.py` 的 `FETCH_K` | ❌ | ❌ | 对外口径固定「一次取 top10、本地截断算 K ∈ {1,3,5,6,10}」；改动同样影响可比性 |
+| **语料来源 / 规模** | 站内导入接口、库内 `wiki_chunk` | ✅ 增量或全量 | ⚠️ 新语料需重新出题 | 建议用**独立空间**做跨库对照；混入既有空间会破坏空间级对照 |
+| **检索链路本身** | `cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java` | ❌ | ❌ | 改链路后必须重跑评测并**替换基线**，同时更新本文件的「当前对外基线」 |
+
+**维护检查项**——改动收尾时确认三件事：
+
+1. `results/` 仍只有唯一基线，旧结果已移除
+2. 本文件的「当前对外基线」指标表已随重跑更新
+3. `openspec validate <change-id> --strict` 通过
 
 ## AI 预筛（LLM-as-Judge）
 
