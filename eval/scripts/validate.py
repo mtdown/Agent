@@ -33,17 +33,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lib_eval import EVAL_DIR, db_conn, load_env, norm_flat, quote_hit  # noqa: E402
 
-CATEGORIES = {"pair", "docnum", "unanswerable", "permission", "synthetic"}
+# expand-rag-eval-coverage 新增 crossdoc / single 两类（见 design D3）
+CATEGORIES = {"pair", "docnum", "unanswerable", "permission", "synthetic",
+              "crossdoc", "single"}
 CAT_CN = {
     "pair": "A 配对题", "docnum": "B 文号题", "unanswerable": "C 无答案题",
     "permission": "D 权限题", "synthetic": "E 合成题",
+    "crossdoc": "F 跨文档题", "single": "G 单文档题",
 }
-# 目标配比（tasks.md 3.7 产出值），仅作偏差提示，不作为硬性门槛
+# 必须有 gold 的类别（C 类应无 gold；D 类走 permission 结构）
+GOLD_REQUIRED_CATS = {"pair", "docnum", "synthetic", "crossdoc", "single"}
+# 目标配比（v1 tasks.md 3.7 产出值）。v2 题型构成不同，此处降级为提示、不作为门槛
 TARGET_MIX = {"pair": 54, "docnum": 9, "unanswerable": 15, "permission": 10, "synthetic": 12}
 
 REQUIRED_TOP = ["id", "category", "question", "answer", "expectRefusal",
                 "gold", "source", "permission", "meta"]
 REQUIRED_META = ["qType", "goldVerified", "generatedBy", "reviewState"]
+# reviewedBy 为 expand-rag-eval-coverage 新增；v1 数据集没有该字段，故只提示不报错
+RECOMMENDED_META = ["reviewedBy"]
 
 CROSS_REGION_KEYS = ("四川", "成都")  # 川渝通办合法存在，仅提示人工确认
 
@@ -209,15 +216,27 @@ def validate(rows: list[dict], anchors: dict, docinfo: dict,
                 errors.append(f"[{rid}] D 类 meta.mirrorOf 缺失（需指向被镜像的 A/B 题 id）")
             elif meta["mirrorOf"] not in seen_ids and meta["mirrorOf"] not in {x.get("id") for x in rows}:
                 errors.append(f"[{rid}] D 类 mirrorOf={meta['mirrorOf']} 在数据集中不存在")
-        elif cat in ("pair", "docnum", "synthetic"):
+        elif cat in GOLD_REQUIRED_CATS:
             if not gold:
                 errors.append(f"[{rid}] {CAT_CN[cat]} gold 不能为空")
 
-        # --- golden 模式：reviewState 必须已人工定稿 ---
+        # --- reviewedBy：v2 新增字段，缺失只提示（v1 数据集没有该字段）---
+        for k in RECOMMENDED_META:
+            if k not in meta:
+                warns.append(f"[{rid}] meta 建议补充 {k}（区分人工复核 / 自动生成）")
+
+        # --- golden 模式：复核必须已定稿 ---
+        # v1 题由人工复核（reviewState ∈ kept/edited）；v2 新题由自动闸门产出
+        # （reviewState=auto + reviewedBy=auto）。两者都可定稿，但来源必须能区分。
         if strict_golden:
             st = meta.get("reviewState")
-            if st not in ("kept", "edited"):
-                errors.append(f"[{rid}] golden 数据集要求 meta.reviewState ∈ {kept_edited()}，当前 {st!r}")
+            by = meta.get("reviewedBy")
+            if by == "auto":
+                if st != "auto":
+                    errors.append(f"[{rid}] reviewedBy=auto 的题 meta.reviewState 应为 'auto'，当前 {st!r}")
+            elif st not in ("kept", "edited"):
+                errors.append(f"[{rid}] golden 数据集要求 meta.reviewState ∈ {kept_edited()}"
+                              f"（自动生成题除外，须标 reviewedBy='auto'），当前 {st!r}")
 
         # --- 跨辖区提示（非错误）---
         info = docinfo.get(int(gold[0]["docId"])) if gold and has_db else None
@@ -226,9 +245,16 @@ def validate(rows: list[dict], anchors: dict, docinfo: dict,
 
     # --- 整体配比 ---
     total = len(rows)
-    missing_cats = [c for c in CATEGORIES if cat_count[c] == 0]
+    # 基线五类必须齐全；expand-rag-eval-coverage 新增的两类缺失只作提示
+    # （单独校验 golden.v1.jsonl 时 crossdoc / single 必然为空，属预期）
+    baseline_cats = ("pair", "docnum", "unanswerable", "permission", "synthetic")
+    missing_cats = [c for c in baseline_cats if cat_count[c] == 0]
     if missing_cats:
-        errors.append(f"[整体] 五类不齐，缺少：{', '.join(CAT_CN[c] for c in missing_cats)}")
+        errors.append(f"[整体] 基线五类不齐，缺少：{', '.join(CAT_CN[c] for c in missing_cats)}")
+    new_missing = [c for c in ("crossdoc", "single") if cat_count[c] == 0]
+    if new_missing:
+        warns.append(f"[整体] 未包含新题型：{', '.join(CAT_CN[c] for c in new_missing)}"
+                     f"（单独校验 v1 数据集时属预期）")
     if total < 50:
         warns.append(f"[整体] 题量仅 {total}，统计意义有限（目标约 90 题）")
 

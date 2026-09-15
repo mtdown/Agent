@@ -356,6 +356,9 @@ def main():
     ap.add_argument("--offline-vector", choices=["db", "recompute"], default="db")
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 题（调试用）")
     ap.add_argument("--probe", action="store_true", help="仅探测后端与 key，不跑评测")
+    ap.add_argument("--exclude-dup-pairs", action="store_true",
+                    help="剔除带 meta.dupOf 标记的单文档题（与 crossdoc 近似重复者），"
+                         "用于产出一组不含近重复的对照指标")
     ap.add_argument("--no-report", action="store_true")
     args = ap.parse_args()
 
@@ -384,6 +387,10 @@ def main():
         sys.exit(1)
 
     rows = load_golden(args.golden)
+    if args.exclude_dup_pairs:
+        before = len(rows)
+        rows = [r for r in rows if not (r.get("meta") or {}).get("dupOf")]
+        print(f"[run] --exclude-dup-pairs：{before} -> {len(rows)} 题（剔除近重复的单文档题）")
     if args.limit:
         rows = rows[: args.limit]
     by_id = {r["id"]: r for r in rows}
@@ -467,7 +474,9 @@ def main():
     # ---- 汇总 ----
     scored = [r for r in per_question if r.get("metrics")]
     by_cat = {}
-    for cat in ("pair", "docnum", "synthetic"):
+    # expand-rag-eval-coverage：新增 crossdoc / single 必须一并分组统计，
+    # 否则新题只进 overall、不进分组报告（等于把难度差异藏起来）
+    for cat in ("pair", "docnum", "synthetic", "crossdoc", "single"):
         sub = [r for r in scored if r["category"] == cat]
         if sub:
             by_cat[cat] = aggregate(sub, METRIC_KEYS)
@@ -660,6 +669,10 @@ def gen_report(result, by_id):
     L.append(f"| 调用失败 | {c['errors']} |\n")
 
     L.append("### 整体指标（仅 gold 非空的题）\n")
+    if len(result["byCategory"]) > 3:
+        L.append("> 注：本版数据集含 `crossdoc`（跨文档，难）与 `single`（单文档，易）两类新题型，"
+                 "**overall 受题型构成影响，请以「分类明细」为准**；"
+                 "与不含这两类的历史版本**不可直接比较**。\n")
     L.append("| 指标 | 数值 |\n|---|---|")
     for k in METRIC_KEYS:
         L.append(f"| {k} | {ov.get(k)} |")
@@ -667,7 +680,8 @@ def gen_report(result, by_id):
 
     L.append("### 分类明细\n")
     L.append("| 类别 | 题数 | recall@6 | docRecall@6 | hitRate@6 | mrr |\n|---|---|---|---|---|---|")
-    name = {"pair": "A 配对", "docnum": "B 文号", "synthetic": "E 合成"}
+    name = {"pair": "A 配对", "docnum": "B 文号", "synthetic": "E 合成",
+            "crossdoc": "F 跨文档", "single": "G 单文档"}
     for cat, agg in result["byCategory"].items():
         L.append(
             f"| {name.get(cat, cat)} | {agg['count']} | {agg['recall@6']} | "
