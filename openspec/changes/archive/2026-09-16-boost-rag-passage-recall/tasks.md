@@ -81,7 +81,10 @@
       接受 0.7930 收口，或另立 change 主攻"池深 × 精排"（分组重排 / 查询改写）
       → **负责人 2026-09-16 决策：接受 0.7930 收口**（原 0.85 目标未达成，理由见 design.md §7：
       剩余 5.7pt 中 73.3% 属"池里已有、重排没排进 top-6"，需另立 change 主攻一阶段排序质量）
-- [ ] 5.4 经负责人确认后 `upload.ps1` 上传分支并发起 merge request（不自行合并 main）
+- [x] 5.4 经负责人确认后上传分支并发起 merge request（不自行合并 main）
+      → 负责人 2026-09-16 确认收口归档；已推送 `323c86c..9721543`（6 个提交），
+      `git fetch origin` 后 `rev-list --count upstream..HEAD = 0` 验证落地。
+      **MR 待负责人在远程平台发起与合并**（AI 不自行合并 main）
 - [x] 5.5 同步主 spec `wiki-rag-retrieval`（本 change 新增能力，4 条 ADDED requirement 转正）并归档到
       `openspec/changes/archive/2026-09-16-boost-rag-passage-recall/`
 
