@@ -62,6 +62,13 @@ declare namespace API {
     spaceId: string | number
   }
 
+  type batchImportJsonUsingPOSTParams = {
+    /** folderId */
+    folderId?: string | number
+    /** spaceId */
+    spaceId: string | number
+  }
+
   type BaseResponseListSpaceLevel_ = {
     code?: number
     data?: SpaceLevel[]

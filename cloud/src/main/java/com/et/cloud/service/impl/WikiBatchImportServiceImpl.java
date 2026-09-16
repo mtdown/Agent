@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -40,6 +41,12 @@ import java.util.Map;
 public class WikiBatchImportServiceImpl implements WikiBatchImportService {
 
     private static final int MAX_TITLE_LENGTH = 128;
+
+    /**
+     * A JSON corpus is submitted whole, so the entry count is unbounded and the file size is the
+     * only guard. Kept equal to the servlet {@code spring.servlet.multipart.max-file-size}.
+     */
+    private static final long MAX_JSON_FILE_SIZE = 30L * 1024 * 1024;
 
     @Value("${wiki.batch-import.max-items:20}")
     private int maxItems = 20;
@@ -122,6 +129,30 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         return results;
     }
 
+    @Override
+    public List<BatchImportItemResult> importJson(Long spaceId, Long folderId, MultipartFile file, User loginUser) {
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "请选择要导入的 JSON 文件");
+        ThrowUtils.throwIf(file.getSize() > MAX_JSON_FILE_SIZE, ErrorCode.PARAMS_ERROR,
+                "JSON 文件大小不能超过 " + (MAX_JSON_FILE_SIZE / 1024 / 1024) + "M");
+        WikiSpace wikiSpace = wikiSpaceService.requireEditableSpace(spaceId, loginUser);
+        Long targetFolderId = resolveFolderId(folderId, wikiSpace, loginUser);
+
+        // entries are read, imported and released one at a time; a bad entry only costs its own result
+        List<BatchImportItemResult> results = new ArrayList<>();
+        int entries = JsonDocumentSplitter.split(readBytes(file), imported -> {
+            String input = entryInput(imported);
+            try {
+                Long documentId = saveImported(imported, wikiSpace, targetFolderId, loginUser);
+                results.add(BatchImportItemResult.success(input, documentId, imported.getTitle()));
+            } catch (Exception e) {
+                log.warn("batch json import failed for {}", input, e);
+                results.add(BatchImportItemResult.failed(input, failureMessage(e)));
+            }
+        });
+        ThrowUtils.throwIf(entries == 0, ErrorCode.PARAMS_ERROR, "JSON 文件中没有可导入的条目");
+        return results;
+    }
+
     private Long saveImported(ImportedWikiDocument imported, WikiSpace wikiSpace, Long folderId, User loginUser) {
         DocumentWiki documentWiki = new DocumentWiki();
         documentWiki.setTitle(imported.getTitle());
@@ -142,6 +173,23 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         ThrowUtils.throwIf(!saved, ErrorCode.OPERATION_ERROR, "保存文档失败");
         wikiCacheManager.clearSpace(wikiSpace.getId());
         return documentWiki.getId();
+    }
+
+    /**
+     * Stable per-entry identifier for the result list: the entry's url when it has one, otherwise
+     * its title. Never the array position, so a skipped or reordered entry cannot silently shift
+     * the source-entry -> document mapping the evaluation harness relies on.
+     */
+    private String entryInput(ImportedWikiDocument imported) {
+        return StrUtil.isNotBlank(imported.getSourceUrl()) ? imported.getSourceUrl() : imported.getTitle();
+    }
+
+    private byte[] readBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "读取文件失败");
+        }
     }
 
     private Long resolveFolderId(Long folderId, WikiSpace wikiSpace, User loginUser) {

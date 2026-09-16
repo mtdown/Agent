@@ -10,15 +10,13 @@ import java.util.regex.Pattern;
  * oversized sections are split by paragraph, tiny sections merged into neighbours,
  * adjacent chunks share a small overlap so clause context is not cut off.
  *
+ * <p>Every length and boundary decision comes from the supplied {@link ChunkerProfile}, so the
+ * pipeline stays a single implementation while Chinese and English documents each get parameters
+ * that fit their prose.
+ *
  * Pure static utility, no Spring / DB coupling.
  */
 public final class MarkdownChunker {
-
-    public static final int MAX_CHUNK_LENGTH = 600;
-
-    public static final int MIN_CHUNK_LENGTH = 100;
-
-    public static final int OVERLAP_LENGTH = 80;
 
     /**
      * Government document number, e.g. 渝府办发〔2026〕24号.
@@ -43,9 +41,9 @@ public final class MarkdownChunker {
     }
 
     /**
-     * Chunks a Markdown document.
+     * Chunks a Markdown document using the parameters of the given profile.
      */
-    public static List<MarkdownChunk> chunk(String content) {
+    public static List<MarkdownChunk> chunk(String content, ChunkerProfile profile) {
         List<MarkdownChunk> chunks = new ArrayList<>();
         if (content == null || content.isBlank()) {
             return chunks;
@@ -55,14 +53,14 @@ public final class MarkdownChunker {
         // 2. Split oversized sections by paragraph, keep heading path.
         List<Section> pieces = new ArrayList<>();
         for (Section section : sections) {
-            if (section.text.length() <= MAX_CHUNK_LENGTH) {
+            if (section.text.length() <= profile.getMaxChunkLength()) {
                 pieces.add(section);
                 continue;
             }
-            pieces.addAll(splitOversized(section));
+            pieces.addAll(splitOversized(section, profile));
         }
         // 3. Merge tiny sections forward (accumulate until >= MIN or end).
-        List<Section> merged = mergeTiny(pieces);
+        List<Section> merged = mergeTiny(pieces, profile);
         // 4. Emit chunks with overlap from previous chunk tail.
         String prevTail = null;
         int index = 0;
@@ -75,7 +73,7 @@ public final class MarkdownChunker {
                 text = prevTail + "\n" + text;
             }
             chunks.add(new MarkdownChunk(index++, section.headingPath, text));
-            prevTail = tailOf(text, OVERLAP_LENGTH);
+            prevTail = tailOf(text, profile.getOverlapLength());
         }
         return chunks;
     }
@@ -122,8 +120,9 @@ public final class MarkdownChunker {
         return sections;
     }
 
-    private static List<Section> splitOversized(Section section) {
+    private static List<Section> splitOversized(Section section, ChunkerProfile profile) {
         List<Section> parts = new ArrayList<>();
+        int cap = profile.getMaxChunkLength();
         String[] paragraphs = section.text.split("\n\\s*\n");
         StringBuilder buffer = new StringBuilder();
         for (String paragraph : paragraphs) {
@@ -131,13 +130,13 @@ public final class MarkdownChunker {
             if (p.isEmpty()) {
                 continue;
             }
-            if (buffer.length() + p.length() + 2 > MAX_CHUNK_LENGTH && buffer.length() > 0) {
+            if (buffer.length() + p.length() + 2 > cap && buffer.length() > 0) {
                 parts.add(new Section(section.headingPath, buffer.toString()));
                 buffer = new StringBuilder();
             }
-            if (p.length() > MAX_CHUNK_LENGTH) {
+            if (p.length() > cap) {
                 // single paragraph longer than the cap: hard-split by sentences-ish segments
-                for (String seg : hardSplit(p, MAX_CHUNK_LENGTH)) {
+                for (String seg : hardSplit(p, profile)) {
                     parts.add(new Section(section.headingPath, seg));
                 }
                 continue;
@@ -150,17 +149,28 @@ public final class MarkdownChunker {
         return parts;
     }
 
-    private static List<String> hardSplit(String text, int cap) {
+    /**
+     * Cuts an over-long run into windows of at most {@code profile.maxChunkLength}.
+     *
+     * <p>A window is closed at a sentence boundary when one is available past the half-way point,
+     * otherwise (English only) at a word boundary, and otherwise at the raw cap so that no word,
+     * decimal number or abbreviation is ever split in two.
+     */
+    private static List<String> hardSplit(String text, ChunkerProfile profile) {
+        int cap = profile.getMaxChunkLength();
         List<String> out = new ArrayList<>();
         int start = 0;
         while (start < text.length()) {
             int end = Math.min(start + cap, text.length());
             if (end < text.length()) {
-                int dot = text.lastIndexOf('。', end);
-                int semicolon = text.lastIndexOf('；', end);
-                int cut = Math.max(dot, semicolon);
-                if (cut > start + cap / 2) {
-                    end = cut + 1;
+                int sentence = profile.lastSentenceEnd(text, start, end);
+                if (sentence > start + cap / 2) {
+                    end = sentence + 1;
+                } else {
+                    int word = profile.lastWordBoundary(text, start, end);
+                    if (word > start + cap / 2) {
+                        end = word + 1;
+                    }
                 }
             }
             out.add(text.substring(start, end));
@@ -169,7 +179,7 @@ public final class MarkdownChunker {
         return out;
     }
 
-    private static List<Section> mergeTiny(List<Section> pieces) {
+    private static List<Section> mergeTiny(List<Section> pieces, ChunkerProfile profile) {
         List<Section> merged = new ArrayList<>();
         StringBuilder buffer = new StringBuilder();
         String headingPath = null;
@@ -178,7 +188,7 @@ public final class MarkdownChunker {
                 headingPath = piece.headingPath;
             }
             buffer.append(piece.text.strip()).append("\n\n");
-            if (buffer.length() >= MIN_CHUNK_LENGTH) {
+            if (buffer.length() >= profile.getMinChunkLength()) {
                 merged.add(new Section(headingPath, buffer.toString()));
                 buffer = new StringBuilder();
                 headingPath = null;
@@ -189,7 +199,7 @@ public final class MarkdownChunker {
                 merged.add(new Section(headingPath == null ? "" : headingPath, buffer.toString()));
             } else {
                 Section last = merged.get(merged.size() - 1);
-                if (last.text.length() + buffer.length() <= MAX_CHUNK_LENGTH) {
+                if (last.text.length() + buffer.length() <= profile.getMaxChunkLength()) {
                     last.text = last.text + buffer;
                 } else {
                     // merging would overflow the cap: emit the leftover as its own section

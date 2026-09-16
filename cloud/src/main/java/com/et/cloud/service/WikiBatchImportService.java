@@ -8,14 +8,22 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * Batch import of webpages and local documents into a Wiki destination.
+ * Batch import of webpages, local documents and JSON corpora into a Wiki destination.
  *
- * Every submitted item is isolated: one failing url or file never prevents the remaining items from
- * being imported.
+ * Every submitted item is isolated: one failing url, file or JSON entry never prevents the remaining
+ * items from being imported.
  */
 public interface WikiBatchImportService {
 
     List<BatchImportItemResult> importUrls(DocumentWikiBatchUrlImportRequest request, User loginUser);
 
     List<BatchImportItemResult> importFiles(Long spaceId, Long folderId, List<MultipartFile> files, User loginUser);
+
+    /**
+     * Splits one JSON corpus file into one document per entry and imports them all.
+     *
+     * <p>The entry count is deliberately not capped by {@code max-items}: the corpus arrives as a
+     * single file, so the file size limit is what bounds the request.
+     */
+    List<BatchImportItemResult> importJson(Long spaceId, Long folderId, MultipartFile file, User loginUser);
 }

@@ -57,4 +57,20 @@ public class DocumentWikiBatchController {
         return ResultUtils.success(
                 wikiBatchImportService.importFiles(spaceId, folderId, Arrays.asList(files), loginUser));
     }
+
+    /**
+     * One JSON corpus file becomes one document per entry. Unlike {@code /file} there is no entry
+     * count limit: the corpus is submitted as a single file, so only its size is bounded.
+     */
+    @PostMapping("/json")
+    public BaseResponse<List<BatchImportItemResult>> importJson(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("spaceId") Long spaceId,
+            @RequestParam(value = "folderId", required = false) Long folderId,
+            HttpServletRequest httpServletRequest) {
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "请选择要导入的 JSON 文件");
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR, "空间不能为空");
+        User loginUser = userService.getLoginUser(httpServletRequest);
+        return ResultUtils.success(wikiBatchImportService.importJson(spaceId, folderId, file, loginUser));
+    }
 }
