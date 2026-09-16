@@ -38,6 +38,7 @@ class WikiRagIndexServiceImplTest {
     private WikiChunkService wikiChunkService;
     private RagEmbeddingClient embeddingClient;
     private VectorStore vectorStore;
+    private LexicalIndex lexicalIndex;
     private WikiRagIndexServiceImpl indexService;
 
     @BeforeEach
@@ -47,6 +48,7 @@ class WikiRagIndexServiceImplTest {
         wikiChunkService = mock(WikiChunkService.class);
         embeddingClient = mock(RagEmbeddingClient.class);
         vectorStore = mock(VectorStore.class);
+        lexicalIndex = mock(LexicalIndex.class);
         RagProperties properties = new RagProperties();
         indexService = new WikiRagIndexServiceImpl();
         ReflectionTestUtils.setField(indexService, "documentWikiMapper", documentWikiMapper);
@@ -55,6 +57,7 @@ class WikiRagIndexServiceImplTest {
         ReflectionTestUtils.setField(indexService, "ragEmbeddingClient", embeddingClient);
         ReflectionTestUtils.setField(indexService, "ragProperties", properties);
         ReflectionTestUtils.setField(indexService, "vectorStore", vectorStore);
+        ReflectionTestUtils.setField(indexService, "lexicalIndex", lexicalIndex);
     }
 
     private DocumentWiki markdownDoc(long id, long spaceId, int version, String content) {
@@ -182,8 +185,11 @@ class WikiRagIndexServiceImplTest {
     void moveDocumentChunksUpdatesSpace() {
         indexService.moveDocumentChunks(1L, 10L, 20L);
         verify(wikiChunkMapper).moveByDocId(1L, 20L);
+        // both cached indexes must follow the move — not just the vector store
         verify(vectorStore).onChunksChanged(10L);
         verify(vectorStore).onChunksChanged(20L);
+        verify(lexicalIndex).onChunksChanged(10L);
+        verify(lexicalIndex).onChunksChanged(20L);
     }
 
     @Test

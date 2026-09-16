@@ -91,6 +91,37 @@ rag:
     timeout-seconds: 30
   retrieval:
     top-k: 6
+    # topK 硬上限：无上限时可一次请求整个空间（全量暴力余弦 + 巨量回传），并稀释下游 prompt
+    top-k-max: 50
+    # 粗排候选池：重排只能重排池子里已有的候选，池深决定 recall 的理论上限。
+    # 实测（399 题；oracle = 该深度下完美重排的理论上限，端到端 = 本系统实测 recall@6，
+    # 延迟为同一 120 题取样、单并发的客户端端到端耗时）：
+    #   深度 20  → oracle 0.7690 / 实测 0.7590（吃到上限 98.7%）
+    #   深度 50  → oracle 0.8600 / 实测 0.7930（92.2%），mean 516ms / p95 600ms
+    #   深度 100 → oracle 0.9061 / 实测 0.8030（88.6%），mean 720ms / p95 928ms
+    # 池越深，重排从 N 里挑 6 的精度越低（命中率衰减），故 50→100 只多 1.0pt 却多 190ms。
+    # 默认取 50；可用 RAG_CANDIDATE_POOL_SIZE / RAG_FUSION_POOL_SIZE 覆盖。
+    candidate-pool-size: ${RAG_CANDIDATE_POOL_SIZE:50}
+    # 融合池 = 交给重排的那一批候选的深度，与 candidate-pool-size 共同决定有效池深
+    fusion-pool-size: ${RAG_FUSION_POOL_SIZE:50}
+    # RRF 常数取文献默认值，刻意不针对评测集调参，保证收益可对外声明
+    rrf-k: 60
+    lexical:
+      # 中文 bigram 的 BM25 通道：零外部依赖，把候选池 oracle@50 从 0.8148 抬到 0.8600
+      enabled: true
+      k1: 1.2
+      b: 0.75
+    rerank:
+      enabled: ${RAG_RERANK_ENABLED:true}
+      # DashScope 原生 text-rerank 端点（注意不是 OpenAI 兼容 base-url）；与 embedding 复用同一把 key
+      base-url: ${RAG_RERANK_BASE_URL:https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank}
+      api-key: ${RAG_RERANK_API_KEY:${RAG_EMBEDDING_API_KEY:}}
+      # 同文档集实测 top 分：qwen3.7-text-rerank 0.9973 vs gte-rerank-v2 0.5897（无关文档 0.0321 vs 0.006）
+      model: ${RAG_RERANK_MODEL:qwen3.7-text-rerank}
+      timeout-seconds: 20
+      # 单次请求可送的最大文档数；必须 >= 有效池深，否则候选池会被静默截断。
+      # 与池深分开控制是为了让「池子多深」和「重排吃多深」能被独立观测。
+      max-documents: ${RAG_RERANK_MAX_DOCUMENTS:50}
   llm:
     # 回答生成 LLM（OpenAI 兼容 /chat/completions 流式）；key 走环境变量，未配置时问答接口返回可读错误
     base-url: ${RAG_LLM_BASE_URL:https://api.deepseek.com}

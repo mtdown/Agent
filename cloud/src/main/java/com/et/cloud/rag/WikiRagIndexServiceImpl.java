@@ -47,6 +47,9 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
     @Resource
     private VectorStore vectorStore;
 
+    @Resource
+    private LexicalIndex lexicalIndex;
+
     @Override
     public void indexDocument(Long docId) {
         try {
@@ -69,14 +72,14 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
         // non-markdown documents are out of RAG scope this phase
         wikiChunkMapper.invalidateByDocId(docId);
         if (!CONTENT_FORMAT_MARKDOWN.equals(doc.getContentFormat()) || StrUtil.isBlank(doc.getContent())) {
-            vectorStore.onChunksChanged(spaceId);
+            notifyIndexChanged(spaceId);
             return;
         }
         int version = doc.getContentVersion() == null ? 1 : doc.getContentVersion();
         ChunkerProfile profile = ChunkerProfile.resolve(doc.getContent(), metadataLanguage(doc.getMetadataJson()));
         List<MarkdownChunk> slices = MarkdownChunker.chunk(doc.getContent(), profile);
         if (slices.isEmpty()) {
-            vectorStore.onChunksChanged(spaceId);
+            notifyIndexChanged(spaceId);
             return;
         }
         String docNumber = MarkdownChunker.extractDocNumber(doc.getContent());
@@ -108,7 +111,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
             }
         }
         wikiChunkService.saveBatch(rows);
-        vectorStore.onChunksChanged(spaceId);
+        notifyIndexChanged(spaceId);
         log.info("doc {} indexed: {} chunks, version {}, profile {}", docId, rows.size(), version, profile.getName());
     }
 
@@ -136,7 +139,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
             DocumentWiki doc = documentWikiMapper.selectById(docId);
             int updated = wikiChunkMapper.invalidateByDocId(docId);
             if (doc != null && updated > 0) {
-                vectorStore.onChunksChanged(doc.getSpaceId());
+                notifyIndexChanged(doc.getSpaceId());
             }
             log.info("doc {} chunks invalidated: {}", docId, updated);
         } catch (Exception e) {
@@ -156,7 +159,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
                     : contentVersion;
             int reactivated = wikiChunkMapper.reactivateByDocIdAndVersion(docId, version);
             if (reactivated > 0) {
-                vectorStore.onChunksChanged(doc.getSpaceId());
+                notifyIndexChanged(doc.getSpaceId());
                 log.info("doc {} chunks reactivated: {}", docId, reactivated);
             } else {
                 // version drifted while in the recycle bin — rebuild
@@ -172,7 +175,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
         try {
             wikiChunkMapper.physicallyDeleteByDocId(docId);
             if (spaceId != null) {
-                vectorStore.onChunksChanged(spaceId);
+                notifyIndexChanged(spaceId);
             }
             log.info("doc {} chunks physically deleted", docId);
         } catch (Exception e) {
@@ -185,10 +188,10 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
         try {
             wikiChunkMapper.moveByDocId(docId, toSpaceId);
             if (fromSpaceId != null) {
-                vectorStore.onChunksChanged(fromSpaceId);
+                notifyIndexChanged(fromSpaceId);
             }
             if (toSpaceId != null) {
-                vectorStore.onChunksChanged(toSpaceId);
+                notifyIndexChanged(toSpaceId);
             }
             log.info("doc {} chunks moved to space {}", docId, toSpaceId);
         } catch (Exception e) {
@@ -200,11 +203,21 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
     public void invalidateSpace(Long spaceId) {
         try {
             int updated = wikiChunkMapper.invalidateBySpaceId(spaceId);
-            vectorStore.onChunksChanged(spaceId);
+            notifyIndexChanged(spaceId);
             log.info("space {} chunks invalidated: {}", spaceId, updated);
         } catch (Exception e) {
             log.error("space {} 索引批量失效失败（对账兜底）", spaceId, e);
         }
+    }
+
+    /**
+     * Single notification point for every chunk-set change: both retrieval
+     * channels cache the space, and a stale lexical snapshot would keep serving
+     * chunks of a deleted or edited document.
+     */
+    private void notifyIndexChanged(Long spaceId) {
+        vectorStore.onChunksChanged(spaceId);
+        lexicalIndex.onChunksChanged(spaceId);
     }
 
     @Override
@@ -227,7 +240,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
                     restored += wikiChunkMapper.updateById(patch) > 0 ? 1 : 0;
                 }
             }
-            vectorStore.onChunksChanged(spaceId);
+            notifyIndexChanged(spaceId);
             log.info("space {} chunks restored: {}", spaceId, restored);
         } catch (Exception e) {
             log.error("space {} 索引恢复失败（对账兜底）", spaceId, e);
@@ -238,7 +251,7 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
     public void deleteSpaceChunks(Long spaceId) {
         try {
             wikiChunkMapper.physicallyDeleteBySpaceId(spaceId);
-            vectorStore.onChunksChanged(spaceId);
+            notifyIndexChanged(spaceId);
             log.info("space {} chunks physically deleted", spaceId);
         } catch (Exception e) {
             log.error("space {} chunk 物理删除失败（对账兜底）", spaceId, e);
