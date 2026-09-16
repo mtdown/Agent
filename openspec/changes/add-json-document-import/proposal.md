@@ -7,7 +7,7 @@
 - `POST /documentWiki/import`（`WikiDocumentImportServiceImpl:27`）白名单只有 `md/html/htm`，**json 直接被拒**；
 - `POST /documentWiki/batch/file`（`WikiBatchImportServiceImpl:101`）虽然是批量，但是**一文件对应一文档（1:1）**，且一次最多 `maxItems = 20` 项。
 
-要把 609 篇语料入库，人工拆成 609 个 md 再分 31 批上传不现实；更重要的是，**每个条目的原始元数据（title / source / published_at / url）必须随文档落库**，否则 MultiHop-RAG 的 gold（靠 `(title, published_at, source)` 定位）无法映射回本系统的 `docId`，评测集就是废的。
+要把 609 篇语料入库，人工拆成 609 个 md 再分 31 批上传不现实；更重要的是，**每个条目的原始元数据（title / source / published_at / url）必须随文档落库**，否则 MultiHop-RAG 的 gold（靠条目 `url` 定位证据）无法映射回本系统的 `docId`，评测集就是废的。实测 `url` 与 `title` 均 609/609 唯一，但 `title` 会受 128 字符截断影响，故**以 `url` 为映射主键**（可直接落 `sourceUrl` 列，无需解析元数据 JSON）。
 
 因此需要一个把「单个 JSON → 多个 Wiki 文档（1:N）」的导入能力。
 
@@ -30,9 +30,10 @@
 - `json-document-import`: 接收一个 JSON 文件，将其中的条目逐条拆分为独立 Wiki 文档导入指定空间/文件夹，保留每条原始元数据，并对每个条目给出独立的处理结果；导入的文档进入既有切片与索引流程，切片参数按文档语言选择。
 
 ### Modified Capabilities
-（无。现有批量导入的既有行为不变；本次为新增入口，不改动 `batch-document-import` 已定义的任何 Requirement。）
+- `wiki-rag-pipeline`: 切片参数由固定值改为**按文档语言选择**（中文口径与切分结果逐字节不变）。既有需求 `Markdown documents are chunked into semantic slices` 被 **MODIFIED**——字符上限 / 最小块长 / 重叠 / 句界字符表成为语言相关（中文 600/100/80 与 `。；`，英文 1800/100/100 与 `.!?;`），并新增「英文切分不落在词中」「语言判定确定性」两个场景；同时以 **ADDED** 并入 `Retrieved chunks carry their document title`（检索结果携带来源文档标题，且**不**把标题写进块文本）。
 
-> 说明：切片能力的规格（`wiki-rag-pipeline`）目前仍归属**未归档**的变更 `add-wiki-rag-pipeline`，尚未进入 `openspec/specs/` 规格库，因此本次无法对声明 `MODIFIED Requirements`。语言感知切片的行为以 **ADDED Requirement** 形式并入本变更；待 `add-wiki-rag-pipeline` 归档后，建议把切片行为独立成 `wiki-rag-chunking` 规格并从本变更迁出。
+> 说明一：现有批量导入的既有行为不变，本次为新增入口，不改动 `batch-document-import` 已定义的任何 Requirement。
+> 说明二：切片能力 `wiki-rag-pipeline` 已于 2026-09-16 随 `add-wiki-rag-pipeline` 归档进入规格库（`openspec/specs/wiki-rag-pipeline/spec.md`），故本次得以对其声明 `MODIFIED Requirements`，切片口径在规格库中**只有一份**，不再与硬编码 600/80 的旧文并存。这两条需求已从 `json-document-import` 能力迁出（该能力只留 6 条导入相关需求），避免切片行为挂在导入能力之下造成归属错位。
 
 ## Impact
 
@@ -49,10 +50,14 @@
 **复用的既有组件（零改动）**
 - `ImportedWikiDocument`：解析产物载体，是整条链路的接缝（新增 `language`、`sourceUrl` 字段承载）
 - `WikiBatchImportServiceImpl.saveImported(...)`：单文档落库
-- `BatchImportItemResult`（`input/status/message/documentId/title`）：逐项结果，其 `documentId` 直接充当数据集 gold 映射表
+- `BatchImportItemResult`（`input/status/message/documentId/title`）：逐项结果。其 `documentId` 只能充当 gold 映射的**第一步**（`url → docId`）；`chunkIndex` 是切分参数的函数、且切分是 AFTER_COMMIT 异步的（返回时尚无 chunk 行），必须在索引完成后查 `wiki_chunk` 做**第二步**绑定（见「评测侧改动」）
 - `WikiRagIndexListener`：`@Async("ragIndexExecutor")` + `@TransactionalEventListener(AFTER_COMMIT)` → `indexDocument()`，文档入库后自动切片 + embedding
 - `ChunkHit.docTitle` / `wiki_chunk.docTitle`：检索结果天然携带文档标题，无需改动即可支撑"检索后拼接标题"
 - `DocumentWikiController:100-102` 的 `contentFormat` 兜底（未传即默认 `markdown`），保证不会静默零切片
+
+**评测侧改动（独立数据集，不并入自有评测目录）**
+- 新增 `eval/scripts/lib_rag_eval.py`：从 `run_eval.py` 抽出的**数据集中立内核**（取数适配器 + 打分数学 `compute_metrics` / `METRIC_KEYS`）。全仓**只保留一份**，两个数据集的 recall / docRecall / hitRate / mrr 定义因此不可能漂移、可横向比较；`run_eval.py`（784 → 493 行）改为 import 该内核，打分结果经回归验证**逐位不变**
+- 新增 `eval/datasets/mhr-rag/`：MultiHop-RAG 泛化评测独立目录（口径 README + `mhr_lib.py` / `bind_anchor.py` / `run_eval.py` + 独立 `results/` 与 `anchor/`），与 `eval/golden.*.jsonl` 完全隔离。gold 绑定为**两步**（`url → docId`，再 `fact → chunkIndex`）；未绑定的证据显式记入 `unbound-report.json` 并计数，**不得静默出 gold**
 
 **不改动**
 - 现有 `/documentWiki/import`、`/documentWiki/batch/url`、`/documentWiki/batch/file` 的行为与契约
@@ -65,4 +70,4 @@
 - 若导入规模大，需关注既有 embedding 调用频率限制
 
 **跨变更影响**
-- 本次修改的 `MarkdownChunker` 与 `WikiRagIndexServiceImpl` 属未归档变更 `add-wiki-rag-pipeline` 的实现范围（其 tasks 已全部完成）。中文行为逐字节不变，不改变该变更已定义的任何行为。
+- 本次修改的 `MarkdownChunker` 与 `WikiRagIndexServiceImpl` 由变更 `add-wiki-rag-pipeline` 引入（该变更已于 2026-09-16 归档）。中文行为逐字节不变，不改变该变更已定义的任何行为；切片口径的修订以 `MODIFIED Requirements` 形式对 `wiki-rag-pipeline` 声明。

@@ -215,4 +215,4 @@ ImportFiles 循环体：
 → 当前接受：数据集导入是一次性操作，且逐项结果会给出已成功的 `documentId` 便于人工清理。若后续成为高频场景，再引入去重或幂等键。
 
 **跨变更影响**
-本次会修改 `MarkdownChunker`（签名 + profile 化）与 `WikiRagIndexServiceImpl`（唯一调用点），这两个文件属未归档变更 `add-wiki-rag-pipeline` 的实现范围（其 tasks 已全部完成）。中文行为逐字节不变，因此不改变该变更已定义的任何行为。
+本次会修改 `MarkdownChunker`（签名 + profile 化）与 `WikiRagIndexServiceImpl`（唯一调用点），这两个文件由变更 `add-wiki-rag-pipeline` 引入（该变更已于 2026-09-16 归档，切片口径现已进入规格库 `openspec/specs/wiki-rag-pipeline/spec.md`，本次以 `MODIFIED Requirements` 方式修订）。中文行为逐字节不变，因此不改变该变更已定义的任何行为。
