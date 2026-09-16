@@ -76,10 +76,14 @@
 ## 5. 收尾
 
 - [x] 5.1 `IssueLog.xlsx` 记录 8 条：启动环境三处障碍、文号组缩水、timings 误导性 0、测试缺依赖、RRF 稀释文号层、runner 无耗时记录、diag 脚本路径、`score` 语义变化（第 152~159 行）
-- [ ] 5.2 更新 `.workbuddy/memory/` 的项目记忆（oracle 框架、qwen3.7 选型、池深-延迟权衡、沙箱启动障碍）
-- [ ] 5.3 汇报实际指标与结论（召回 +23.1pt / 未达 0.85 / 延迟 p95 600ms / 机制归因），由负责人决定：
+- [x] 5.2 更新 `.workbuddy/memory/` 的项目记忆（oracle 框架、qwen3.7 选型、池深-延迟权衡、沙箱启动障碍）
+- [x] 5.3 汇报实际指标与结论（召回 +23.1pt / 未达 0.85 / 延迟 p95 600ms / 机制归因），由负责人决定：
       接受 0.7930 收口，或另立 change 主攻"池深 × 精排"（分组重排 / 查询改写）
+      → **负责人 2026-09-16 决策：接受 0.7930 收口**（原 0.85 目标未达成，理由见 design.md §7：
+      剩余 5.7pt 中 73.3% 属"池里已有、重排没排进 top-6"，需另立 change 主攻一阶段排序质量）
 - [ ] 5.4 经负责人确认后 `upload.ps1` 上传分支并发起 merge request（不自行合并 main）
+- [x] 5.5 同步主 spec `wiki-rag-retrieval`（本 change 新增能力，4 条 ADDED requirement 转正）并归档到
+      `openspec/changes/archive/2026-09-16-boost-rag-passage-recall/`
 
 ## 未纳入本 change（登记备查）
 
