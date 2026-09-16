@@ -75,7 +75,74 @@ public class RagProperties {
 
     @Data
     public static class Retrieval {
+        /** Number of hits returned to the caller when the request does not specify one. */
         private int topK = 6;
+
+        /**
+         * Hard ceiling for the requested topK. Without it a single request can
+         * ask for the whole space, paying a full brute-force scan plus a huge
+         * payload — and diluting the prompt downstream.
+         */
+        private int topKMax = 50;
+
+        /**
+         * Coarse-retrieval candidate pool per channel. The re-ranker can only
+         * reorder what is already in the pool, so pool depth caps achievable
+         * recall — but only up to a point: measured over the eval set with the
+         * dense+BM25 hybrid pool, a perfect re-ranker could take recall@6 to
+         * 0.7690 / 0.8600 / 0.9061 at depth 20 / 50 / 100, while the shipped
+         * system actually reached 0.7590 / 0.7930 / 0.8030. The re-ranker's
+         * precision decays as the pool grows (98.7% → 92.2% → 88.6% of the
+         * ceiling), so depth 100 buys 1.0pt for +190ms over depth 50.
+         * 50 is the default knee; override with RAG_CANDIDATE_POOL_SIZE.
+         */
+        private int candidatePoolSize = 50;
+
+        /** Size of the fused pool handed to the re-ranker (and used when re-ranking is off). */
+        private int fusionPoolSize = 50;
+
+        /**
+         * RRF constant. Left at the literature default on purpose: it is NOT
+         * tuned against the eval set, so the reported gain stays honest.
+         */
+        private int rrfK = 60;
+
+        private Lexical lexical = new Lexical();
+
+        private Rerank rerank = new Rerank();
+    }
+
+    @Data
+    public static class Lexical {
+        private boolean enabled = true;
+        /** BM25 term-frequency saturation. */
+        private double k1 = 1.2;
+        /** BM25 length normalisation. */
+        private double b = 0.75;
+    }
+
+    @Data
+    public static class Rerank {
+        private boolean enabled = true;
+        /** DashScope native text-rerank endpoint (NOT the OpenAI-compatible base-url). */
+        private String baseUrl = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank";
+        private String apiKey = "";
+        /**
+         * Cross-encoder model. {@code qwen3.7-text-rerank} shares the DashScope
+         * key already used for embeddings; it separates a relevant document from
+         * an irrelevant one far more sharply than {@code gte-rerank-v2} on the
+         * same input (top score 0.9973 vs 0.5897). The {@code qwen3-reranker-*}
+         * names are NOT served on this key — they answer "Model not exist".
+         */
+        private String model = "qwen3.7-text-rerank";
+        private int timeoutSeconds = 20;
+        /** Upper bound of documents sent per call; deeper pools are truncated. */
+        private int maxDocuments = 50;
+
+        /** Re-ranking stays off until a key is supplied — never a hard failure. */
+        public boolean isUsable() {
+            return enabled && apiKey != null && !apiKey.isBlank();
+        }
     }
 
     @Data

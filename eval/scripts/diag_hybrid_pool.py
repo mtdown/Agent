@@ -62,9 +62,23 @@ def bm25_rank(query, df, docs_tf, dl_map, avgdl, postings, k1=1.2, b=0.75):
     return sorted(scores.items(), key=lambda x: -x[1])
 
 
+def find_data(name):
+    """Locate a scratch data file.
+
+    This tool was promoted from eval/tmp/ into eval/scripts/, but its input
+    rankings (14MB) stay in eval/tmp/ because they are gitignored scratch data.
+    Looking in both places keeps the tool runnable wherever the cwd is.
+    """
+    for candidate in (os.path.join(HERE, name),
+                      os.path.join(EVAL_DIR, "tmp", name)):
+        if os.path.exists(candidate):
+            return candidate
+    raise SystemExit(f"[FATAL] 找不到 {name}：应位于 eval/tmp/ 或 eval/scripts/")
+
+
 def main():
     cfg = load_env()
-    diag = json.load(open(os.path.join(HERE, "diag-rankings.json"), encoding="utf-8"))
+    diag = json.load(open(find_data("diag-rankings.json"), encoding="utf-8"))
     pq = diag["perQuestion"]
     qtext = {}
     for line in open(os.path.join(EVAL_DIR, "golden.v2.jsonl"), encoding="utf-8"):
