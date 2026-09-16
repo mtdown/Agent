@@ -82,8 +82,13 @@ def index_corpus_by_url(corpus: list) -> dict:
     return {c["url"]: c for c in corpus}
 
 
-def bind_fact(fact: str, chunks: list) -> int | None:
-    """把一条 fact 绑到 chunkIndex。
+def bind_fact_detail(fact: str, chunks: list) -> tuple[int | None, int]:
+    """`bind_fact` 的明细版：返回 `(chunkIndex | None, 候选块数)`。
+
+    候选块数 = 匹配到该 fact 的 chunk 个数（去重后）。**== 1 就是 README 表里的
+    「单块唯一命中」**，>1 表示需靠"重叠前缀消歧"定夺。这个计数是绑定质量的体检指标：
+    它与"绑定是否成功"是两个维度 —— 绑定成功但候选数很大，说明该 fact 在语料里
+    不唯一，gold 坐标的可信度要打折。
 
     chunks: [{"chunkIndex": int, "text": str}]，必须来自库内 `wiki_chunk.chunkText`（唯一权威）。
 
@@ -97,26 +102,31 @@ def bind_fact(fact: str, chunks: list) -> int | None:
     否则等于用缩小分母来抬高指标。
     """
     if not fact:
-        return None
+        return None, 0
     exact = [c["chunkIndex"] for c in chunks if fact in (c.get("text") or "")]
     cand = exact
     if not cand:
         nf = norm_ws(fact)
         if len(nf) < 6:
-            return None
+            return None, 0
         cand = [c["chunkIndex"] for c in chunks if nf in norm_ws(c.get("text") or "")]
     if not cand:
-        return None
-    if len(cand) == 1:
-        return cand[0]
+        return None, 0
     cand = sorted(set(cand))
+    if len(cand) == 1:
+        return cand[0], 1
     tail_free = []
     for idx in cand:
         txt = next((c.get("text") or "" for c in chunks if c["chunkIndex"] == idx), "")
         prefix = txt[: _BIND_OVERLAP + 1]
         if norm_ws(fact) not in norm_ws(prefix):
             tail_free.append(idx)
-    return (tail_free or cand)[0]
+    return (tail_free or cand)[0], len(cand)
+
+
+def bind_fact(fact: str, chunks: list) -> int | None:
+    """只关心坐标时的便捷入口；需要候选块数（体检指标）请用 `bind_fact_detail`。"""
+    return bind_fact_detail(fact, chunks)[0]
 
 
 def make_gold_entry(doc_id: int, chunk_index: int, fact: str, url: str = "",

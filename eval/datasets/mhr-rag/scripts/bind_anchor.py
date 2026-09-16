@@ -129,12 +129,16 @@ def main():
                 unbound.append({"qaIndex": qi, "url": url, "title": e.get("title"),
                                 "reason": "document-not-imported", "factLen": len(fact)})
                 continue
-            idx = L.bind_fact(fact, chunks.get(did) or [])
+            idx, n_cand = L.bind_fact_detail(fact, chunks.get(did) or [])
             if idx is None:
                 stat["none"] += 1
                 unbound.append({"qaIndex": qi, "url": url, "docId": did, "title": e.get("title"),
                                 "reason": "fact-not-found-in-any-chunk", "factLen": len(fact)})
                 continue
+            # 绑定成功后再按"候选块数"细分：1 块 = 单块唯一命中；>1 = 靠重叠前缀消歧定夺。
+            # 这两个计数原本漏写（只声明了初值 0，循环里从不 +=），会把 total_ev 压成 0，
+            # 触发 ZeroDivisionError 并让 anchor-map 的 binding 段全 0 —— 2026-09-16 修。
+            stat["one" if n_cand == 1 else "multi"] += 1
             gold.append(L.make_gold_entry(did, idx, fact, url, e.get("title") or ""))
             coords.append((did, idx))
         if len(set(coords)) < len(coords):
@@ -168,10 +172,25 @@ def main():
     print()
     print("=" * 72)
     print(f"evidence 合计 {total_ev}")
-    print(f"  绑定成功 {bound} ({bound / total_ev * 100:.2f}%)   未绑定 {total_ev - bound}")
+    if not total_ev:
+        print("[WARN] 一条 evidence 都没读到 —— 先查 qa 结构与 --qa 路径，绑定实际未发生")
+    else:
+        print(f"  绑定成功 {bound} ({bound / total_ev * 100:.2f}%)   未绑定 {total_ev - bound}")
+    print(f"    - 单块唯一命中    {stat['one']}")
+    print(f"    - 多块命中(消歧)  {stat['multi']}")
     print(f"    - 文档未导入      {stat['no_doc']}")
     print(f"    - fact 找不到块   {stat['none']}   <- 切分参数不当时会显著上升")
     print(f"  出现重复坐标的题 {dup_coord_q}（计分走 set 去重，分母相应缩小）")
+
+    # 6.8 回归对照：README「已知实测数字」的 EN 1800/100 一列。
+    # 不一致时先查绑定算法与切分参数，**不得直接调参掩盖**。
+    chunk_total = sum(len(v) for v in chunks.values())
+    print("  --- 对照 README 已知值（EN 1800/100）---")
+    for name, got, want in (("总块数", chunk_total, 4195),
+                            ("单块唯一命中", stat["one"], 6068),
+                            ("未绑定", total_ev - bound, 0)):
+        flag = "OK" if got == want else "<-- 不一致：先查算法与参数，勿调参掩盖"
+        print(f"    {name}: 实测 {got} / 期望 {want}  {flag}")
     print(f"golden  -> {os.path.relpath(L.GOLDEN_PATH, L.REPO_ROOT)}")
     print(f"anchor  -> {os.path.relpath(L.ANCHOR_PATH, L.REPO_ROOT)}")
     if unbound:

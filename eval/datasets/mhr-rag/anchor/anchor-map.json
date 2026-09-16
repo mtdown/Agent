@@ -1,0 +1,30 @@
+{
+ "dataset": "mhr-rag",
+ "generatedAt": "2026-09-16T18:35:55",
+ "corpus": {
+  "path": "C:\\Users\\origin\\IdeaProjects\\Agent\\eval\\tmp\\mhr_corpus.json",
+  "count": 609,
+  "sha256": "20b61b5ab84de84a927420c5d265b7ec8d859ae49980699958a787ade9e4d28f"
+ },
+ "qa": {
+  "path": "C:\\Users\\origin\\IdeaProjects\\Agent\\eval\\tmp\\mhr_qa.json",
+  "count": 2556,
+  "sha256": "03cfb4926461f868684903aadc8024447bdda5bb3f6804741424cce338515bff"
+ },
+ "profile": {
+  "max_chunk": 1800,
+  "overlap": 100,
+  "min_chunk": 100
+ },
+ "docsImported": 609,
+ "docsMissing": 0,
+ "binding": {
+  "one": 6068,
+  "multi": 16,
+  "none": 0,
+  "no_doc": 0
+ },
+ "questionsWithDupCoord": 39,
+ "note": "gold 走 set 去重，同题多 quote 落同一 chunk 时只算一个坐标（跨数据集同口径）",
+ "unbound": []
+}
