@@ -2,6 +2,7 @@ package com.et.cloud.rag;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.SecureUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.et.cloud.mapper.DocumentWikiMapper;
 import com.et.cloud.mapper.WikiChunkMapper;
@@ -72,7 +73,8 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
             return;
         }
         int version = doc.getContentVersion() == null ? 1 : doc.getContentVersion();
-        List<MarkdownChunk> slices = MarkdownChunker.chunk(doc.getContent());
+        ChunkerProfile profile = ChunkerProfile.resolve(doc.getContent(), metadataLanguage(doc.getMetadataJson()));
+        List<MarkdownChunk> slices = MarkdownChunker.chunk(doc.getContent(), profile);
         if (slices.isEmpty()) {
             vectorStore.onChunksChanged(spaceId);
             return;
@@ -107,7 +109,25 @@ public class WikiRagIndexServiceImpl implements WikiRagIndexService {
         }
         wikiChunkService.saveBatch(rows);
         vectorStore.onChunksChanged(spaceId);
-        log.info("doc {} indexed: {} chunks, version {}", docId, rows.size(), version);
+        log.info("doc {} indexed: {} chunks, version {}, profile {}", docId, rows.size(), version, profile.getName());
+    }
+
+    /**
+     * Language recorded on the document when it was imported, or null when it carries none.
+     *
+     * <p>Preferring the stored value keeps a rebuild in step with the chunks produced right after the
+     * import: re-detecting the language here could select the other profile, renumber every chunk and
+     * invalidate evaluation anchors that are already bound to chunk indexes.
+     */
+    private static String metadataLanguage(String metadataJson) {
+        if (StrUtil.isBlank(metadataJson)) {
+            return null;
+        }
+        try {
+            return JSONUtil.parseObj(metadataJson).getStr("language");
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override

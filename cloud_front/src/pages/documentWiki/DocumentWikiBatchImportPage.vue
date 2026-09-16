@@ -56,16 +56,55 @@
       </div>
     </div>
 
+    <div class="batch-panel">
+      <div class="panel-head">JSON 语料导入</div>
+      <a-space wrap>
+        <a-button :disabled="jsonLoading" @click="openJsonPicker">选择 JSON 文件</a-button>
+        <span class="file-hint">单个 .json 文件，每个条目生成一篇文档，条目数不限，最大 30MB</span>
+        <input
+          ref="jsonInputRef"
+          class="file-input"
+          type="file"
+          accept=".json"
+          @change="onJsonChange"
+        />
+      </a-space>
+      <ul v-if="jsonFile" class="file-list">
+        <li>{{ jsonFile.name }}（{{ jsonFileSizeText }}）</li>
+      </ul>
+      <div class="panel-actions">
+        <a-button
+          type="primary"
+          :loading="jsonLoading"
+          :disabled="jsonLoading || !jsonFile"
+          @click="submitJson"
+        >
+          导入 JSON
+        </a-button>
+        <a-button v-if="jsonFile" :disabled="jsonLoading" @click="clearJsonFile">移除文件</a-button>
+      </div>
+      <a-alert
+        v-if="jsonIndexNotice"
+        class="json-notice"
+        type="info"
+        show-icon
+        message="切片与向量化在后台异步执行"
+        :description="jsonIndexNotice"
+      />
+    </div>
+
     <div v-if="results.length" class="batch-panel">
-      <div class="panel-head">
-        导入结果（成功 {{ successCount }} / 共 {{ results.length }}）
+      <div class="panel-head result-head">
+        <span>导入结果（成功 {{ successCount }} / 共 {{ results.length }}）</span>
+        <a-checkbox :checked="failedOnly" @change="onFailedOnlyChange">仅看失败</a-checkbox>
       </div>
       <a-table
         :columns="resultColumns"
-        :data-source="results"
-        :pagination="false"
+        :data-source="visibleResults"
+        :pagination="resultPagination"
         row-key="input"
         size="small"
+        @change="onResultTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -81,15 +120,19 @@
           </template>
         </template>
       </a-table>
+      <p v-if="results.length && !visibleResults.length" class="file-hint empty-hint">
+        没有失败条目，全部 {{ results.length }} 条均导入成功。
+      </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   batchImportFilesUsingPost,
+  batchImportJsonUsingPost,
   batchImportUrlsUsingPost,
 } from '@/api/documentWikiController.ts'
 import { listFolderTreeUsingGet } from '@/api/wikiFolderController.ts'
@@ -97,6 +140,13 @@ import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController.ts'
 import { flattenFolderOptions } from './components/wikiShared'
 
 const SUPPORTED_PATTERN = /\.(md|html|htm)$/i
+
+const JSON_PATTERN = /\.json$/i
+
+/** Kept in step with the backend JSON import limit, which itself matches multipart max-file-size. */
+const MAX_JSON_SIZE = 30 * 1024 * 1024
+
+const RESULT_PAGE_SIZE = 20
 
 const form = ref<{ spaceId?: string | number; folderId?: string | number }>({})
 const spaces = ref<API.WikiSpaceVis[]>([])
@@ -107,6 +157,12 @@ const results = ref<API.BatchImportItemResult[]>([])
 const urlLoading = ref(false)
 const fileLoading = ref(false)
 const fileInputRef = ref<HTMLInputElement>()
+const jsonFile = ref<File>()
+const jsonLoading = ref(false)
+const jsonInputRef = ref<HTMLInputElement>()
+const jsonIndexNotice = ref('')
+const failedOnly = ref(false)
+const resultPage = ref(1)
 
 const spaceOptions = computed(() =>
   spaces.value.map((space) => ({ label: space.name ?? '未命名空间', value: space.id })),
@@ -118,12 +174,33 @@ const folderOptions = computed(() => [
 const successCount = computed(
   () => results.value.filter((item) => item.status === 'SUCCESS').length,
 )
+const jsonFileSizeText = computed(() => formatSize(jsonFile.value?.size ?? 0))
+const visibleResults = computed(() =>
+  failedOnly.value ? results.value.filter((item) => item.status !== 'SUCCESS') : results.value,
+)
+const resultPagination = computed(() => ({
+  current: resultPage.value,
+  pageSize: RESULT_PAGE_SIZE,
+  showSizeChanger: true,
+  pageSizeOptions: ['20', '50', '100'],
+  showTotal: (total: number) => `共 ${total} 条`,
+}))
 const resultColumns = [
   { title: '输入', dataIndex: 'input', key: 'input' },
   { title: '状态', dataIndex: 'status', key: 'status' },
   { title: '说明', dataIndex: 'message', key: 'message' },
   { title: '文档', dataIndex: 'documentId', key: 'document' },
 ]
+
+watch(results, () => {
+  resultPage.value = 1
+})
+
+const formatSize = (bytes: number) => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
 
 const fetchSpaces = async () => {
   const res = await listVisibleSpaceUsingGet()
@@ -243,6 +320,91 @@ const submitFiles = async () => {
   }
 }
 
+const openJsonPicker = () => jsonInputRef.value?.click()
+
+const onJsonChange = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const picked = input.files?.[0]
+  jsonIndexNotice.value = ''
+  const reject = (reason: string) => {
+    message.error(reason)
+    jsonFile.value = undefined
+    input.value = ''
+  }
+  if (!picked) {
+    jsonFile.value = undefined
+    return
+  }
+  if (!JSON_PATTERN.test(picked.name)) {
+    reject('JSON 导入仅支持 .json 文件')
+    return
+  }
+  if (picked.size === 0) {
+    reject('不能导入空文件')
+    return
+  }
+  if (picked.size > MAX_JSON_SIZE) {
+    reject(`文件不能超过 30MB，当前 ${formatSize(picked.size)}`)
+    return
+  }
+  jsonFile.value = picked
+}
+
+const clearJsonFile = () => {
+  jsonFile.value = undefined
+  if (jsonInputRef.value) {
+    jsonInputRef.value.value = ''
+  }
+}
+
+const submitJson = async () => {
+  if (!jsonFile.value) {
+    message.warning('请先选择要导入的 JSON 文件')
+    return
+  }
+  if (!requireSpace()) return
+  jsonIndexNotice.value = ''
+  jsonLoading.value = true
+  const startedAt = Date.now()
+  try {
+    const res = await batchImportJsonUsingPost(
+      {
+        spaceId: form.value.spaceId as string | number,
+        folderId: form.value.folderId || undefined,
+      },
+      jsonFile.value,
+    )
+    if (res.data.code === 0) {
+      results.value = res.data.data ?? []
+      const seconds = ((Date.now() - startedAt) / 1000).toFixed(1)
+      message.success(
+        `导入完成，成功 ${successCount.value} / 共 ${results.value.length}，耗时 ${seconds}s`,
+      )
+      // chunking is triggered AFTER_COMMIT and runs off the request path, so the chunks do not
+      // exist yet when this response arrives — the operator must wait before starting a test
+      jsonIndexNotice.value =
+        `接口返回时切片尚未生成。请稍候到该空间的文档列表确认文档数达到 ${results.value.length}，` +
+        '确认后再开始检索测试；文档数不足说明仍有条目在异步索引中。'
+      clearJsonFile()
+    } else {
+      message.error('导入失败，' + res.data.message)
+    }
+  } catch (e: any) {
+    message.error('导入失败，' + e.message)
+  } finally {
+    jsonLoading.value = false
+  }
+}
+
+const onFailedOnlyChange = (event: any) => {
+  failedOnly.value = Boolean(event?.target?.checked)
+  resultPage.value = 1
+}
+
+const onResultTableChange = (pagination: { current?: number }) => {
+  resultPage.value = pagination?.current ?? 1
+}
+
 onMounted(fetchSpaces)
 </script>
 
@@ -293,5 +455,20 @@ onMounted(fetchSpaces)
   margin: 12px 0 0;
   padding-left: 18px;
   color: var(--wiki-text-muted);
+}
+
+.result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.json-notice {
+  margin-top: 12px;
+}
+
+.empty-hint {
+  margin: 12px 0 0;
 }
 </style>

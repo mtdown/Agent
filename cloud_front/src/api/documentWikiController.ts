@@ -237,3 +237,30 @@ export async function batchImportFilesUsingPost(
     ...(options || {}),
   })
 }
+
+/** batchImportJson POST /api/documentWiki/batch/json */
+export async function batchImportJsonUsingPost(
+  params: API.batchImportJsonUsingPOSTParams,
+  file?: File,
+  options?: { [key: string]: any }
+) {
+  const formData = new FormData()
+
+  if (file) {
+    formData.append('file', file)
+  }
+
+  Object.keys(params).forEach((ele) => {
+    const item = (params as any)[ele]
+
+    if (item !== undefined && item !== null) {
+      formData.append(ele, item)
+    }
+  })
+
+  return request<API.BaseResponseListBatchImportItemResult_>('/api/documentWiki/batch/json', {
+    method: 'POST',
+    data: formData,
+    ...(options || {}),
+  })
+}

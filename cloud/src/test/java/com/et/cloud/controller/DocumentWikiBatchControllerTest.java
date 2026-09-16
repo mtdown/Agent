@@ -121,6 +121,71 @@ class DocumentWikiBatchControllerTest {
                 .getMessage());
     }
 
+    @Test
+    void jsonImportPassesFileAndDestination() {
+        DocumentWikiBatchController controller = newController();
+        User loginUser = user(7L);
+        MockMultipartFile file = new MockMultipartFile("file", "corpus.json", "application/json",
+                "[{\"title\":\"A\",\"content\":\"one\"}]".getBytes(StandardCharsets.UTF_8));
+        when(userService.getLoginUser(any())).thenReturn(loginUser);
+        when(batchImportService.importJson(eq(11L), eq(22L), any(), eq(loginUser)))
+                .thenReturn(Collections.singletonList(BatchImportItemResult.success("https://news.test/a", 5L, "A")));
+
+        BaseResponse<List<BatchImportItemResult>> response =
+                controller.importJson(file, 11L, 22L, new MockHttpServletRequest());
+
+        assertEquals(1, response.getData().size());
+        assertEquals(5L, response.getData().get(0).getDocumentId());
+        verify(batchImportService).importJson(eq(11L), eq(22L), any(), eq(loginUser));
+    }
+
+    @Test
+    void jsonImportWithoutFolderPassesNullFolder() {
+        DocumentWikiBatchController controller = newController();
+        User loginUser = user(7L);
+        MockMultipartFile file = new MockMultipartFile("file", "corpus.json", "application/json",
+                "[]".getBytes(StandardCharsets.UTF_8));
+        when(userService.getLoginUser(any())).thenReturn(loginUser);
+        when(batchImportService.importJson(eq(11L), isNull(), any(), eq(loginUser)))
+                .thenReturn(Collections.emptyList());
+
+        controller.importJson(file, 11L, null, new MockHttpServletRequest());
+
+        verify(batchImportService).importJson(eq(11L), isNull(), any(), eq(loginUser));
+    }
+
+    @Test
+    void jsonImportRequiresAFile() {
+        DocumentWikiBatchController controller = newController();
+
+        assertEquals("请选择要导入的 JSON 文件", assertThrows(BusinessException.class,
+                () -> controller.importJson(new MockMultipartFile("file", "corpus.json", "application/json",
+                        new byte[0]), 11L, null, new MockHttpServletRequest())).getMessage());
+    }
+
+    @Test
+    void jsonImportRequiresSpace() {
+        DocumentWikiBatchController controller = newController();
+        MockMultipartFile file = new MockMultipartFile("file", "corpus.json", "application/json",
+                "[]".getBytes(StandardCharsets.UTF_8));
+
+        assertEquals("空间不能为空", assertThrows(BusinessException.class,
+                () -> controller.importJson(file, null, null, new MockHttpServletRequest())).getMessage());
+    }
+
+    @Test
+    void jsonImportRequiresLogin() {
+        DocumentWikiBatchController controller = newController();
+        MockMultipartFile file = new MockMultipartFile("file", "corpus.json", "application/json",
+                "[]".getBytes(StandardCharsets.UTF_8));
+        when(userService.getLoginUser(any()))
+                .thenThrow(new BusinessException(ErrorCode.NOT_LOGIN_ERROR));
+
+        assertThrows(BusinessException.class,
+                () -> controller.importJson(file, 11L, null, new MockHttpServletRequest()));
+        verify(batchImportService, org.mockito.Mockito.never()).importJson(any(), any(), any(), any());
+    }
+
     private DocumentWikiBatchController newController() {
         DocumentWikiBatchController controller = new DocumentWikiBatchController();
         ReflectionTestUtils.setField(controller, "userService", userService);

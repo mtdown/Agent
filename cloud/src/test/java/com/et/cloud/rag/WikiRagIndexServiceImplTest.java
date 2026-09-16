@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -331,5 +332,100 @@ class WikiRagIndexServiceImplTest {
         verify(embeddingClient, never()).embed(anyList());
         verify(wikiChunkService, never()).saveBatch(anyList());
         verify(vectorStore).onChunksChanged(10L);
+    }
+
+    /**
+     * The chunk sequence must not depend on which path produced it. A rebuild re-reads the stored
+     * row, so if it re-detected the language instead of honouring the recorded one it could pick the
+     * other profile, renumber every chunk and invalidate anchors that were already bound.
+     */
+    @Test
+    void storedLanguageKeepsTheFirstIndexAndTheRebuildInStep() {
+        String content = chineseBody();
+        DocumentWiki doc = markdownDoc(1L, 10L, 1, content);
+        doc.setContentHash("hash");
+        doc.setMetadataJson("{\"language\":\"en\"}");
+        when(documentWikiMapper.selectById(1L)).thenReturn(doc);
+        when(wikiChunkMapper.invalidateByDocId(anyLong())).thenReturn(0);
+        when(embeddingClient.embed(anyList())).thenReturn(List.of(new float[]{0.1f}));
+        when(wikiChunkService.saveBatch(anyList())).thenReturn(true);
+
+        // path 1: the asynchronous index triggered right after the import commits
+        List<WikiChunk> imported = captureSavedRows(() -> indexService.indexDocument(1L));
+
+        // path 2: the same document chunks cleared, then an admin rebuild
+        org.mockito.Mockito.clearInvocations(wikiChunkService, wikiChunkMapper, documentWikiMapper);
+        when(documentWikiMapper.selectList(any(Wrapper.class))).thenReturn(List.of(doc));
+        when(documentWikiMapper.selectById(1L)).thenReturn(doc);
+        when(embeddingClient.isConfigured()).thenReturn(true);
+        when(wikiChunkMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(wikiChunkMapper.invalidateByDocId(anyLong())).thenReturn(0);
+        when(embeddingClient.embed(anyList())).thenReturn(List.of(new float[]{0.1f}));
+        when(wikiChunkService.saveBatch(anyList())).thenReturn(true);
+        List<WikiChunk> rebuilt = captureSavedRows(() -> indexService.rebuildAll(false));
+
+        assertEquals(chunkTexts(imported), chunkTexts(rebuilt),
+                "a rebuild must reproduce the chunk sequence produced at import time");
+        // the recorded language, not content detection, decided the profile
+        assertEquals(markdownChunkTexts(MarkdownChunker.chunk(content, ChunkerProfile.EN)), chunkTexts(imported));
+        assertNotEquals(markdownChunkTexts(MarkdownChunker.chunk(content, ChunkerProfile.ZH)), chunkTexts(imported),
+                "the fixture must genuinely distinguish the two profiles, otherwise this proves nothing");
+    }
+
+    @Test
+    void contentWithoutARecordedLanguageIsDetectedFromTheContent() {
+        String content = "# News\n\nEnglish prose that carries no Chinese characters at all.";
+        when(documentWikiMapper.selectById(1L)).thenReturn(markdownDoc(1L, 10L, 1, content));
+        when(wikiChunkMapper.invalidateByDocId(1L)).thenReturn(0);
+        when(embeddingClient.embed(anyList())).thenReturn(List.of(new float[]{0.1f}));
+        when(wikiChunkService.saveBatch(anyList())).thenReturn(true);
+
+        List<WikiChunk> rows = captureSavedRows(() -> indexService.indexDocument(1L));
+
+        assertEquals(1, rows.size());
+        assertEquals("News", rows.get(0).getChunkHeading());
+    }
+
+    private List<WikiChunk> captureSavedRows(Runnable action) {
+        action.run();
+        ArgumentCaptor<List<WikiChunk>> captor = ArgumentCaptor.forClass(List.class);
+        verify(wikiChunkService, org.mockito.Mockito.atLeastOnce()).saveBatch(captor.capture());
+        List<WikiChunk> rows = new java.util.ArrayList<>();
+        captor.getAllValues().forEach(rows::addAll);
+        return rows;
+    }
+
+    private static List<String> chunkTexts(List<WikiChunk> rows) {
+        List<String> texts = new java.util.ArrayList<>(rows.size());
+        for (WikiChunk row : rows) {
+            texts.add(row.getChunkIndex() + "|" + row.getChunkText());
+        }
+        return texts;
+    }
+
+    /**
+     * Same projection as {@link #chunkTexts}, so the two can be compared directly.
+     */
+    private static List<String> markdownChunkTexts(List<MarkdownChunk> chunks) {
+        List<String> texts = new java.util.ArrayList<>(chunks.size());
+        for (MarkdownChunk chunk : chunks) {
+            texts.add(chunk.getIndex() + "|" + chunk.getText());
+        }
+        return texts;
+    }
+
+    /** Well over the Chinese cap but under the English one, and predominantly Chinese by letters. */
+    private static String chineseBody() {
+        String sentence = "本办法所称困难群众救助补助资金，是指中央和市级财政安排的用于保障困难群众基本生活的专项资金，"
+                + "应当专款专用并及时拨付到位。";
+        StringBuilder body = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            body.append("第").append(i + 1).append("条 ");
+            for (int j = 0; j < 4; j++) {
+                body.append(sentence);
+            }
+            body.append("\n\n");
+        }
+        return body.toString();
     }
 }

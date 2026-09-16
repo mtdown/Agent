@@ -57,7 +57,8 @@
 | `manifest.json` | 数据集快照：语料 hash、chunk 统计、模型版本、题量配比 |
 | `results/` | 评测结果 JSON，规则见「当前对外基线」 |
 | `audit/` | 审计与报告：`baseline-report.md`（单次快照）、`baseline-compare.md`（跨版本对比 + 可复现性）、`coverage-qc-report.md`（扩题质检）、`pairs-audit.md`、`human-review-report.md` |
-| `scripts/` | 构建与评测脚本（见下） |
+| `scripts/` | 构建与评测脚本（见下）。`lib_rag_eval.py` 是**数据集中立**的取数与打分内核，`lib_eval.py` 是环境/DB/HTTP 共用库 |
+| `datasets/mhr-rag/` | **另一套数据集，与本节完全隔离**：MultiHop-RAG 609 篇英文新闻 + 2556 题多跳问答，自带 `scripts/` 与 `results/`，只共享 `lib_rag_eval.py` 的打分口径。见该目录的 README |
 | `tools/review.html` | 人工筛选页（离线可用，进度存 localStorage） |
 | `tmp/` | 中间产物与缓存，**已 gitignore** |
 | `.env` | 密钥与模型配置，**已 gitignore**（参照 `.env.dev` 重建） |
@@ -299,10 +300,10 @@ v2 全量 http 模式实测约 **80 秒**（0 失败）。
 | **题型配比 / 出题口径** | `eval/scripts/generate_*.py`、`merge_candidates.py`、`merge_golden_v2.py`、`llm_judge.py`、`validate.py`、`gen_manifest.py` | ❌ | ❌ | 走「出题 → 汇总 → 预筛 → 人工复核 → 校验 → 快照」，冻结数据集前必须过摘抄校验 |
 | **扩题覆盖范围** | `eval/scripts/generate_coverage_questions.py` 的 `QUOTA` 与五道闸门阈值 | ❌ | ❌ | 配额改完先 `--dry-run` 看计划；G2 阈值（3-gram 覆盖率 0.35）切在 detail/overview 两型分布之间，调低会放进不可定位答案 |
 | **配对匹配范围** | `eval/scripts/build_pairs.py` 的 `MIN_BOOK_LEN` / `MIN_CONTAIN_LEN` / `NOISE_BOOK` | ❌ | ❌ | 默认匹配标题 + 正文书名号 + 文号；`--title-only` 复现 v1 行为（31 组）用于回归对照 |
-| **指标口径** | `eval/scripts/run_eval.py`（指标计算段与 `METRIC_KEYS`） | ❌ | ❌ | 改口径会让**所有历史结果失去可比性**，须同步重跑并替换基线 |
+| **指标口径 / 取数协议** | `eval/scripts/lib_rag_eval.py`（`KS` / `FETCH_K` / `compute_metrics` / `METRIC_KEYS`） | ❌ | ❌ | 改口径会让**所有历史结果失去可比性**，须同步重跑并替换基线。**注意这是两个数据集共享的一份**：改它同时影响本目录与 `datasets/mhr-rag/`，这正是刻意的——保证两边 metric 定义不漂移 |
 | **检索参数** | `eval/scripts/run_eval.py` 的 `FETCH_K` | ❌ | ❌ | 对外口径固定「一次取 top10、本地截断算 K ∈ {1,3,5,6,10}」；改动同样影响可比性 |
 | **语料来源 / 规模** | 站内导入接口、库内 `wiki_chunk` | ✅ 增量或全量 | ⚠️ 新语料需重新出题 | 建议用**独立空间**做跨库对照；混入既有空间会破坏空间级对照 |
-| **检索链路本身** | `cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java` | ❌ | ❌ | 改链路后必须重跑评测并**替换基线**，同时更新本文件的「当前对外基线」 |
+| **检索链路本身** | `cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java` | ❌ | ❌ | 改链路后必须重跑评测并**替换基线**，同时更新本文件的「当前对外基线」。链路 = 权限过滤 → **文号精确命中层** → 向量补齐；评测脚本走 HTTP 自动跟到新行为，**改算法不用动评测脚本**。另注意文号层靠中文公文号正则，**英文语料上恒不命中**（`datasets/mhr-rag/` 因此测的是纯向量链路） |
 
 **维护检查项**——改动收尾时确认四件事：
 
