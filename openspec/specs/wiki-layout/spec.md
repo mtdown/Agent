@@ -67,3 +67,35 @@ The system SHALL apply the approved visual direction to the Wiki layout: warm of
 - **WHEN** the viewport is too narrow to comfortably show three columns
 - **THEN** the Wiki document layout remains usable without content overlap
 - **AND** the document navigation, content, and outline remain available
+
+### Requirement: 列表态三栏一屏布局与中栏结构化滚动
+
+系统 SHALL 在 Wiki 文档页浏览态保持固定一屏三栏布局：左、右两栏高度为一屏并各自保留栏内滚动；中栏自身不整体滚动——搜索表单与「当前位置」栏固定在可视区顶部，仅文档摘要列表在栏内滚动，分页器常驻底部。预览或编辑文档时保持固定视口三栏布局，右栏大纲在正文滚动时保持可见。
+
+#### Scenario: 浏览列表时仅摘要列表滚动
+
+- **GIVEN** 当前位置的文档数量使摘要列表超出中栏可视高度
+- **WHEN** 用户处于浏览列表状态并滚动
+- **THEN** 搜索表单（关键词/匹配模式/空间）与「当前位置」栏保持可见不滚动
+- **AND** 仅文档摘要列表在中栏内滚动
+- **AND** 左、右两栏保持一屏高度不动（各自内容超出时使用各自栏内滚动条）
+
+#### Scenario: 分页器常驻可视区底部
+
+- **GIVEN** 摘要列表在栏内滚动
+- **WHEN** 列表滚动到任意位置
+- **THEN** 分页器始终可见，固定在中栏底部
+
+#### Scenario: 预览长文档时大纲常驻
+
+- **GIVEN** 用户正在预览或编辑一篇超出视口高度的长文档
+- **WHEN** 中栏正文滚动
+- **THEN** 布局保持固定视口三栏（与改动前一致）
+- **AND** 右栏「本文大纲」保持可见，不随正文滚动离开视野
+
+#### Scenario: 列表态与预览态之间切换布局随动
+
+- **GIVEN** 用户在浏览文档列表后打开其中某篇文档
+- **WHEN** 中栏从列表切换为文档预览
+- **THEN** 中栏恢复整体滚动（搜索表单与列表随正文一起滚动）
+- **AND** 返回列表后恢复结构化滚动
