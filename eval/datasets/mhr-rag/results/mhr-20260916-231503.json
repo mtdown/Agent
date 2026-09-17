@@ -1,0 +1,1650 @@
+{
+ "runId": "mhr-20260916-231503",
+ "dataset": "mhr-rag",
+ "config": {
+  "goldenFile": "eval/datasets/mhr-rag/anchor/golden.mhr.jsonl",
+  "baseUrl": "http://localhost:8123/api",
+  "spaceId": 2095544464810774534,
+  "fetchK": 10,
+  "ks": [
+   1,
+   3,
+   5,
+   6,
+   10
+  ],
+  "profile": {
+   "max_chunk": 1800,
+   "overlap": 100,
+   "min_chunk": 100
+  },
+  "corpusSha256": "20b61b5ab84de84a927420c5d265b7ec8d859ae49980699958a787ade9e4d28f",
+  "qaSha256": "03cfb4926461f868684903aadc8024447bdda5bb3f6804741424cce338515bff"
+ },
+ "counts": {
+  "total": 20,
+  "scored": 17,
+  "refusal": 3,
+  "errors": 0
+ },
+ "overall": {
+  "count": 17,
+  "mrr": 0.858824,
+  "recall@1": 0.357843,
+  "recall@3": 0.519608,
+  "recall@5": 0.617647,
+  "recall@6": 0.671569,
+  "recall@10": 0.77451,
+  "docRecall@1": 0.387255,
+  "docRecall@3": 0.598039,
+  "docRecall@5": 0.651961,
+  "docRecall@6": 0.70098,
+  "docRecall@10": 0.818627,
+  "hitRate@1": 0.823529,
+  "hitRate@3": 0.882353,
+  "hitRate@5": 0.882353,
+  "hitRate@6": 0.941176,
+  "hitRate@10": 1.0
+ },
+ "overallMultiDoc": {
+  "count": 17,
+  "mrr": 0.858824,
+  "recall@1": 0.357843,
+  "recall@3": 0.519608,
+  "recall@5": 0.617647,
+  "recall@6": 0.671569,
+  "recall@10": 0.77451,
+  "docRecall@1": 0.387255,
+  "docRecall@3": 0.598039,
+  "docRecall@5": 0.651961,
+  "docRecall@6": 0.70098,
+  "docRecall@10": 0.818627,
+  "hitRate@1": 0.823529,
+  "hitRate@3": 0.882353,
+  "hitRate@5": 0.882353,
+  "hitRate@6": 0.941176,
+  "hitRate@10": 1.0
+ },
+ "byQuestionType": {
+  "comparison_query": {
+   "count": 6,
+   "mrr": 1.0,
+   "recall@1": 0.5,
+   "recall@3": 0.833333,
+   "recall@5": 0.833333,
+   "recall@6": 0.833333,
+   "recall@10": 0.916667,
+   "docRecall@1": 0.5,
+   "docRecall@3": 0.833333,
+   "docRecall@5": 0.833333,
+   "docRecall@6": 0.833333,
+   "docRecall@10": 0.916667,
+   "hitRate@1": 1.0,
+   "hitRate@3": 1.0,
+   "hitRate@5": 1.0,
+   "hitRate@6": 1.0,
+   "hitRate@10": 1.0
+  },
+  "inference_query": {
+   "count": 9,
+   "mrr": 0.833333,
+   "recall@1": 0.305555,
+   "recall@3": 0.388889,
+   "recall@5": 0.537037,
+   "recall@6": 0.638889,
+   "recall@10": 0.722222,
+   "docRecall@1": 0.361111,
+   "docRecall@3": 0.537037,
+   "docRecall@5": 0.601852,
+   "docRecall@6": 0.694444,
+   "docRecall@10": 0.805556,
+   "hitRate@1": 0.777778,
+   "hitRate@3": 0.888889,
+   "hitRate@5": 0.888889,
+   "hitRate@6": 1.0,
+   "hitRate@10": 1.0
+  },
+  "temporal_query": {
+   "count": 2,
+   "mrr": 0.55,
+   "recall@1": 0.166666,
+   "recall@3": 0.166666,
+   "recall@5": 0.333334,
+   "recall@6": 0.333334,
+   "recall@10": 0.583333,
+   "docRecall@1": 0.166666,
+   "docRecall@3": 0.166666,
+   "docRecall@5": 0.333334,
+   "docRecall@6": 0.333334,
+   "docRecall@10": 0.583333,
+   "hitRate@1": 0.5,
+   "hitRate@3": 0.5,
+   "hitRate@5": 0.5,
+   "hitRate@6": 0.5,
+   "hitRate@10": 1.0
+  }
+ },
+ "refusalByType": {
+  "null_query": 3
+ },
+ "errors": [],
+ "perQuestion": [
+  {
+   "id": "MHR-0000",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Who is the individual associated with the cryptocurrency industry facing a criminal trial on fraud and conspiracy charges, as reported by both The Verge and TechCrunch, and is accused by prosecutors of committing fraud for personal gain?",
+   "goldCount": 3,
+   "goldDocs": 3,
+   "hits": [
+    {
+     "docId": 2100163596483125251,
+     "chunkIndex": 0,
+     "score": 0.028898,
+     "docTitle": "SBF’s trial starts soon, but how did he — and FTX — get here?"
+    },
+    {
+     "docId": 2100163625486737409,
+     "chunkIndex": 0,
+     "score": 0.032787,
+     "docTitle": "The FTX trial is bigger than Sam Bankman-Fried"
+    },
+    {
+     "docId": 2100163607820328962,
+     "chunkIndex": 0,
+     "score": 0.031025,
+     "docTitle": "Sam Bankman-Fried was a terrible boyfriend"
+    },
+    {
+     "docId": 2100163638099009537,
+     "chunkIndex": 1,
+     "score": 0.02901,
+     "docTitle": "How is it still getting worse for Sam Bankman-Fried?"
+    },
+    {
+     "docId": 2100163599830179842,
+     "chunkIndex": 0,
+     "score": 0.025344,
+     "docTitle": "Is Sam Bankman-Fried a bad ‘man’ or a good ‘boy’? Lawyers swap opening statements before first witnesses take the stand"
+    },
+    {
+     "docId": 2100163625486737409,
+     "chunkIndex": 2,
+     "score": 0.030118,
+     "docTitle": "The FTX trial is bigger than Sam Bankman-Fried"
+    },
+    {
+     "docId": 2100163599763070978,
+     "chunkIndex": 0,
+     "score": 0.029083,
+     "docTitle": "SBF, riding high on FTX, reportedly offered $5B to Trump to cancel President re-run"
+    },
+    {
+     "docId": 2100163596155969537,
+     "chunkIndex": 0,
+     "score": 0.028068,
+     "docTitle": "SBF Trial: The latest updates from the FTX collapse’s courtroom drama"
+    },
+    {
+     "docId": 2100163607497367553,
+     "chunkIndex": 1,
+     "score": 0.014286,
+     "docTitle": "Sam Bankman-Fried didn’t ask where the $8 billion went"
+    },
+    {
+     "docId": 2100163602854273027,
+     "chunkIndex": 0,
+     "score": 0.025808,
+     "docTitle": "The jury finally hears from Sam Bankman-Fried"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.333333,
+    "docRecall@1": 0.333333,
+    "hitRate@1": 1.0,
+    "recall@3": 0.333333,
+    "docRecall@3": 0.666667,
+    "hitRate@3": 1.0,
+    "recall@5": 0.333333,
+    "docRecall@5": 0.666667,
+    "hitRate@5": 1.0,
+    "recall@6": 0.666667,
+    "docRecall@6": 0.666667,
+    "hitRate@6": 1.0,
+    "recall@10": 0.666667,
+    "docRecall@10": 0.666667,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0001",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Which individual is implicated in both inflating the value of a Manhattan apartment to a figure not yet achieved in New York City's real estate history, according to 'Fortune', and is also accused of adjusting this apartment's valuation to compensate for a loss in another asset's worth, as reported by 'The Age'?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 4,
+     "score": 0.030679,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657480888322,
+     "chunkIndex": 2,
+     "score": 0.032258,
+     "docTitle": "Donald Trump defrauded banks with 'fantasy' to build his real estate empire, judge rules in a major repudiation against the form"
+    },
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 3,
+     "score": 0.03125,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 5,
+     "score": 0.030798,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 7,
+     "score": 0.031258,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 6,
+     "score": 0.027313,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 0,
+     "score": 0.031545,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657547997188,
+     "chunkIndex": 1,
+     "score": 0.029631,
+     "docTitle": "The $777 million surprise: Donald Trump is getting richer"
+    },
+    {
+     "docId": 2100163657480888322,
+     "chunkIndex": 0,
+     "score": 0.028595,
+     "docTitle": "Donald Trump defrauded banks with 'fantasy' to build his real estate empire, judge rules in a major repudiation against the form"
+    },
+    {
+     "docId": 2100163657480888322,
+     "chunkIndex": 1,
+     "score": 0.02773,
+     "docTitle": "Donald Trump defrauded banks with 'fantasy' to build his real estate empire, judge rules in a major repudiation against the form"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 1.0,
+    "docRecall@3": 1.0,
+    "hitRate@3": 1.0,
+    "recall@5": 1.0,
+    "docRecall@5": 1.0,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0002",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Who is the figure associated with generative AI technology whose departure from OpenAI was considered shocking according to Fortune, and is also the subject of a prevailing theory suggesting a lack of full truthfulness with the board as reported by TechCrunch?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163641190211586,
+     "chunkIndex": 0,
+     "score": 0.031754,
+     "docTitle": "WTF is going on at OpenAI? We have theories"
+    },
+    {
+     "docId": 2100163656457478145,
+     "chunkIndex": 0,
+     "score": 0.032266,
+     "docTitle": "Sam Altman ousted as OpenAI’s CEO"
+    },
+    {
+     "docId": 2100163641123102722,
+     "chunkIndex": 0,
+     "score": 0.028783,
+     "docTitle": "OpenAI's ex-chairman accuses board of going rogue in firing Altman: 'Sam and I are shocked and saddened by what the board did'"
+    },
+    {
+     "docId": 2100163641123102722,
+     "chunkIndex": 3,
+     "score": 0.030579,
+     "docTitle": "OpenAI's ex-chairman accuses board of going rogue in firing Altman: 'Sam and I are shocked and saddened by what the board did'"
+    },
+    {
+     "docId": 2100163611289018369,
+     "chunkIndex": 8,
+     "score": 0.014286,
+     "docTitle": "How OpenAI's ChatGPT has changed the world in just a year"
+    },
+    {
+     "docId": 2100163641123102722,
+     "chunkIndex": 1,
+     "score": 0.031778,
+     "docTitle": "OpenAI's ex-chairman accuses board of going rogue in firing Altman: 'Sam and I are shocked and saddened by what the board did'"
+    },
+    {
+     "docId": 2100163611289018369,
+     "chunkIndex": 7,
+     "score": 0.014085,
+     "docTitle": "How OpenAI's ChatGPT has changed the world in just a year"
+    },
+    {
+     "docId": 2100163647745908737,
+     "chunkIndex": 0,
+     "score": 0.028665,
+     "docTitle": "A timeline of Sam Altman’s firing from OpenAI — and the fallout"
+    },
+    {
+     "docId": 2100163647745908737,
+     "chunkIndex": 2,
+     "score": 0.013889,
+     "docTitle": "A timeline of Sam Altman’s firing from OpenAI — and the fallout"
+    },
+    {
+     "docId": 2100163641190211586,
+     "chunkIndex": 3,
+     "score": 0.025564,
+     "docTitle": "WTF is going on at OpenAI? We have theories"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 0.5,
+    "docRecall@3": 1.0,
+    "hitRate@3": 1.0,
+    "recall@5": 1.0,
+    "docRecall@5": 1.0,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0003",
+   "category": "comparison_query",
+   "refusal": false,
+   "question": "Do the TechCrunch article on software companies and the Hacker News article on The Epoch Times both report an increase in revenue related to payment and subscription models, respectively?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163606465568770,
+     "chunkIndex": 6,
+     "score": 0.032787,
+     "docTitle": "How the conspiracy-fueled Epoch Times went mainstream and made millions"
+    },
+    {
+     "docId": 2100163606465568770,
+     "chunkIndex": 0,
+     "score": 0.031498,
+     "docTitle": "How the conspiracy-fueled Epoch Times went mainstream and made millions"
+    },
+    {
+     "docId": 2100163606335545346,
+     "chunkIndex": 0,
+     "score": 0.030303,
+     "docTitle": "Here’s how Rainforest, a budding Stripe rival, aims to win over software companies"
+    },
+    {
+     "docId": 2100163606335545346,
+     "chunkIndex": 1,
+     "score": 0.028624,
+     "docTitle": "Here’s how Rainforest, a budding Stripe rival, aims to win over software companies"
+    },
+    {
+     "docId": 2100163606465568770,
+     "chunkIndex": 1,
+     "score": 0.023632,
+     "docTitle": "How the conspiracy-fueled Epoch Times went mainstream and made millions"
+    },
+    {
+     "docId": 2100163606335545346,
+     "chunkIndex": 6,
+     "score": 0.011364,
+     "docTitle": "Here’s how Rainforest, a budding Stripe rival, aims to win over software companies"
+    },
+    {
+     "docId": 2100163606465568770,
+     "chunkIndex": 8,
+     "score": 0.015385,
+     "docTitle": "How the conspiracy-fueled Epoch Times went mainstream and made millions"
+    },
+    {
+     "docId": 2100163606335545346,
+     "chunkIndex": 7,
+     "score": 0.024908,
+     "docTitle": "Here’s how Rainforest, a budding Stripe rival, aims to win over software companies"
+    },
+    {
+     "docId": 2100163606465568770,
+     "chunkIndex": 9,
+     "score": 0.031054,
+     "docTitle": "How the conspiracy-fueled Epoch Times went mainstream and made millions"
+    },
+    {
+     "docId": 2100163606465568770,
+     "chunkIndex": 7,
+     "score": 0.014706,
+     "docTitle": "How the conspiracy-fueled Epoch Times went mainstream and made millions"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 1.0,
+    "docRecall@3": 1.0,
+    "hitRate@3": 1.0,
+    "recall@5": 1.0,
+    "docRecall@5": 1.0,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0004",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Which online betting platform provides a welcome bonus of up to $1000 in bonus bets for new customers' first losses, runs NBA betting promotions, and is anticipated to extend the same sign-up offer to new users in Vermont, as reported by both CBSSports.com and Sporting News?",
+   "goldCount": 3,
+   "goldDocs": 3,
+   "hits": [
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 9,
+     "score": 0.030886,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163644008783874,
+     "chunkIndex": 1,
+     "score": 0.028595,
+     "docTitle": "The Best NBA Betting Sites and Apps for the 2023-24 Season"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 5,
+     "score": 0.028439,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 6,
+     "score": 0.024394,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 8,
+     "score": 0.031498,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163644008783874,
+     "chunkIndex": 0,
+     "score": 0.024837,
+     "docTitle": "The Best NBA Betting Sites and Apps for the 2023-24 Season"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 10,
+     "score": 0.031514,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 7,
+     "score": 0.028595,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 4,
+     "score": 0.020623,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    },
+    {
+     "docId": 2100163605970640899,
+     "chunkIndex": 0,
+     "score": 0.031319,
+     "docTitle": "Vermont Sportsbook Promos and Sports Betting Launch News"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.333333,
+    "docRecall@1": 0.333333,
+    "hitRate@1": 1.0,
+    "recall@3": 0.333333,
+    "docRecall@3": 0.333333,
+    "hitRate@3": 1.0,
+    "recall@5": 0.333333,
+    "docRecall@5": 0.333333,
+    "hitRate@5": 1.0,
+    "recall@6": 0.333333,
+    "docRecall@6": 0.333333,
+    "hitRate@6": 1.0,
+    "recall@10": 0.333333,
+    "docRecall@10": 0.333333,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0005",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Who is the individual alleged to have built a thriving crypto exchange on falsehoods and is accused by the prosecution of committing fraud for personal gain, as reported by both Fortune and TechCrunch?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163599830179842,
+     "chunkIndex": 0,
+     "score": 0.032787,
+     "docTitle": "Is Sam Bankman-Fried a bad ‘man’ or a good ‘boy’? Lawyers swap opening statements before first witnesses take the stand"
+    },
+    {
+     "docId": 2100163596483125251,
+     "chunkIndex": 0,
+     "score": 0.029762,
+     "docTitle": "SBF’s trial starts soon, but how did he — and FTX — get here?"
+    },
+    {
+     "docId": 2100163623926456322,
+     "chunkIndex": 0,
+     "score": 0.030622,
+     "docTitle": "Is Sam Bankman-Fried’s defense even trying to win?"
+    },
+    {
+     "docId": 2100163596155969537,
+     "chunkIndex": 3,
+     "score": 0.027584,
+     "docTitle": "SBF Trial: The latest updates from the FTX collapse’s courtroom drama"
+    },
+    {
+     "docId": 2100163596155969537,
+     "chunkIndex": 0,
+     "score": 0.030415,
+     "docTitle": "SBF Trial: The latest updates from the FTX collapse’s courtroom drama"
+    },
+    {
+     "docId": 2100163638099009537,
+     "chunkIndex": 1,
+     "score": 0.026754,
+     "docTitle": "How is it still getting worse for Sam Bankman-Fried?"
+    },
+    {
+     "docId": 2100163599830179842,
+     "chunkIndex": 1,
+     "score": 0.030777,
+     "docTitle": "Is Sam Bankman-Fried a bad ‘man’ or a good ‘boy’? Lawyers swap opening statements before first witnesses take the stand"
+    },
+    {
+     "docId": 2100163625486737409,
+     "chunkIndex": 2,
+     "score": 0.028125,
+     "docTitle": "The FTX trial is bigger than Sam Bankman-Fried"
+    },
+    {
+     "docId": 2100163631983714305,
+     "chunkIndex": 1,
+     "score": 0.02879,
+     "docTitle": "Sex, Signal messages, and sabotaging FTX's code: SBF execs and Bahamas roommates tell all in court"
+    },
+    {
+     "docId": 2100163596738977794,
+     "chunkIndex": 4,
+     "score": 0.022462,
+     "docTitle": "Sam Altman backs teens’ startup, Google unveils the Pixel 8 and TikTok tests an ad-free tier"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 0.5,
+    "docRecall@3": 0.5,
+    "hitRate@3": 1.0,
+    "recall@5": 0.5,
+    "docRecall@5": 0.5,
+    "hitRate@5": 1.0,
+    "recall@6": 0.5,
+    "docRecall@6": 0.5,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0006",
+   "category": "comparison_query",
+   "refusal": false,
+   "question": "Does the TechCrunch article on Twitch's subscription revenue split policy indicate a different monetization strategy compared to the TechCrunch article on Beeper's plans for Beeper Mini subscriptions?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163646382759937,
+     "chunkIndex": 0,
+     "score": 0.032018,
+     "docTitle": "Twitch’s money guy talks about the revenue split controversy and its monetization long game"
+    },
+    {
+     "docId": 2100163646382759937,
+     "chunkIndex": 2,
+     "score": 0.028191,
+     "docTitle": "Twitch’s money guy talks about the revenue split controversy and its monetization long game"
+    },
+    {
+     "docId": 2100163646382759937,
+     "chunkIndex": 1,
+     "score": 0.030798,
+     "docTitle": "Twitch’s money guy talks about the revenue split controversy and its monetization long game"
+    },
+    {
+     "docId": 2100163646382759937,
+     "chunkIndex": 3,
+     "score": 0.031281,
+     "docTitle": "Twitch’s money guy talks about the revenue split controversy and its monetization long game"
+    },
+    {
+     "docId": 2100163646382759937,
+     "chunkIndex": 4,
+     "score": 0.011494,
+     "docTitle": "Twitch’s money guy talks about the revenue split controversy and its monetization long game"
+    },
+    {
+     "docId": 2100163646382759937,
+     "chunkIndex": 5,
+     "score": 0.029052,
+     "docTitle": "Twitch’s money guy talks about the revenue split controversy and its monetization long game"
+    },
+    {
+     "docId": 2100163646508589057,
+     "chunkIndex": 2,
+     "score": 0.030331,
+     "docTitle": "Beeper Mini is back in operation after Apple’s attempt to shut it down"
+    },
+    {
+     "docId": 2100163647024488450,
+     "chunkIndex": 3,
+     "score": 0.030159,
+     "docTitle": "Kick streamers consider leaving over CEO’s comments in a sex worker ‘prank’ stream"
+    },
+    {
+     "docId": 2100163647024488450,
+     "chunkIndex": 4,
+     "score": 0.031281,
+     "docTitle": "Kick streamers consider leaving over CEO’s comments in a sex worker ‘prank’ stream"
+    },
+    {
+     "docId": 2100163646508589057,
+     "chunkIndex": 0,
+     "score": 0.027418,
+     "docTitle": "Beeper Mini is back in operation after Apple’s attempt to shut it down"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 0.5,
+    "docRecall@3": 0.5,
+    "hitRate@3": 1.0,
+    "recall@5": 0.5,
+    "docRecall@5": 0.5,
+    "hitRate@5": 1.0,
+    "recall@6": 0.5,
+    "docRecall@6": 0.5,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0007",
+   "category": "comparison_query",
+   "refusal": false,
+   "question": "Does 'The New York Times' article attribute the success of the Buffalo Bills' defense to the contributions of Jordan Poyer, while the 'Sporting News' article suggests that the Baltimore Ravens' defense needs to improve before their game against the Cincinnati Bengals?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163614132756481,
+     "chunkIndex": 1,
+     "score": 0.031754,
+     "docTitle": "NFL power rankings: Lions, 49ers level up; Texans jump Bengals, Bills; Jets, Patriots sink to bottom for Week 11"
+    },
+    {
+     "docId": 2100163640414265346,
+     "chunkIndex": 6,
+     "score": 0.027289,
+     "docTitle": "Alcoholism, Ayahuasca and the Enlightenment of an N.F.L. Player"
+    },
+    {
+     "docId": 2100163640414265346,
+     "chunkIndex": 5,
+     "score": 0.012048,
+     "docTitle": "Alcoholism, Ayahuasca and the Enlightenment of an N.F.L. Player"
+    },
+    {
+     "docId": 2100163640414265346,
+     "chunkIndex": 0,
+     "score": 0.028778,
+     "docTitle": "Alcoholism, Ayahuasca and the Enlightenment of an N.F.L. Player"
+    },
+    {
+     "docId": 2100163640414265346,
+     "chunkIndex": 7,
+     "score": 0.011628,
+     "docTitle": "Alcoholism, Ayahuasca and the Enlightenment of an N.F.L. Player"
+    },
+    {
+     "docId": 2100163638229032961,
+     "chunkIndex": 5,
+     "score": 0.014085,
+     "docTitle": "Bills vs. Bengals live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163614132756481,
+     "chunkIndex": 2,
+     "score": 0.030886,
+     "docTitle": "NFL power rankings: Lions, 49ers level up; Texans jump Bengals, Bills; Jets, Patriots sink to bottom for Week 11"
+    },
+    {
+     "docId": 2100163639965474818,
+     "chunkIndex": 5,
+     "score": 0.022821,
+     "docTitle": "N.F.L. Executives on the Biggest Questions Facing Super Bowl Contenders"
+    },
+    {
+     "docId": 2100163638229032961,
+     "chunkIndex": 0,
+     "score": 0.031054,
+     "docTitle": "Bills vs. Bengals live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163640414265346,
+     "chunkIndex": 2,
+     "score": 0.011236,
+     "docTitle": "Alcoholism, Ayahuasca and the Enlightenment of an N.F.L. Player"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 1.0,
+    "docRecall@3": 1.0,
+    "hitRate@3": 1.0,
+    "recall@5": 1.0,
+    "docRecall@5": 1.0,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0008",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "What is the name of the organization discussed in TechCrunch articles that, despite its financial instability, is recognized for creating ChatGPT, which is both a priority and a platform for ongoing innovations, and is planning to enhance its capabilities with the release of GPT-4 and associated APIs?",
+   "goldCount": 4,
+   "goldDocs": 4,
+   "hits": [
+    {
+     "docId": 2100163601692450817,
+     "chunkIndex": 0,
+     "score": 0.030478,
+     "docTitle": "ChatGPT: Everything you need to know about the AI-powered chatbot"
+    },
+    {
+     "docId": 2100163601692450817,
+     "chunkIndex": 21,
+     "score": 0.029387,
+     "docTitle": "ChatGPT: Everything you need to know about the AI-powered chatbot"
+    },
+    {
+     "docId": 2100163601503707137,
+     "chunkIndex": 0,
+     "score": 0.032018,
+     "docTitle": "One year later, ChatGPT is still alive and kicking"
+    },
+    {
+     "docId": 2100163601692450817,
+     "chunkIndex": 8,
+     "score": 0.011364,
+     "docTitle": "ChatGPT: Everything you need to know about the AI-powered chatbot"
+    },
+    {
+     "docId": 2100163656457478145,
+     "chunkIndex": 0,
+     "score": 0.012987,
+     "docTitle": "Sam Altman ousted as OpenAI’s CEO"
+    },
+    {
+     "docId": 2100163601692450817,
+     "chunkIndex": 7,
+     "score": 0.030769,
+     "docTitle": "ChatGPT: Everything you need to know about the AI-powered chatbot"
+    },
+    {
+     "docId": 2100163601692450817,
+     "chunkIndex": 14,
+     "score": 0.029857,
+     "docTitle": "ChatGPT: Everything you need to know about the AI-powered chatbot"
+    },
+    {
+     "docId": 2100163601692450817,
+     "chunkIndex": 1,
+     "score": 0.030798,
+     "docTitle": "ChatGPT: Everything you need to know about the AI-powered chatbot"
+    },
+    {
+     "docId": 2100163611289018369,
+     "chunkIndex": 7,
+     "score": 0.013333,
+     "docTitle": "How OpenAI's ChatGPT has changed the world in just a year"
+    },
+    {
+     "docId": 2100163611289018369,
+     "chunkIndex": 0,
+     "score": 0.027253,
+     "docTitle": "How OpenAI's ChatGPT has changed the world in just a year"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.0,
+    "docRecall@1": 0.25,
+    "hitRate@1": 0.0,
+    "recall@3": 0.25,
+    "docRecall@3": 0.5,
+    "hitRate@3": 1.0,
+    "recall@5": 0.5,
+    "docRecall@5": 0.5,
+    "hitRate@5": 1.0,
+    "recall@6": 0.5,
+    "docRecall@6": 0.5,
+    "hitRate@6": 1.0,
+    "recall@10": 0.5,
+    "docRecall@10": 0.5,
+    "hitRate@10": 1.0,
+    "mrr": 0.333333
+   }
+  },
+  {
+   "id": "MHR-0009",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Which company, as reported by both TechCrunch and The Verge, has spent billions to maintain its default search engine status on various platforms and is also accused of harming news publishers’ revenue through its business practices?",
+   "goldCount": 3,
+   "goldDocs": 3,
+   "hits": [
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 0,
+     "score": 0.032787,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 1,
+     "score": 0.031258,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    },
+    {
+     "docId": 2100163597703667714,
+     "chunkIndex": 0,
+     "score": 0.032002,
+     "docTitle": "More from the US v Google trial: vertical search, pre-installs and the case of Firefox/Yahoo"
+    },
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 0,
+     "score": 0.031754,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 3,
+     "score": 0.028577,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163597636558850,
+     "chunkIndex": 1,
+     "score": 0.025487,
+     "docTitle": "Apple defends Google Search deal in court: ‘There wasn’t a valid alternative’"
+    },
+    {
+     "docId": 2100163597636558850,
+     "chunkIndex": 0,
+     "score": 0.015625,
+     "docTitle": "Apple defends Google Search deal in court: ‘There wasn’t a valid alternative’"
+    },
+    {
+     "docId": 2100163597636558850,
+     "chunkIndex": 2,
+     "score": 0.020842,
+     "docTitle": "Apple defends Google Search deal in court: ‘There wasn’t a valid alternative’"
+    },
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 1,
+     "score": 0.026857,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 3,
+     "score": 0.028485,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.333333,
+    "docRecall@1": 0.333333,
+    "hitRate@1": 1.0,
+    "recall@3": 0.333333,
+    "docRecall@3": 0.333333,
+    "hitRate@3": 1.0,
+    "recall@5": 0.666667,
+    "docRecall@5": 0.666667,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0010",
+   "category": "null_query",
+   "refusal": true,
+   "metrics": null,
+   "hits": []
+  },
+  {
+   "id": "MHR-0011",
+   "category": "comparison_query",
+   "refusal": false,
+   "question": "Does 'The Age' article suggest that Australia's Davis Cup team is aiming for an improvement in their performance compared to the previous year, while the 'Sporting News' article indicates that the South Africa national rugby team has already achieved an improvement to reach the Rugby World Cup semi-finals?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163650556092418,
+     "chunkIndex": 6,
+     "score": 0.027757,
+     "docTitle": "‘Biggest win of my career’: De Minaur, Popyrin power Australia into Davis Cup final"
+    },
+    {
+     "docId": 2100163650556092418,
+     "chunkIndex": 2,
+     "score": 0.024675,
+     "docTitle": "‘Biggest win of my career’: De Minaur, Popyrin power Australia into Davis Cup final"
+    },
+    {
+     "docId": 2100163624442355714,
+     "chunkIndex": 1,
+     "score": 0.027629,
+     "docTitle": "Where to watch England vs South Africa: Live stream, TV channel, lineups, odds for 2023 Rugby World Cup semifinal"
+    },
+    {
+     "docId": 2100163650556092418,
+     "chunkIndex": 5,
+     "score": 0.025463,
+     "docTitle": "‘Biggest win of my career’: De Minaur, Popyrin power Australia into Davis Cup final"
+    },
+    {
+     "docId": 2100163624442355714,
+     "chunkIndex": 5,
+     "score": 0.027921,
+     "docTitle": "Where to watch England vs South Africa: Live stream, TV channel, lineups, odds for 2023 Rugby World Cup semifinal"
+    },
+    {
+     "docId": 2100163650556092418,
+     "chunkIndex": 0,
+     "score": 0.012195,
+     "docTitle": "‘Biggest win of my career’: De Minaur, Popyrin power Australia into Davis Cup final"
+    },
+    {
+     "docId": 2100163624442355714,
+     "chunkIndex": 0,
+     "score": 0.029631,
+     "docTitle": "Where to watch England vs South Africa: Live stream, TV channel, lineups, odds for 2023 Rugby World Cup semifinal"
+    },
+    {
+     "docId": 2100163647150317569,
+     "chunkIndex": 2,
+     "score": 0.026333,
+     "docTitle": "Eddie Jones says he needs to ‘give myself an uppercut’ but ‘100 percent’ committed to coaching Wallabies"
+    },
+    {
+     "docId": 2100163647150317569,
+     "chunkIndex": 1,
+     "score": 0.029139,
+     "docTitle": "Eddie Jones says he needs to ‘give myself an uppercut’ but ‘100 percent’ committed to coaching Wallabies"
+    },
+    {
+     "docId": 2100163650556092418,
+     "chunkIndex": 3,
+     "score": 0.025517,
+     "docTitle": "‘Biggest win of my career’: De Minaur, Popyrin power Australia into Davis Cup final"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 1.0,
+    "docRecall@3": 1.0,
+    "hitRate@3": 1.0,
+    "recall@5": 1.0,
+    "docRecall@5": 1.0,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0012",
+   "category": "temporal_query",
+   "refusal": false,
+   "question": "After the TechCrunch report on October 7, 2023, concerning Dave Clark's comments on Flexport, and the subsequent TechCrunch article on October 30, 2023, regarding Ryan Petersen's actions at Flexport, was there a change in the nature of the events reported?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 15,
+     "score": 0.028191,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 6,
+     "score": 0.027652,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 1,
+     "score": 0.032787,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 12,
+     "score": 0.03055,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 10,
+     "score": 0.029287,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 3,
+     "score": 0.029437,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 2,
+     "score": 0.028814,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 11,
+     "score": 0.028992,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163657996787714,
+     "chunkIndex": 14,
+     "score": 0.027418,
+     "docTitle": "The inside story of Dave Clark's tumultuous last days at Flexport"
+    },
+    {
+     "docId": 2100163658063896578,
+     "chunkIndex": 2,
+     "score": 0.02886,
+     "docTitle": "Cruise hits the brakes on driverless, UAW makes progress and more EV backpedaling"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.0,
+    "docRecall@1": 0.0,
+    "hitRate@1": 0.0,
+    "recall@3": 0.0,
+    "docRecall@3": 0.0,
+    "hitRate@3": 0.0,
+    "recall@5": 0.0,
+    "docRecall@5": 0.0,
+    "hitRate@5": 0.0,
+    "recall@6": 0.0,
+    "docRecall@6": 0.0,
+    "hitRate@6": 0.0,
+    "recall@10": 0.5,
+    "docRecall@10": 0.5,
+    "hitRate@10": 1.0,
+    "mrr": 0.1
+   }
+  },
+  {
+   "id": "MHR-0013",
+   "category": "null_query",
+   "refusal": true,
+   "metrics": null,
+   "hits": []
+  },
+  {
+   "id": "MHR-0014",
+   "category": "comparison_query",
+   "refusal": false,
+   "question": "Does 'The Independent - Life and Style' article suggesting Prince William's emotional state regarding Princess Diana's death align with the same publication's depiction of the events leading up to her death in 'The Crown season six'?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 6,
+     "score": 0.031746,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    },
+    {
+     "docId": 2100163635968303105,
+     "chunkIndex": 0,
+     "score": 0.032787,
+     "docTitle": "Fans react to most ‘heartbreaking’ scene in The Crown"
+    },
+    {
+     "docId": 2100163635968303105,
+     "chunkIndex": 2,
+     "score": 0.030777,
+     "docTitle": "Fans react to most ‘heartbreaking’ scene in The Crown"
+    },
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 0,
+     "score": 0.032258,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    },
+    {
+     "docId": 2100163635968303105,
+     "chunkIndex": 1,
+     "score": 0.03101,
+     "docTitle": "Fans react to most ‘heartbreaking’ scene in The Crown"
+    },
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 1,
+     "score": 0.029877,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    },
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 5,
+     "score": 0.030077,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    },
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 4,
+     "score": 0.027444,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    },
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 3,
+     "score": 0.026993,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    },
+    {
+     "docId": 2100163635846668290,
+     "chunkIndex": 2,
+     "score": 0.029412,
+     "docTitle": "The Crown: What is fact and what is fiction on season 6?"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 1.0,
+    "docRecall@3": 1.0,
+    "hitRate@3": 1.0,
+    "recall@5": 1.0,
+    "docRecall@5": 1.0,
+    "hitRate@5": 1.0,
+    "recall@6": 1.0,
+    "docRecall@6": 1.0,
+    "hitRate@6": 1.0,
+    "recall@10": 1.0,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0015",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Which entity is currently engaged with Amazon to address competition concerns, facilitating dialogue with consumer groups against Meta, deploying staff within its AI Office for future regulations, and has previously focused on illegal content and disinformation issues related to the Israel-Hamas war, as reported by TechCrunch?",
+   "goldCount": 4,
+   "goldDocs": 4,
+   "hits": [
+    {
+     "docId": 2100163622819160065,
+     "chunkIndex": 0,
+     "score": 0.02603,
+     "docTitle": "Elon Musk’s X faces first DSA probe in EU over illegal content risks, moderation, transparency and deceptive UX design"
+    },
+    {
+     "docId": 2100163598869684226,
+     "chunkIndex": 0,
+     "score": 0.027799,
+     "docTitle": "After warning, the EU opens investigation into X over alleged disinformation"
+    },
+    {
+     "docId": 2100163599129731073,
+     "chunkIndex": 4,
+     "score": 0.02409,
+     "docTitle": "EU fires urgent warning at Elon Musk’s X over illegal content and disinformation following Hamas attacks"
+    },
+    {
+     "docId": 2100163599129731073,
+     "chunkIndex": 0,
+     "score": 0.030478,
+     "docTitle": "EU fires urgent warning at Elon Musk’s X over illegal content and disinformation following Hamas attacks"
+    },
+    {
+     "docId": 2100163620956889090,
+     "chunkIndex": 4,
+     "score": 0.013699,
+     "docTitle": "European consumer groups band together to fight Meta’s self-serving ad-free sub — branding it ‘unfair’ and ‘illegal’"
+    },
+    {
+     "docId": 2100163600597737478,
+     "chunkIndex": 0,
+     "score": 0.011236,
+     "docTitle": "Amazon’s iRobot purchase sucks up formal competition concerns in EU"
+    },
+    {
+     "docId": 2100163641378955265,
+     "chunkIndex": 2,
+     "score": 0.016393,
+     "docTitle": "Meta says it’s prioritizing livestreaming checks during Israel-Hamas war"
+    },
+    {
+     "docId": 2100163599129731073,
+     "chunkIndex": 1,
+     "score": 0.028665,
+     "docTitle": "EU fires urgent warning at Elon Musk’s X over illegal content and disinformation following Hamas attacks"
+    },
+    {
+     "docId": 2100163622819160065,
+     "chunkIndex": 1,
+     "score": 0.027651,
+     "docTitle": "Elon Musk’s X faces first DSA probe in EU over illegal content risks, moderation, transparency and deceptive UX design"
+    },
+    {
+     "docId": 2100163598869684226,
+     "chunkIndex": 3,
+     "score": 0.014085,
+     "docTitle": "After warning, the EU opens investigation into X over alleged disinformation"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.25,
+    "docRecall@1": 0.25,
+    "hitRate@1": 1.0,
+    "recall@3": 0.25,
+    "docRecall@3": 0.25,
+    "hitRate@3": 1.0,
+    "recall@5": 0.5,
+    "docRecall@5": 0.5,
+    "hitRate@5": 1.0,
+    "recall@6": 0.5,
+    "docRecall@6": 0.75,
+    "hitRate@6": 1.0,
+    "recall@10": 0.5,
+    "docRecall@10": 0.75,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0016",
+   "category": "inference_query",
+   "refusal": false,
+   "question": "Which company, known for its dominance in the e-reader space and for offering exclusive invite-only deals during sales events, faced a stock decline due to an antitrust lawsuit reported by 'The Sydney Morning Herald' and discussed by sellers in a 'Cnbc | World Business News Leader' article?",
+   "goldCount": 4,
+   "goldDocs": 4,
+   "hits": [
+    {
+     "docId": 2100163592540479489,
+     "chunkIndex": 6,
+     "score": 0.013889,
+     "docTitle": "Amazon sellers sound off on the FTC's 'long-overdue' antitrust case"
+    },
+    {
+     "docId": 2100163592540479489,
+     "chunkIndex": 3,
+     "score": 0.029287,
+     "docTitle": "Amazon sellers sound off on the FTC's 'long-overdue' antitrust case"
+    },
+    {
+     "docId": 2100163592540479489,
+     "chunkIndex": 1,
+     "score": 0.031025,
+     "docTitle": "Amazon sellers sound off on the FTC's 'long-overdue' antitrust case"
+    },
+    {
+     "docId": 2100163592540479489,
+     "chunkIndex": 2,
+     "score": 0.015385,
+     "docTitle": "Amazon sellers sound off on the FTC's 'long-overdue' antitrust case"
+    },
+    {
+     "docId": 2100163592540479489,
+     "chunkIndex": 8,
+     "score": 0.014493,
+     "docTitle": "Amazon sellers sound off on the FTC's 'long-overdue' antitrust case"
+    },
+    {
+     "docId": 2100163656780439553,
+     "chunkIndex": 42,
+     "score": 0.016393,
+     "docTitle": "78 Absolute Best October Prime Day Deals (2023)"
+    },
+    {
+     "docId": 2100163592100077569,
+     "chunkIndex": 4,
+     "score": 0.02938,
+     "docTitle": "ASX set to drop as Wall Street’s September slump deepens"
+    },
+    {
+     "docId": 2100163656906268673,
+     "chunkIndex": 4,
+     "score": 0.020125,
+     "docTitle": "Here are the best Kindle deals right now"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 3,
+     "score": 0.026847,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    },
+    {
+     "docId": 2100163662044291074,
+     "chunkIndex": 0,
+     "score": 0.012346,
+     "docTitle": "The best anti-Prime Big Deal Day deals"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.0,
+    "docRecall@1": 0.25,
+    "hitRate@1": 0.0,
+    "recall@3": 0.0,
+    "docRecall@3": 0.25,
+    "hitRate@3": 0.0,
+    "recall@5": 0.0,
+    "docRecall@5": 0.25,
+    "hitRate@5": 0.0,
+    "recall@6": 0.25,
+    "docRecall@6": 0.5,
+    "hitRate@6": 1.0,
+    "recall@10": 0.5,
+    "docRecall@10": 1.0,
+    "hitRate@10": 1.0,
+    "mrr": 0.166667
+   }
+  },
+  {
+   "id": "MHR-0017",
+   "category": "temporal_query",
+   "refusal": false,
+   "question": "Was there no change in the portrayal of Google's influence on the digital ecosystem between the report from The Verge on Google's impact on the internet's appearance published on November 1, 2023, and the report from TechCrunch on a class action antitrust suit against Google published later?",
+   "goldCount": 3,
+   "goldDocs": 3,
+   "hits": [
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 0,
+     "score": 0.031281,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 1,
+     "score": 0.025838,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 3,
+     "score": 0.032787,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163599956008961,
+     "chunkIndex": 2,
+     "score": 0.025589,
+     "docTitle": "News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line"
+    },
+    {
+     "docId": 2100163613671383042,
+     "chunkIndex": 26,
+     "score": 0.012821,
+     "docTitle": "The people who ruined the internet"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 0,
+     "score": 0.029911,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    },
+    {
+     "docId": 2100163597703667714,
+     "chunkIndex": 1,
+     "score": 0.030579,
+     "docTitle": "More from the US v Google trial: vertical search, pre-installs and the case of Firefox/Yahoo"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 1,
+     "score": 0.023611,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 4,
+     "score": 0.014085,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    },
+    {
+     "docId": 2100163632814186498,
+     "chunkIndex": 3,
+     "score": 0.029418,
+     "docTitle": "5 things we learned so far about the Google antitrust case"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.333333,
+    "docRecall@1": 0.333333,
+    "hitRate@1": 1.0,
+    "recall@3": 0.333333,
+    "docRecall@3": 0.333333,
+    "hitRate@3": 1.0,
+    "recall@5": 0.666667,
+    "docRecall@5": 0.666667,
+    "hitRate@5": 1.0,
+    "recall@6": 0.666667,
+    "docRecall@6": 0.666667,
+    "hitRate@6": 1.0,
+    "recall@10": 0.666667,
+    "docRecall@10": 0.666667,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  },
+  {
+   "id": "MHR-0018",
+   "category": "null_query",
+   "refusal": true,
+   "metrics": null,
+   "hits": []
+  },
+  {
+   "id": "MHR-0019",
+   "category": "comparison_query",
+   "refusal": false,
+   "question": "Does the Sporting News article suggest that streaming services do not require a subscription for viewing the Cowboys vs. 49ers game, in contrast to the Polygon article's claim about film availability on streaming platforms without a subscription?",
+   "goldCount": 2,
+   "goldDocs": 2,
+   "hits": [
+    {
+     "docId": 2100163636685529089,
+     "chunkIndex": 7,
+     "score": 0.032522,
+     "docTitle": "Cowboys vs. 49ers live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163636685529089,
+     "chunkIndex": 4,
+     "score": 0.020545,
+     "docTitle": "Cowboys vs. 49ers live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163600153141250,
+     "chunkIndex": 13,
+     "score": 0.014925,
+     "docTitle": "Jaguars vs. Saints live score, updates, highlights from NFL 'Thursday Night Football' game"
+    },
+    {
+     "docId": 2100163627206402051,
+     "chunkIndex": 0,
+     "score": 0.020285,
+     "docTitle": "The best new TV series on every streaming service"
+    },
+    {
+     "docId": 2100163650811944962,
+     "chunkIndex": 0,
+     "score": 0.015873,
+     "docTitle": "The best gifts to level up a home theater"
+    },
+    {
+     "docId": 2100163636685529089,
+     "chunkIndex": 1,
+     "score": 0.030478,
+     "docTitle": "Cowboys vs. 49ers live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163637968986114,
+     "chunkIndex": 0,
+     "score": 0.014706,
+     "docTitle": "Here are over 40 last-minute gifts you can still nab before Christmas"
+    },
+    {
+     "docId": 2100163636685529089,
+     "chunkIndex": 5,
+     "score": 0.02411,
+     "docTitle": "Cowboys vs. 49ers live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163636685529089,
+     "chunkIndex": 0,
+     "score": 0.012658,
+     "docTitle": "Cowboys vs. 49ers live score, updates, highlights from NFL 'Sunday Night Football' game"
+    },
+    {
+     "docId": 2100163636685529089,
+     "chunkIndex": 6,
+     "score": 0.022511,
+     "docTitle": "Cowboys vs. 49ers live score, updates, highlights from NFL 'Sunday Night Football' game"
+    }
+   ],
+   "metrics": {
+    "recall@1": 0.5,
+    "docRecall@1": 0.5,
+    "hitRate@1": 1.0,
+    "recall@3": 0.5,
+    "docRecall@3": 0.5,
+    "hitRate@3": 1.0,
+    "recall@5": 0.5,
+    "docRecall@5": 0.5,
+    "hitRate@5": 1.0,
+    "recall@6": 0.5,
+    "docRecall@6": 0.5,
+    "hitRate@6": 1.0,
+    "recall@10": 0.5,
+    "docRecall@10": 0.5,
+    "hitRate@10": 1.0,
+    "mrr": 1.0
+   }
+  }
+ ]
+}

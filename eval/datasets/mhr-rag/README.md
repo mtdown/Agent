@@ -90,7 +90,8 @@
 |---|---|
 | `scripts/mhr_lib.py` | 数据集专属约定：路径、题型、sha256、`bind_fact` 绑定算法 |
 | `scripts/bind_anchor.py` | 两步绑定，产出 `golden.mhr.jsonl` + anchor map + 未绑定清单 |
-| `scripts/run_eval.py` | 评测 runner（import 共享内核），按 `question_type` 分类报指标 |
+| `scripts/run_eval.py` | 评测 runner（import 共享内核），按 `question_type` 分类报指标；支持 `--checkpoint-every` / `--resume` 断点续跑 |
+| `scripts/compare_runs.py` | 对比两次 run（纯离线）。支持 `--subset-first N` 同题子集对比 |
 | `anchor/` | 绑定产物：`golden.mhr.jsonl`、`anchor-map.json`、`unbound-report.json` |
 | `results/` | 本数据集的评测结果（不写进 `eval/results/`） |
 
@@ -113,11 +114,65 @@ python eval/datasets/mhr-rag/scripts/run_eval.py --space-id <spaceId> --probe
 python eval/datasets/mhr-rag/scripts/run_eval.py --space-id <spaceId>
 ```
 
-## 阻塞
+## 阻塞（已解除）
 
-本数据集**尚未能端到端跑通**：导入 609 篇依赖变更
-`openspec/changes/add-json-document-import`，该变更 tasks 为 **0/45**，一行实现都没写。
-在其落地前，`bind_anchor.py` 的步骤一会全部报"文档未导入"。
+原先担心"导入 609 篇依赖 `add-json-document-import`（当时 0/45）"——**实测未阻塞**：
+609 篇语料已在库（`bind_anchor.py` 步骤一按 `sourceUrl` 反查命中 609/609），
+gold 绑定 6084 条全部成功（`unbound=0`），全量/子集均已跑通。
+
+语料落在空间 **`2095544464810774534`**（609 篇 markdown）。
+另有一个空间 `2095512793587744770` 含 610 篇同源文档，是导入过程的副产品，
+**不要用于评测**——两个空间同时存在会让文档级指标虚高。
+
+## 基线记录（英文 × 改造前 / 改造后，同题对比）
+
+改造 = 混合检索（向量 + BM25 → RRF 融合，池深 50）+ `qwen3.7-text-rerank` 重排。
+**同一批题（golden 前 600 题，其中 521 题计分、79 题 `null_query` 拒答）**，逐题可比：
+
+| 指标 | 改造前（纯向量） | 改造后（混合+重排） | 提升 |
+|---|---|---|---|
+| `recall@6` | 0.4677 | **0.7121** | **+24.4pt** |
+| `docRecall@6` | 0.6200 | 0.7815 | +16.2pt |
+| `hitRate@6` | 0.8215 | 0.9635 | +14.2pt |
+| `mrr` | 0.5712 | 0.8320 | +26.1pt |
+
+按题型（`recall@6`）：comparison 0.5748→0.8006（+22.6pt）、
+inference 0.3703→0.6550（**+28.5pt**）、temporal 0.4276→0.6434（+21.6pt）。
+
+结果文件：
+- 改造前全量：`results/mhr-20260916-184519.json`（2556 题，跑于改造提交之前）
+- 改造后子集：`results/mhr-20260916-233042.json`（前 600 题）
+- `results/mhr-20260916-231503.json` 是 **20 题烟雾测试，不是基线，禁止引用**
+
+### 为什么这个对比能证明"泛化"
+
+中文侧（自有 216 篇，399 题）同样改造是 `recall@6 0.5623 → 0.7930（+23.1pt）`；
+英文侧是 **+24.4pt**。两者量级一致，且英文走的是**纯向量链路**（文号层对英文恒不生效），
+说明收益来自"混合检索 + 重排"本身，**不是中文公文号钉位带来的语种特化**。
+
+⚠️ 只跑了前 600 题（非全量 2556），故上表数值**不与全量基线直接横比**，
+只能与同子集的 A 栏比。题序是打散的（前 200 题类型游程 142），
+前 600 题题型占比与全量最大偏差 2.5pt；521 题的 `recall@6` 标准误约 ±2.2pt，
+而观测到的提升是 +24.4pt，远超噪声。
+
+## 跑批必须开 checkpoint（血泪）
+
+一次全量 = 2556 题 ×（1 次 embedding + 1 次 50 篇候选的 rerank），约 30 分钟、
+数千次付费调用。2026-09-16 首次全量跑到 ~800 题时 DashScope 返回
+**`Arrearage`（账号欠费）**，后端连续抛 `RagEmbeddingUnavailableException`，
+runner 按设计保护性中止 —— **已跑的 800 题因为没落盘全部作废**。
+
+现在默认每 100 题写一次进度到 `tmp/mhr-ckpt-<runId>.json`（原子替换），
+中断后 `--resume` 接着跑，只补没跑的题：
+
+```bash
+python eval/datasets/mhr-rag/scripts/run_eval.py --space-id 2095544464810774534 --limit 600
+python eval/datasets/mhr-rag/scripts/run_eval.py --space-id 2095544464810774534 \
+       --resume tmp/mhr-ckpt-<runId>.json
+```
+
+续跑前会校验 `corpusSha256` / `qaSha256` / `spaceId`，不一致直接拒绝——
+把两批不同前提的结果拼在一起，比不跑更危险。
 
 ## 已知实测数字（用于日后回归对照）
 
