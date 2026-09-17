@@ -51,3 +51,8 @@ tmp/
 *.inspect.ndjson
 diag.txt
 cloud/project.txt
+
+### Internal eval docs (local only, not published) ###
+### 内部问题记录与引用纪律，保留在本地工作区，不进入版本库
+eval/EVAL-REFERENCE.md
+eval/EVAL-BACKLOG.md
