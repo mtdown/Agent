@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -157,6 +158,38 @@ class RagLlmClientTest {
 
         client.streamChat("system", "prompt", true, new RecordingCallback());
         assertEquals("thinking-model", requestedModel[0]);
+    }
+
+    @Test
+    void enableThinkingIsOnlySentWhenExplicitlyConfigured() throws Exception {
+        final java.util.List<String> bodies = new java.util.ArrayList<>();
+        server.createContext("/chat/completions", exchange -> {
+            bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] out = "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, out.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(out);
+            }
+        });
+        server.start();
+        properties.getLlm().setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+        properties.getLlm().setApiKey("test-key");
+        RagLlmClient client = new RagLlmClient(properties);
+
+        // 未配置：请求体必须与该特性引入前逐字节一致，不得出现新字段
+        client.streamChat("system", "prompt", false, new RecordingCallback());
+        assertFalse(bodies.get(0).contains("enable_thinking"),
+                "未配置时不得下发 enable_thinking，否则会污染既有厂商链路");
+
+        properties.getLlm().setEnableThinking(false);
+        client.streamChat("system", "prompt", false, new RecordingCallback());
+        assertTrue(bodies.get(1).contains("\"enable_thinking\":false"));
+
+        properties.getLlm().setEnableThinking(true);
+        client.streamChat("system", "prompt", false, new RecordingCallback());
+        assertTrue(bodies.get(2).contains("\"enable_thinking\":true"));
     }
 
     @Test

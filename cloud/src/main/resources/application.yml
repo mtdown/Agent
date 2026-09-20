@@ -144,6 +144,12 @@ rag:
     model: ${RAG_LLM_MODEL:deepseek-v4-flash-vision-exp}
     # 默认（快速）模式的非思考模型，勾选「深度思考」时才用上面的思考型模型
     fast-model: ${RAG_LLM_FAST_MODEL:deepseek-chat}
+    # 生成模型是否开思考（DashScope 系模型对应请求体 enable_thinking）。
+    # 留空（或未设该环境变量）= 不发送该字段，保持各厂商默认行为；仅显式配置 true/false 时才写入请求体。
+    # 实测：qwen3.8-max 不传时默认开思考（有 reasoning_content），设 false 后单题 2.84s → 1.06s。
+    # 注意：不能用 ${RAG_LLM_ENABLE_THINKING:#{null}} —— SpEL 默认值在 @ConfigurationProperties
+    # 绑定时不会被求值，会以字面量 '#{null}' 参与 Boolean 转换并导致启动失败（CloudApplicationTests 已捕获）。
+    enable-thinking: ${RAG_LLM_ENABLE_THINKING:}
     timeout-seconds: 120
     # 思考型模型的 reasoning_content 与正文共用 token 预算，2048 会导致复杂题思考阶段即被截断（finishReason=length、正文为空）
     max-tokens: 8192
