@@ -32,9 +32,20 @@ public class RagProperties {
         private int timeoutSeconds = 120;
         // 思考型模型 reasoning 与正文共用预算，需留足空间，避免 finishReason=length 截断
         private int maxTokens = 8192;
+        /**
+         * 生成模型是否开思考（DashScope 系模型对应请求体的 enable_thinking）。
+         * null = 不发送该字段，保持各厂商默认行为（DeepSeek 链路因此完全不受影响）；
+         * 仅在显式配置 true/false 时才写入请求体。实测 qwen3.8-max 默认开思考。
+         */
+        private Boolean enableThinking;
 
         public boolean isConfigured() {
             return apiKey != null && !apiKey.isBlank();
+        }
+
+        /** 是否需要把 enable_thinking 写进请求体（未显式配置时为 false） */
+        public boolean hasEnableThinking() {
+            return enableThinking != null;
         }
 
         /** deepThinking=true 用思考型模型，否则用快速模型；快速模型未配置时回退思考型 */

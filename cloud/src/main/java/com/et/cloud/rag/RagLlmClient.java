@@ -114,6 +114,11 @@ public class RagLlmClient {
                          boolean deepThinking, EmittingCallback cb) {
         JSONObject body = new JSONObject();
         body.set("model", config.resolveModel(deepThinking));
+        // 仅显式配置时下发思考开关：不配置则请求体与本特性引入前逐字节一致，
+        // 避免给 DeepSeek 等不识别该字段的服务写入未知参数。
+        if (config.hasEnableThinking()) {
+            body.set("enable_thinking", config.getEnableThinking());
+        }
         body.set("stream", true);
         body.set("max_tokens", config.getMaxTokens());
         JSONArray messages = new JSONArray();
