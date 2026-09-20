@@ -111,6 +111,21 @@ rag:
       enabled: true
       k1: 1.2
       b: 0.75
+    multi-query:
+      enabled: ${RAG_MULTI_QUERY_ENABLED:false}
+      model: ${RAG_MULTI_QUERY_MODEL:qwen3.8-flash}
+      timeout-seconds: ${RAG_MULTI_QUERY_TIMEOUT_SECONDS:20}
+      max-tokens: ${RAG_MULTI_QUERY_MAX_TOKENS:512}
+      original-weight: ${RAG_MULTI_QUERY_ORIGINAL_WEIGHT:1.0}
+      rewritten-question-weight: ${RAG_MULTI_QUERY_REWRITE_WEIGHT:0.7}
+      hypothetical-answer-weight: ${RAG_MULTI_QUERY_HYPOTHETICAL_ANSWER_WEIGHT:0.6}
+    evidence-assembly:
+      enabled: ${RAG_EVIDENCE_ASSEMBLY_ENABLED:false}
+      max-merged-chars: ${RAG_EVIDENCE_MAX_MERGED_CHARS:3600}
+      max-chunks-per-block: ${RAG_EVIDENCE_MAX_CHUNKS_PER_BLOCK:3}
+      max-chunk-index-gap: ${RAG_EVIDENCE_MAX_CHUNK_INDEX_GAP:1}
+      max-per-document: ${RAG_EVIDENCE_MAX_PER_DOCUMENT:3}
+      final-context-k: ${RAG_EVIDENCE_FINAL_CONTEXT_K:6}
     rerank:
       enabled: ${RAG_RERANK_ENABLED:true}
       # DashScope 原生 text-rerank 端点（注意不是 OpenAI 兼容 base-url）；与 embedding 复用同一把 key

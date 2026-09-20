@@ -66,6 +66,9 @@ public class RagSearchServiceImpl implements RagSearchService {
     private RagRerankClient ragRerankClient;
 
     @Resource
+    private RagQueryExpansionClient queryExpansionClient;
+
+    @Resource
     private RagProperties ragProperties;
 
     @Override
@@ -119,48 +122,56 @@ public class RagSearchServiceImpl implements RagSearchService {
         List<ChunkHit> docNumberGroup = findDocNumberHits(request.getQuery(), effectiveSpaceIds);
         timings.setDocNumberMs(System.currentTimeMillis() - phaseStart);
 
-        // 4. embed the query once: the vector channel needs it, and it also lets the
-        //    doc-number group be ordered by relevance when no re-ranker is available
-        float[] queryVector = null;
+        // 4. Build query branches. By default this is just the original query;
+        //    optional generated branches are lower-weighted retrieval probes, never evidence.
+        List<QueryBranch> branches = buildQueryBranches(request.getQuery(), retrieval);
+
+        // 5. embed the query branches once: the vector channel needs them, and the
+        //    original vector also lets the doc-number group be ordered by relevance when no re-ranker is available
+        List<float[]> queryVectors = Collections.emptyList();
         if (ragEmbeddingClient.isConfigured()) {
             phaseStart = System.currentTimeMillis();
-            List<float[]> vectors = ragEmbeddingClient.embed(List.of(request.getQuery().trim()));
+            List<String> branchTexts = branches.stream().map(QueryBranch::getText).collect(Collectors.toList());
+            queryVectors = ragEmbeddingClient.embed(branchTexts);
             timings.setEmbedMs(System.currentTimeMillis() - phaseStart);
-            if (!vectors.isEmpty()) {
-                queryVector = vectors.get(0);
-            }
         }
 
-        // 5. candidate generation: dense + lexical over the SAME authorized corpus.
+        // 6. candidate generation: dense + lexical over the SAME authorized corpus.
         //    A channel that did not run leaves its timing null rather than a
         //    misleading 0 — callers render this as a step timeline.
-        List<ChunkHit> vectorHits = Collections.emptyList();
-        if (queryVector != null) {
-            phaseStart = System.currentTimeMillis();
-            vectorHits = vectorStore.search(queryVector, effectiveSpaceIds, poolSize);
+        phaseStart = System.currentTimeMillis();
+        List<List<ChunkHit>> vectorBranchHits = new ArrayList<>();
+        if (!queryVectors.isEmpty()) {
+            for (float[] queryVector : queryVectors) {
+                vectorBranchHits.add(vectorStore.search(queryVector, effectiveSpaceIds, poolSize));
+            }
             timings.setVectorMs(System.currentTimeMillis() - phaseStart);
         }
 
-        List<ChunkHit> lexicalHits = Collections.emptyList();
+        phaseStart = System.currentTimeMillis();
+        List<List<ChunkHit>> lexicalBranchHits = new ArrayList<>();
         if (retrieval.getLexical().isEnabled()) {
-            phaseStart = System.currentTimeMillis();
-            lexicalHits = lexicalIndex.search(request.getQuery(), effectiveSpaceIds, poolSize);
+            for (QueryBranch branch : branches) {
+                lexicalBranchHits.add(lexicalIndex.search(branch.getText(), effectiveSpaceIds, poolSize));
+            }
             timings.setLexicalMs(System.currentTimeMillis() - phaseStart);
         }
 
-        // 6. fuse the channels (rank-based: cosine and BM25 are not on a common scale)
+        // 7. fuse the channels (rank-based: cosine and BM25 are not on a common scale),
+        //    then fuse branches with fixed weights: original 1.0, rewrite 0.7, hypothetical answer 0.6.
         phaseStart = System.currentTimeMillis();
-        List<ChunkHit> fused = RrfFusion.fuse(List.of(vectorHits, lexicalHits), retrieval.getRrfK(), fusionSize);
+        List<ChunkHit> fused = fuseBranches(branches, vectorBranchHits, lexicalBranchHits, retrieval, fusionSize);
         timings.setFusionMs(System.currentTimeMillis() - phaseStart);
 
-        // 7. assemble: pinned doc-number group first, fused results fill the rest
+        // 8. assemble: pinned doc-number group first, fused results fill the rest
         List<Long> pinnedIds = docNumberGroup.stream().map(ChunkHit::getChunkId).collect(Collectors.toList());
         List<ChunkHit> refined = orderDocNumberGroup(request.getQuery(), docNumberGroup);
         List<ChunkHit> remaining = fused.stream()
                 .filter(hit -> !pinnedIds.contains(hit.getChunkId()))
                 .collect(Collectors.toList());
+        remaining = assembleEvidence(remaining, retrieval.getEvidenceAssembly(), fusionSize);
 
-        // 8. pinned group keeps its leading slots; the re-ranker only orders what fills the rest.
+        // 9. pinned group keeps its leading slots; the re-ranker only orders what fills the rest.
         //    Re-ranking the pinned group together with the rest would let unrelated chunks
         //    displace it — measured, that costs the doc-number layer ~24pt of recall@6.
         boolean rerankUsable = retrieval.getRerank() != null && retrieval.getRerank().isUsable();
@@ -294,6 +305,247 @@ public class RagSearchServiceImpl implements RagSearchService {
 
     private static List<ChunkHit> truncate(List<ChunkHit> hits, int topK) {
         return hits.size() > topK ? new ArrayList<>(hits.subList(0, topK)) : hits;
+    }
+
+    private List<QueryBranch> buildQueryBranches(String originalQuery, RagProperties.Retrieval retrieval) {
+        String original = originalQuery.trim();
+        List<QueryBranch> branches = new ArrayList<>();
+        RagProperties.MultiQuery config = retrieval.getMultiQuery();
+        branches.add(new QueryBranch(original, Math.max(0.0d, config.getOriginalWeight())));
+        if (config == null || !config.isEnabled()) {
+            return branches;
+        }
+        try {
+            RagQueryExpansion expansion = queryExpansionClient.expand(original);
+            if (expansion != null && StrUtil.isNotBlank(expansion.getRewrittenQuestion())) {
+                branches.add(new QueryBranch(expansion.getRewrittenQuestion().trim(),
+                        Math.max(0.0d, config.getRewrittenQuestionWeight())));
+            }
+            if (expansion != null && StrUtil.isNotBlank(expansion.getHypotheticalAnswer())) {
+                branches.add(new QueryBranch(expansion.getHypotheticalAnswer().trim(),
+                        Math.max(0.0d, config.getHypotheticalAnswerWeight())));
+            }
+            // 多查询 A/B 跑批必须能自证分支真的生成了：expansion 静默返回空会让链路
+            // 退回单查询，而指标照样出数 —— 不记录分支数就无法区分"没效果"和"没生效"。
+            if (branches.size() == 1) {
+                log.warn("多查询已启用但未生成任何分支（expansion 为空），本次按原问题检索");
+            } else {
+                log.info("RAG multi-query branches={} (rewrite={}, hypotheticalAnswer={})",
+                        branches.size(),
+                        expansion != null && StrUtil.isNotBlank(expansion.getRewrittenQuestion()),
+                        expansion != null && StrUtil.isNotBlank(expansion.getHypotheticalAnswer()));
+            }
+        } catch (RuntimeException e) {
+            log.warn("多查询生成失败，回退到原问题检索: {}", e.toString());
+        }
+        return branches;
+    }
+
+    private List<ChunkHit> fuseBranches(List<QueryBranch> branches,
+                                        List<List<ChunkHit>> vectorBranchHits,
+                                        List<List<ChunkHit>> lexicalBranchHits,
+                                        RagProperties.Retrieval retrieval,
+                                        int fusionSize) {
+        if (branches.size() == 1) {
+            List<ChunkHit> vectorHits = vectorBranchHits.isEmpty() ? Collections.emptyList() : vectorBranchHits.get(0);
+            List<ChunkHit> lexicalHits = lexicalBranchHits.isEmpty() ? Collections.emptyList() : lexicalBranchHits.get(0);
+            return RrfFusion.fuse(List.of(vectorHits, lexicalHits), retrieval.getRrfK(), fusionSize);
+        }
+        java.util.LinkedHashMap<Long, ChunkHit> byId = new java.util.LinkedHashMap<>();
+        java.util.Map<Long, Double> scores = new java.util.HashMap<>();
+        for (int i = 0; i < branches.size(); i++) {
+            List<ChunkHit> vectorHits = i < vectorBranchHits.size() ? vectorBranchHits.get(i) : Collections.emptyList();
+            List<ChunkHit> lexicalHits = i < lexicalBranchHits.size() ? lexicalBranchHits.get(i) : Collections.emptyList();
+            List<ChunkHit> branchFused = RrfFusion.fuse(List.of(vectorHits, lexicalHits), retrieval.getRrfK(), fusionSize);
+            double weight = branches.get(i).getWeight();
+            for (int rank = 0; rank < branchFused.size(); rank++) {
+                ChunkHit hit = branchFused.get(rank);
+                byId.putIfAbsent(hit.getChunkId(), hit);
+                scores.merge(hit.getChunkId(), weight / (retrieval.getRrfK() + rank + 1.0d), Double::sum);
+            }
+        }
+        List<ChunkHit> out = new ArrayList<>(byId.values());
+        out.sort((a, b) -> Double.compare(scores.getOrDefault(b.getChunkId(), 0.0d),
+                scores.getOrDefault(a.getChunkId(), 0.0d)));
+        for (ChunkHit hit : out) {
+            hit.setScore(scores.getOrDefault(hit.getChunkId(), hit.getScore()));
+        }
+        return truncate(out, fusionSize);
+    }
+
+    private List<ChunkHit> assembleEvidence(List<ChunkHit> hits, RagProperties.EvidenceAssembly config, int limit) {
+        if (config == null || !config.isEnabled() || hits.size() <= 1) {
+            return hits;
+        }
+        List<ChunkHit> merged = mergeSameDocumentAdjacent(hits, config);
+        assignCrossDocumentGroups(merged);
+        List<ChunkHit> out = truncate(merged, limit);
+        // chunk 整理同样会"静默无效"：开关打开但一对可合并的相邻 chunk 都没有时，
+        // 输出与输入逐条相同，指标照出数。不记录就无法区分"没效果"和"没生效"——
+        // 多查询分支已经踩过这个坑，这里同样必须能自证。
+        int mergedBlocks = 0;
+        int maxBlockUnits = 0;
+        int coveredUnits = 0;
+        Set<String> groups = new LinkedHashSet<>();
+        for (ChunkHit hit : out) {
+            int units = hit.getOriginalChunkIds().isEmpty() ? 1 : hit.getOriginalChunkIds().size();
+            coveredUnits += units;
+            if (units > 1) {
+                mergedBlocks++;
+            }
+            maxBlockUnits = Math.max(maxBlockUnits, units);
+            if (hit.getEvidenceGroupId() != null) {
+                groups.add(hit.getEvidenceGroupId());
+            }
+        }
+        log.info("RAG evidence-assembly in={} out={} mergedBlocks={} maxBlockUnits={} coveredUnits={} groups={}",
+                hits.size(), out.size(), mergedBlocks, maxBlockUnits, coveredUnits, groups.size());
+        return out;
+    }
+
+    private List<ChunkHit> mergeSameDocumentAdjacent(List<ChunkHit> hits, RagProperties.EvidenceAssembly config) {
+        List<ChunkHit> out = new ArrayList<>();
+        Set<Long> used = new LinkedHashSet<>();
+        for (ChunkHit seed : hits) {
+            if (seed.getChunkId() == null || used.contains(seed.getChunkId())) {
+                continue;
+            }
+            List<ChunkHit> block = new ArrayList<>();
+            block.add(seed);
+            used.add(seed.getChunkId());
+            for (ChunkHit candidate : hits) {
+                if (candidate.getChunkId() == null || used.contains(candidate.getChunkId())) {
+                    continue;
+                }
+                if (!canMerge(block, candidate, config)) {
+                    continue;
+                }
+                block.add(candidate);
+                used.add(candidate.getChunkId());
+                block.sort(java.util.Comparator.comparing(ChunkHit::getChunkIndex,
+                        java.util.Comparator.nullsLast(Integer::compareTo)));
+                if (block.size() >= config.getMaxChunksPerBlock()) {
+                    break;
+                }
+            }
+            out.add(block.size() == 1 ? seed : mergeBlock(block));
+        }
+        return out;
+    }
+
+    private boolean canMerge(List<ChunkHit> block, ChunkHit candidate, RagProperties.EvidenceAssembly config) {
+        ChunkHit first = block.get(0);
+        if (first.getDocId() == null || !first.getDocId().equals(candidate.getDocId())) {
+            return false;
+        }
+        if (!compatibleHeading(first.getChunkHeading(), candidate.getChunkHeading())) {
+            return false;
+        }
+        List<ChunkHit> trial = new ArrayList<>(block);
+        trial.add(candidate);
+        if (trial.size() > config.getMaxChunksPerBlock()) {
+            return false;
+        }
+        trial.sort(java.util.Comparator.comparing(ChunkHit::getChunkIndex,
+                java.util.Comparator.nullsLast(Integer::compareTo)));
+        for (int i = 1; i < trial.size(); i++) {
+            Integer prev = trial.get(i - 1).getChunkIndex();
+            Integer curr = trial.get(i).getChunkIndex();
+            if (prev == null || curr == null || Math.abs(curr - prev) > config.getMaxChunkIndexGap()) {
+                return false;
+            }
+        }
+        int chars = 0;
+        for (ChunkHit hit : trial) {
+            chars += StrUtil.nullToEmpty(hit.getChunkText()).length();
+        }
+        return chars <= config.getMaxMergedChars();
+    }
+
+    private static boolean compatibleHeading(String a, String b) {
+        String left = StrUtil.nullToEmpty(a).trim();
+        String right = StrUtil.nullToEmpty(b).trim();
+        if (left.equals(right)) {
+            return true;
+        }
+        return !parentHeading(left).isEmpty() && parentHeading(left).equals(parentHeading(right));
+    }
+
+    private static String parentHeading(String heading) {
+        int slash = heading.lastIndexOf('/');
+        if (slash < 0) {
+            slash = heading.lastIndexOf('>');
+        }
+        return slash <= 0 ? "" : heading.substring(0, slash).trim();
+    }
+
+    private static ChunkHit mergeBlock(List<ChunkHit> block) {
+        block.sort(java.util.Comparator.comparing(ChunkHit::getChunkIndex,
+                java.util.Comparator.nullsLast(Integer::compareTo)));
+        ChunkHit first = block.get(0);
+        ChunkHit merged = new ChunkHit();
+        merged.setChunkId(first.getChunkId());
+        merged.setDocId(first.getDocId());
+        merged.setSpaceId(first.getSpaceId());
+        merged.setChunkIndex(first.getChunkIndex());
+        merged.setChunkHeading(first.getChunkHeading());
+        merged.setDocTitle(first.getDocTitle());
+        merged.setDocNumber(first.getDocNumber());
+        StringBuilder text = new StringBuilder();
+        double maxScore = Double.NEGATIVE_INFINITY;
+        List<Long> originalIds = new ArrayList<>();
+        List<Integer> originalIndexes = new ArrayList<>();
+        List<Double> originalScores = new ArrayList<>();
+        for (ChunkHit hit : block) {
+            if (text.length() > 0) {
+                text.append("\n");
+            }
+            text.append(StrUtil.nullToEmpty(hit.getChunkText()));
+            maxScore = Math.max(maxScore, hit.getScore());
+            originalIds.addAll(hit.getOriginalChunkIds());
+            originalIndexes.addAll(hit.getOriginalChunkIndexes());
+            originalScores.addAll(hit.getOriginalChunkScores());
+        }
+        merged.setChunkText(text.toString());
+        merged.setScore(maxScore == Double.NEGATIVE_INFINITY ? first.getScore() : maxScore);
+        merged.setOriginalChunkIds(originalIds);
+        merged.setOriginalChunkIndexes(originalIndexes);
+        merged.setOriginalChunkScores(originalScores);
+        return merged;
+    }
+
+    private static void assignCrossDocumentGroups(List<ChunkHit> hits) {
+        int group = 1;
+        Set<Long> seenDocs = new LinkedHashSet<>();
+        for (ChunkHit hit : hits) {
+            if (hit.getDocId() != null && seenDocs.add(hit.getDocId()) && seenDocs.size() > 1) {
+                String id = "evidence-group-" + group;
+                for (ChunkHit member : hits) {
+                    if (member.getEvidenceGroupId() == null) {
+                        member.setEvidenceGroupId(id);
+                    }
+                }
+                return;
+            }
+        }
+    }
+
+    private static final class QueryBranch {
+        private final String text;
+        private final double weight;
+
+        private QueryBranch(String text, double weight) {
+            this.text = text;
+            this.weight = weight;
+        }
+
+        private String getText() {
+            return text;
+        }
+
+        private double getWeight() {
+            return weight;
+        }
     }
 
     /** Applies the configured default and the hard ceiling to the requested topK. */

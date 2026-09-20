@@ -2,6 +2,9 @@ package com.et.cloud.rag;
 
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * One retrieval hit from the vector store.
  */
@@ -26,6 +29,14 @@ public class ChunkHit {
 
     private double score;
 
+    private List<Long> originalChunkIds = new ArrayList<>();
+
+    private List<Integer> originalChunkIndexes = new ArrayList<>();
+
+    private List<Double> originalChunkScores = new ArrayList<>();
+
+    private String evidenceGroupId;
+
     public ChunkHit() {
     }
 
@@ -40,5 +51,8 @@ public class ChunkHit {
         this.docTitle = docTitle;
         this.docNumber = docNumber;
         this.score = score;
+        this.originalChunkIds.add(chunkId);
+        this.originalChunkIndexes.add(chunkIndex);
+        this.originalChunkScores.add(score);
     }
 }

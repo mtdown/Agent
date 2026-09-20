@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import sys
 from datetime import datetime
 
@@ -49,10 +50,16 @@ from lib_rag_eval import (  # noqa: E402
     compute_metrics,
     gold_pairs,
     load_golden,
+    metric_keys_for,
     probe,
+    quantile,
 )
 
 MAX_CONSECUTIVE_ERRORS = 5
+MHR_KS = [6, 10]
+MHR_FETCH_K = 50
+FIXED_RETRIEVAL_PATH = os.path.join(L.ANCHOR_DIR, "mhr-eval-600-fixed.jsonl")
+FIXED_ANSWER_PATH = os.path.join(L.ANCHOR_DIR, "mhr-answer-100-fixed.jsonl")
 # 英文探针：不能用中文查询探测，否则测的是另一条（会走文号层判定）的输入分布。
 PROBE_QUERY = "Which companies reported earnings growth in the same quarter?"
 CHECKPOINT_DIR = os.path.join(L.REPO_ROOT, "tmp")
@@ -72,8 +79,8 @@ def write_checkpoint(run_id: str, args, records: list, errors: list, total: int)
         "config": {
             "goldenFile": os.path.relpath(args.golden, L.REPO_ROOT).replace("\\", "/"),
             "spaceId": args.space_id,
-            "fetchK": FETCH_K,
-            "ks": KS,
+            "fetchK": args.fetch_k,
+            "ks": args.ks,
             "profile": L.EN_PROFILE,
             "corpusSha256": L.CORPUS_SHA256,
             "qaSha256": L.QA_SHA256,
@@ -86,6 +93,71 @@ def write_checkpoint(run_id: str, args, records: list, errors: list, total: int)
     json.dump(payload, open(tmp_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     os.replace(tmp_path, path)  # 原子替换：写一半被中断不会留下半截文件
     return path
+
+
+def write_jsonl(path: str, rows: list) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def latency_stats(records: list) -> dict | None:
+    """客户端端到端耗时的均值与分位。多查询会额外付一次快速 LLM 调用，
+    因此耗时本身也是"多查询到底生效没有"的旁证，必须和指标一起落盘。"""
+    vals = sorted(r["latencyMs"] for r in records if r.get("latencyMs") is not None)
+    if not vals:
+        return None
+    return {
+        "count": len(vals),
+        "mean": round(sum(vals) / len(vals), 1),
+        "p50": quantile(vals, 0.5),
+        "p95": quantile(vals, 0.95),
+        "max": vals[-1],
+    }
+
+
+def stratified_sample(rows: list, size: int, seed: int, source_ids: set | None = None) -> list:
+    """Deterministic type-stratified sample. Keeps the original golden order in output."""
+    candidates = [r for r in rows if source_ids is None or r.get("id") in source_ids]
+    by_cat = {}
+    for row in candidates:
+        by_cat.setdefault(row.get("category") or "unknown", []).append(row)
+    rng = random.Random(seed)
+    selected = []
+    remaining = size
+    cats = sorted(by_cat)
+    for i, cat in enumerate(cats):
+        bucket = by_cat[cat]
+        if i == len(cats) - 1:
+            take = remaining
+        else:
+            take = round(size * len(bucket) / len(candidates))
+            take = max(1, min(take, len(bucket), remaining - (len(cats) - i - 1)))
+        selected.extend(rng.sample(bucket, take))
+        remaining -= take
+    if len(selected) < size:
+        chosen = {r["id"] for r in selected}
+        pool = [r for r in candidates if r["id"] not in chosen]
+        selected.extend(rng.sample(pool, min(size - len(selected), len(pool))))
+    order = {r["id"]: i for i, r in enumerate(rows)}
+    return sorted(selected[:size], key=lambda r: order[r["id"]])
+
+
+def init_fixed_sets(golden_path: str, seed: int, retrieval_size: int, answer_size: int) -> None:
+    rows = load_golden(golden_path)
+    retrieval_rows = stratified_sample(rows, retrieval_size, seed)
+    retrieval_ids = {r["id"] for r in retrieval_rows}
+    answer_rows = stratified_sample(rows, answer_size, seed + 1, retrieval_ids)
+    write_jsonl(FIXED_RETRIEVAL_PATH, retrieval_rows)
+    write_jsonl(FIXED_ANSWER_PATH, answer_rows)
+    def counts(items):
+        out = {}
+        for item in items:
+            out[item["category"]] = out.get(item["category"], 0) + 1
+        return dict(sorted(out.items()))
+    print(f"[fixed] retrieval {len(retrieval_rows)} -> {os.path.relpath(FIXED_RETRIEVAL_PATH, L.REPO_ROOT)} {counts(retrieval_rows)}")
+    print(f"[fixed] answer    {len(answer_rows)} -> {os.path.relpath(FIXED_ANSWER_PATH, L.REPO_ROOT)} {counts(answer_rows)}")
 
 
 def main():
@@ -101,7 +173,22 @@ def main():
     ap.add_argument("--checkpoint-every", type=int, default=100,
                     help="每 N 题写一次进度到 tmp/（0 = 关闭，不推荐）")
     ap.add_argument("--resume", default=None, help="从 checkpoint 续跑：只补没跑过的题")
+    ap.add_argument("--fixed", action="store_true",
+                    help="使用固定 600 题检索集 anchor/mhr-eval-600-fixed.jsonl；不存在时提示先 --init-fixed-sets")
+    ap.add_argument("--init-fixed-sets", action="store_true",
+                    help="从 golden 初始化固定 600 检索题和固定 100 答案题")
+    ap.add_argument("--sample-seed", type=int, default=20260917)
+    ap.add_argument("--retrieval-size", type=int, default=600)
+    ap.add_argument("--answer-size", type=int, default=100)
+    ap.add_argument("--fetch-k", type=int, default=MHR_FETCH_K,
+                    help="粗排/取数深度，MHR 优化实验固定为 50")
+    ap.add_argument("--ks", default="6,10", help="逗号分隔的评测 K，MHR 优化实验固定为 6,10")
     args = ap.parse_args()
+    args.ks = [int(x) for x in str(args.ks).split(",") if str(x).strip()]
+
+    if args.init_fixed_sets:
+        init_fixed_sets(args.golden, args.sample_seed, args.retrieval_size, args.answer_size)
+        return
 
     cfg = load_env()
     member_key = args.member_key or cfg.get("EVAL_MEMBER_API_KEY", "")
@@ -118,7 +205,13 @@ def main():
     if not os.path.exists(args.golden):
         sys.exit(f"[FATAL] 缺少 golden：{args.golden}\n        先跑 bind_anchor.py 完成 gold 绑定。")
 
-    rows = load_golden(args.golden)
+    if args.fixed:
+        if not os.path.exists(FIXED_RETRIEVAL_PATH):
+            sys.exit(f"[FATAL] 固定检索集不存在：{FIXED_RETRIEVAL_PATH}\n        先运行 --init-fixed-sets")
+        rows = load_golden(FIXED_RETRIEVAL_PATH)
+        args.golden = FIXED_RETRIEVAL_PATH
+    else:
+        rows = load_golden(args.golden)
     if args.limit:
         rows = rows[: args.limit]
 
@@ -147,7 +240,8 @@ def main():
         run_id = datetime.now().strftime("mhr-%Y%m%d-%H%M%S")
 
     done = {r.get("id") for r in records}
-    print(f"[mhr-rag] 载入 {len(rows)} 题，一次取 top{FETCH_K} 本地截断算 K∈{KS}")
+    metric_keys = metric_keys_for(args.ks)
+    print(f"[mhr-rag] 载入 {len(rows)} 题，一次取 top{args.fetch_k} 本地截断算 K∈{args.ks}")
 
     consecutive = 0
     for i, row in enumerate(rows, 1):
@@ -159,7 +253,8 @@ def main():
                             "refusal": True, "metrics": None, "hits": []})
             continue
         try:
-            hits = retriever.search(row["question"], FETCH_K)
+            hits = retriever.search(row["question"], args.fetch_k)
+            latency_ms = getattr(retriever, "last_elapsed_ms", None)
             consecutive = 0
         except RetrieverError as exc:
             errors.append({"id": row.get("id"), "error": str(exc)})
@@ -179,8 +274,9 @@ def main():
             "question": row.get("question"),
             "goldCount": len(gold),
             "goldDocs": len({d for d, _ in gold}),
+            "latencyMs": latency_ms,
             "hits": [h.to_dict() for h in hits],
-            "metrics": compute_metrics(gold, hits),
+            "metrics": compute_metrics(gold, hits, args.ks),
         })
         if args.checkpoint_every and len(records) % args.checkpoint_every == 0:
             write_checkpoint(run_id, args, records, errors, len(rows))
@@ -189,11 +285,14 @@ def main():
     refused = [r for r in records if r["refusal"]]
     by_cat = {}
     for c in sorted({r["category"] for r in scored}):
-        by_cat[c] = aggregate([r for r in scored if r["category"] == c], METRIC_KEYS)
+        by_cat[c] = aggregate([r for r in scored if r["category"] == c], metric_keys)
 
-    overall = aggregate(scored, METRIC_KEYS)
+    overall = aggregate(scored, metric_keys)
     multi = [r for r in scored if r["goldDocs"] > 1]
-    overall_multi = aggregate(multi, METRIC_KEYS) if multi else None
+    overall_multi = aggregate(multi, metric_keys) if multi else None
+    latency_overall = latency_stats(scored)
+    latency_by_cat = {c: latency_stats([r for r in scored if r["category"] == c])
+                      for c in sorted({r["category"] for r in scored})}
 
     os.makedirs(args.out_dir, exist_ok=True)
     result = {
@@ -203,8 +302,12 @@ def main():
             "goldenFile": os.path.relpath(args.golden, L.REPO_ROOT).replace("\\", "/"),
             "baseUrl": base_url,
             "spaceId": args.space_id,
-            "fetchK": FETCH_K,
-            "ks": KS,
+            "fetchK": args.fetch_k,
+            "ks": args.ks,
+            "fixedRetrievalFile": os.path.relpath(FIXED_RETRIEVAL_PATH, L.REPO_ROOT).replace("\\", "/")
+                if args.fixed else None,
+            "fixedAnswerFile": os.path.relpath(FIXED_ANSWER_PATH, L.REPO_ROOT).replace("\\", "/")
+                if os.path.exists(FIXED_ANSWER_PATH) else None,
             "profile": L.EN_PROFILE,
             "corpusSha256": L.CORPUS_SHA256,
             "qaSha256": L.QA_SHA256,
@@ -214,6 +317,7 @@ def main():
         "overall": overall,
         "overallMultiDoc": overall_multi,
         "byQuestionType": by_cat,
+        "latency": {"overall": latency_overall, "byQuestionType": latency_by_cat},
         "refusalByType": {c: sum(1 for r in refused if r["category"] == c)
                           for c in sorted({r["category"] for r in refused})},
         "errors": errors,
@@ -230,6 +334,9 @@ def main():
     for c, agg in by_cat.items():
         print(f"  {c:18s} n={agg['count']:4d}  recall@6={agg.get('recall@6')}"
               f"  docRecall@6={agg.get('docRecall@6')}")
+    if latency_overall:
+        print(f"  latency(ms)   mean={latency_overall['mean']}  p50={latency_overall['p50']}"
+              f"  p95={latency_overall['p95']}  max={latency_overall['max']}")
     print(f"结果 -> {os.path.relpath(out_path, L.REPO_ROOT)}")
     print("提醒：本数据集为纯向量链路（文号层对英文恒不生效），"
           "与自有 216 篇的「向量+文号」混合链路不可直接横比绝对值。")

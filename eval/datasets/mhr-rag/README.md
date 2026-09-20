@@ -90,8 +90,9 @@
 |---|---|
 | `scripts/mhr_lib.py` | 数据集专属约定：路径、题型、sha256、`bind_fact` 绑定算法 |
 | `scripts/bind_anchor.py` | 两步绑定，产出 `golden.mhr.jsonl` + anchor map + 未绑定清单 |
-| `scripts/run_eval.py` | 评测 runner（import 共享内核），按 `question_type` 分类报指标；支持 `--checkpoint-every` / `--resume` 断点续跑 |
+| `scripts/run_eval.py` | 评测 runner（import 共享内核），按 `question_type` 分类报指标；支持 `--checkpoint-every` / `--resume` 断点续跑，`--fixed` 走固定 600 题 |
 | `scripts/compare_runs.py` | 对比两次 run（纯离线）。支持 `--subset-first N` 同题子集对比 |
+| `scripts/report_run.py` | **单次** run 的完整报告（纯离线）：按题集回取 gold 坐标算 `oracle@fetchK`（池内上限）、`latency` 的 mean/p50/p95、按题型与 gold 文档数拆解 |
 | `anchor/` | 绑定产物：`golden.mhr.jsonl`、`anchor-map.json`、`unbound-report.json` |
 | `results/` | 本数据集的评测结果（不写进 `eval/results/`） |
 
