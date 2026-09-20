@@ -56,6 +56,7 @@ class RagSearchServiceImplTest {
     private VectorStore vectorStore;
     private LexicalIndex lexicalIndex;
     private RagRerankClient rerankClient;
+    private RagQueryExpansionClient queryExpansionClient;
     private RagProperties properties;
     private RagSearchServiceImpl ragSearchService;
 
@@ -67,6 +68,7 @@ class RagSearchServiceImplTest {
         vectorStore = mock(VectorStore.class);
         lexicalIndex = mock(LexicalIndex.class);
         rerankClient = mock(RagRerankClient.class);
+        queryExpansionClient = mock(RagQueryExpansionClient.class);
         properties = new RagProperties();
         ragSearchService = new RagSearchServiceImpl();
         ReflectionTestUtils.setField(ragSearchService, "wikiSpaceService", wikiSpaceService);
@@ -75,6 +77,7 @@ class RagSearchServiceImplTest {
         ReflectionTestUtils.setField(ragSearchService, "vectorStore", vectorStore);
         ReflectionTestUtils.setField(ragSearchService, "lexicalIndex", lexicalIndex);
         ReflectionTestUtils.setField(ragSearchService, "ragRerankClient", rerankClient);
+        ReflectionTestUtils.setField(ragSearchService, "queryExpansionClient", queryExpansionClient);
         ReflectionTestUtils.setField(ragSearchService, "ragProperties", properties);
         // default: a configured embedding endpoint. Individual tests override this
         // to exercise the degraded local-only path.
@@ -483,6 +486,75 @@ class RagSearchServiceImplTest {
 
         verify(lexicalIndex, never()).search(anyString(), anySet(), anyInt());
         assertEquals(201L, result.getHits().get(0).getChunkId());
+    }
+
+    @Test
+    void multiQueryUsesOriginalRewriteAndHypotheticalAnswerBranchesWithWeightedFusion() {
+        properties.getRetrieval().getMultiQuery().setEnabled(true);
+        when(queryExpansionClient.expand("低保怎么申请")).thenReturn(
+                new RagQueryExpansion("如何办理最低生活保障申请", "申请人需要提交材料并满足最低生活保障条件。"));
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(1L));
+        when(embeddingClient.embed(anyList())).thenReturn(
+                List.of(new float[]{0.1f}, new float[]{0.2f}, new float[]{0.3f}));
+        when(vectorStore.search(any(float[].class), anySet(), anyInt())).thenReturn(
+                List.of(hit(11L, "原问题第一")),
+                List.of(hit(22L, "改写第一")),
+                List.of(hit(33L, "模拟答案第一")));
+        when(lexicalIndex.search(anyString(), anySet(), anyInt())).thenReturn(
+                List.of(), List.of(), List.of());
+
+        RagSearchResult result = search(plainRequest());
+
+        verify(embeddingClient).embed(List.of(
+                "低保怎么申请",
+                "如何办理最低生活保障申请",
+                "申请人需要提交材料并满足最低生活保障条件。"));
+        List<Long> ids = result.getHits().stream().map(ChunkHit::getChunkId).collect(java.util.stream.Collectors.toList());
+        assertEquals(List.of(11L, 22L, 33L), ids,
+                "original branch has weight 1.0, rewrite 0.7, hypothetical answer 0.6");
+    }
+
+    @Test
+    void multiQueryFallsBackToOriginalBranchWhenGenerationFails() {
+        properties.getRetrieval().getMultiQuery().setEnabled(true);
+        when(queryExpansionClient.expand(anyString())).thenThrow(new RuntimeException("LLM down"));
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(1L));
+        when(vectorStore.search(any(float[].class), anySet(), anyInt())).thenReturn(List.of(hit(11L, "原问题")));
+        when(lexicalIndex.search(anyString(), anySet(), anyInt())).thenReturn(List.of());
+
+        RagSearchResult result = search(plainRequest());
+
+        assertEquals(1, result.getHits().size());
+        assertEquals(11L, result.getHits().get(0).getChunkId());
+        verify(embeddingClient).embed(List.of("低保怎么申请"));
+    }
+
+    @Test
+    void sameDocumentAdjacentChunksAreMergedWithinConfiguredBounds() {
+        properties.getRetrieval().getEvidenceAssembly().setEnabled(true);
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(1L));
+        when(vectorStore.search(any(float[].class), anySet(), anyInt())).thenReturn(List.of(
+                new ChunkHit(100L, 20L, 1L, 0, "第一章/申请", "第一段", "低保办法", null, 0.9d),
+                new ChunkHit(101L, 20L, 1L, 1, "第一章/申请", "第二段", "低保办法", null, 0.8d),
+                new ChunkHit(200L, 30L, 1L, 0, "第一章/申请", "另一文档", "救助办法", null, 0.7d)));
+        when(lexicalIndex.search(anyString(), anySet(), anyInt())).thenReturn(List.of());
+
+        RagSearchRequest request = plainRequest();
+        request.setTopK(3);
+        RagSearchResult result = search(request);
+
+        assertEquals(2, result.getHits().size());
+        ChunkHit merged = result.getHits().get(0);
+        assertEquals(20L, merged.getDocId());
+        assertEquals(List.of(100L, 101L), merged.getOriginalChunkIds());
+        assertEquals(List.of(0, 1), merged.getOriginalChunkIndexes());
+        assertEquals(List.of(0.9d, 0.8d), merged.getOriginalChunkScores());
+        assertTrue(merged.getChunkText().contains("第一段"));
+        assertTrue(merged.getChunkText().contains("第二段"));
+        assertEquals(200L, result.getHits().get(1).getChunkId());
     }
 
     @Test

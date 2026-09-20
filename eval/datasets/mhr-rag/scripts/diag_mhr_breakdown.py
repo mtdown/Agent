@@ -19,7 +19,7 @@ import os
 import sys
 
 import mhr_lib as L  # noqa: E402
-from lib_rag_eval import KS, METRIC_KEYS, aggregate  # noqa: E402
+from lib_rag_eval import KS, aggregate, metric_keys_for  # noqa: E402
 
 # 上游 4 类题型的中文解释（MHR 论文口径 + 本数据集实测）
 TYPE_DESC = {
@@ -45,8 +45,8 @@ def set_ids(d: dict, golden_rows: list) -> set:
     return {r["id"] for r in golden_rows}
 
 
-def agg(rows: list) -> dict:
-    return aggregate(rows, METRIC_KEYS)
+def agg(rows: list, ks=None) -> dict:
+    return aggregate(rows, metric_keys_for(ks))
 
 
 def table(rows, headers):
@@ -73,6 +73,7 @@ def main():
         ids = {r["id"] for r in load_golden(L.GOLDEN_PATH)[: args.subset_first]}
         print(f"[子集] golden 前 {args.subset_first} 题")
     sa, sb = scored(A, ids), scored(B, ids)
+    ks = B.get("config", {}).get("ks") or KS
     print(f"计分题数：A(前)={len(sa)}  B(后)={len(sb)}")
 
     k = args.focus
@@ -87,8 +88,8 @@ def main():
     print(f"\n=== 2. 分题型 recall@{k} / docRecall@{k} / mrr ===")
     rows = []
     for t in sorted(set(ca) | set(cb)):
-        ra = agg([r for r in sa if r["category"] == t])
-        rb = agg([r for r in sb if r["category"] == t])
+        ra = agg([r for r in sa if r["category"] == t], ks)
+        rb = agg([r for r in sb if r["category"] == t], ks)
         va, vb = ra.get(f"recall@{k}"), rb.get(f"recall@{k}")
         rows.append([t, f"{cb.get(t, 0)}",
                      f"{va:.4f} -> {vb:.4f}", f"{vb - va:+.4f}",
@@ -99,8 +100,8 @@ def main():
     print(f"\n=== 3. 按「证据文档数」拆（多跳难度的真正刻度，2–4 篇） ===")
     rows = []
     for nd in sorted({r.get("goldDocs", 0) for r in sb}):
-        ra = agg([r for r in sa if r.get("goldDocs") == nd])
-        rb = agg([r for r in sb if r.get("goldDocs") == nd])
+        ra = agg([r for r in sa if r.get("goldDocs") == nd], ks)
+        rb = agg([r for r in sb if r.get("goldDocs") == nd], ks)
         if not rb:
             continue
         va, vb = ra.get(f"recall@{k}"), rb.get(f"recall@{k}")
@@ -120,8 +121,8 @@ def main():
         return ">=5 块"
     rows = []
     for bk in ["1-2 块", "3 块", "4 块", ">=5 块"]:
-        ra = agg([r for r in sa if bucket(r.get("goldCount", 0)) == bk])
-        rb = agg([r for r in sb if bucket(r.get("goldCount", 0)) == bk])
+        ra = agg([r for r in sa if bucket(r.get("goldCount", 0)) == bk], ks)
+        rb = agg([r for r in sb if bucket(r.get("goldCount", 0)) == bk], ks)
         if not rb or not ra:
             continue
         va, vb = ra.get(f"recall@{k}"), rb.get(f"recall@{k}")
@@ -149,9 +150,9 @@ def main():
               f"（{len(doc_hit)/len(zb)*100:.1f}%）")
 
     print(f"\n=== 6. 抬 K 在英文上还值不值（recall@6 -> recall@10） ===")
-    oa, ob = agg(sa), agg(sb)
+    oa, ob = agg(sa, ks), agg(sb, ks)
     rows = []
-    for kk in KS:
+    for kk in ks:
         if kk not in (6, 10):
             continue
         rows.append([f"recall@{kk}", f"{oa.get('recall@' + str(kk)):.4f}",

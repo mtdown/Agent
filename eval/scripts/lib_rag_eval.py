@@ -28,6 +28,7 @@ import math
 import os
 import struct
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -46,25 +47,56 @@ FETCH_K = max(KS)
 # ③ 取数层：检索适配器
 # --------------------------------------------------------------------------
 class Hit:
-    __slots__ = ("doc_id", "chunk_index", "score", "doc_title")
+    __slots__ = ("doc_id", "chunk_index", "score", "doc_title",
+                 "original_indexes", "evidence_group_id")
 
-    def __init__(self, doc_id, chunk_index, score, doc_title=""):
+    def __init__(self, doc_id, chunk_index, score, doc_title="",
+                 original_indexes=None, evidence_group_id=None):
         self.doc_id = int(doc_id)
         self.chunk_index = int(chunk_index)
         self.score = float(score)
         self.doc_title = doc_title or ""
+        # chunk 整理会把同文相邻 chunk 物理合并成一个证据块，该块覆盖的全部原始
+        # chunkIndex 记在这里。**无合并时为空** ⇒ `coords` 退化成 `[chunk_index]`，
+        # 对所有不含合并的历史 run 是 no-op，不构成"改指标口径"。
+        self.original_indexes = [int(i) for i in (original_indexes or []) if i is not None]
+        self.evidence_group_id = evidence_group_id
 
     @property
     def coord(self):
         return (self.doc_id, self.chunk_index)
 
+    @property
+    def coords(self):
+        """该 hit 覆盖的**全部** (docId, chunkIndex)。
+
+        合并块必须把每个原始 chunk 都计入：若只按 `coord` 计分，整理会把多个原始
+        chunk 收进一个 hit、却只算一个坐标，recall 被系统性低估 —— 那是**度量失真**，
+        不是整理效果差。两个口径在这里必须一起改。
+        """
+        if not self.original_indexes:
+            return [(self.doc_id, self.chunk_index)]
+        out = []
+        for idx in self.original_indexes:
+            coord = (self.doc_id, idx)
+            if coord not in out:
+                out.append(coord)
+        return out
+
     def to_dict(self):
-        return {
+        # 只在真有合并/分组信息时加字段：无合并的 run 落盘内容与历史完全一致，
+        # 因此老结果与新结果的 diff 不会被无意义的空数组污染。
+        out = {
             "docId": self.doc_id,
             "chunkIndex": self.chunk_index,
             "score": round(self.score, 6),
             "docTitle": self.doc_title,
         }
+        if len(self.original_indexes) > 1:
+            out["originalChunkIndexes"] = list(self.original_indexes)
+        if self.evidence_group_id:
+            out["evidenceGroupId"] = self.evidence_group_id
+        return out
 
 
 class RetrieverError(Exception):
@@ -85,26 +117,35 @@ class HttpRetriever:
         self.api_key = api_key
         self.space_ids = space_ids
         self.timeout = timeout
+        # 最近一次 search() 的客户端端到端耗时（毫秒）。只用于报告 p50/p95，
+        # 不参与任何指标定义 —— 因此加它不会让历史 recall/docRecall 失去可比性。
+        self.last_elapsed_ms = None
 
     def search(self, query, top_k, api_key=None):
         key = api_key or self.api_key
         payload = {"query": query, "topK": top_k}
         if self.space_ids:
             payload["spaceIds"] = list(self.space_ids)
-        raw = self._post("/open/rag/search", payload, key)
-        body = json.loads(raw)
-        # 业务码：0=成功；40101=key 无效；其余为系统错误
-        code = body.get("code")
-        if code != 0:
-            msg = body.get("message") or f"code={code}"
-            if code == 40101:
-                raise RetrieverError(f"API Key 无效或已失效（{msg}）", fatal=True)
-            raise RetrieverError(f"检索返回业务错误 {msg}")
-        data = body.get("data") or {}
-        return [
-            Hit(h.get("docId"), h.get("chunkIndex"), h.get("score", 0.0), h.get("docTitle", ""))
-            for h in (data.get("hits") or [])
-        ]
+        started = time.perf_counter()
+        try:
+            raw = self._post("/open/rag/search", payload, key)
+            body = json.loads(raw)
+            # 业务码：0=成功；40101=key 无效；其余为系统错误
+            code = body.get("code")
+            if code != 0:
+                msg = body.get("message") or f"code={code}"
+                if code == 40101:
+                    raise RetrieverError(f"API Key 无效或已失效（{msg}）", fatal=True)
+                raise RetrieverError(f"检索返回业务错误 {msg}")
+            data = body.get("data") or {}
+            return [
+                Hit(h.get("docId"), h.get("chunkIndex"), h.get("score", 0.0), h.get("docTitle", ""),
+                    original_indexes=h.get("originalChunkIndexes"),
+                    evidence_group_id=h.get("evidenceGroupId"))
+                for h in (data.get("hits") or [])
+            ]
+        finally:
+            self.last_elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
 
     def _post(self, path, payload, api_key):
         return post_json(
@@ -307,23 +348,34 @@ def gold_pairs(row):
     return [(int(g["docId"]), int(g["chunkIndex"])) for g in (row.get("gold") or [])]
 
 
-def compute_metrics(gold, hits):
-    """gold: [(docId, chunkIndex)]；hits: [Hit]。一次 topK=10 本地截断算各 K。
+def metric_keys_for(ks=None):
+    selected = ks or KS
+    return ["mrr"] + [f"{m}@{k}" for m in ("recall", "docRecall", "hitRate") for k in selected]
+
+
+def compute_metrics(gold, hits, ks=None):
+    """gold: [(docId, chunkIndex)]；hits: [Hit]。一次取 topK 再本地截断算各 K。
 
     注意 gold 走 set 去重：同一题的多个 quote 落在同一 chunk 时只算一个坐标，
     分母按去重后计。跨数据集沿用同一口径，换取可比性。
+
+    合并块按**覆盖坐标**计分（`Hit.coords`）：整理把相邻 chunk 合成一块后，
+    该块仍覆盖全部原始坐标。无合并时 `coords == [coord]`，与历史口径逐位一致。
     """
+    selected = ks or KS
     gset = set(gold)
     gdocs = {d for d, _ in gold}
     out = {}
-    for k in KS:
+    for k in selected:
         hk = hits[:k]
-        hset = {h.coord for h in hk}
+        hset = set()
+        for h in hk:
+            hset.update(h.coords)
         hdocs = {h.doc_id for h in hk}
         out[f"recall@{k}"] = round(len(gset & hset) / len(gset), 6)
         out[f"docRecall@{k}"] = round(len(gdocs & hdocs) / len(gdocs), 6)
         out[f"hitRate@{k}"] = 1.0 if (gset & hset) else 0.0
-    rank = next((i + 1 for i, h in enumerate(hits) if h.coord in gset), None)
+    rank = next((i + 1 for i, h in enumerate(hits) if gset & set(h.coords)), None)
     out["mrr"] = round(1.0 / rank, 6) if rank else 0.0
     return out
 
@@ -340,7 +392,7 @@ def aggregate(records, metric_keys):
     return out
 
 
-METRIC_KEYS = ["mrr"] + [f"{m}@{k}" for m in ("recall", "docRecall", "hitRate") for k in KS]
+METRIC_KEYS = metric_keys_for(KS)
 
 
 # --------------------------------------------------------------------------

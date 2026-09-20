@@ -57,8 +57,12 @@ public final class RrfFusion {
         List<ChunkHit> out = new ArrayList<>(ordered.size());
         for (Map.Entry<Long, Double> e : ordered) {
             ChunkHit hit = firstSeen.get(e.getKey());
-            out.add(new ChunkHit(hit.getChunkId(), hit.getDocId(), hit.getSpaceId(), hit.getChunkIndex(),
-                    hit.getChunkHeading(), hit.getChunkText(), hit.getDocTitle(), hit.getDocNumber(), e.getValue()));
+            ChunkHit fused = new ChunkHit(hit.getChunkId(), hit.getDocId(), hit.getSpaceId(), hit.getChunkIndex(),
+                    hit.getChunkHeading(), hit.getChunkText(), hit.getDocTitle(), hit.getDocNumber(), e.getValue());
+            fused.setOriginalChunkIds(new ArrayList<>(hit.getOriginalChunkIds()));
+            fused.setOriginalChunkIndexes(new ArrayList<>(hit.getOriginalChunkIndexes()));
+            fused.setOriginalChunkScores(new ArrayList<>(hit.getOriginalChunkScores()));
+            out.add(fused);
             if (topN > 0 && out.size() >= topN) {
                 break;
             }

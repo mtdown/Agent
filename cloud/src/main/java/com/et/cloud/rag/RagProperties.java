@@ -110,6 +110,31 @@ public class RagProperties {
         private Lexical lexical = new Lexical();
 
         private Rerank rerank = new Rerank();
+
+        private MultiQuery multiQuery = new MultiQuery();
+
+        private EvidenceAssembly evidenceAssembly = new EvidenceAssembly();
+    }
+
+    @Data
+    public static class MultiQuery {
+        private boolean enabled = false;
+        private String model = "qwen3.8-flash";
+        private int timeoutSeconds = 20;
+        private int maxTokens = 512;
+        private double originalWeight = 1.0d;
+        private double rewrittenQuestionWeight = 0.7d;
+        private double hypotheticalAnswerWeight = 0.6d;
+    }
+
+    @Data
+    public static class EvidenceAssembly {
+        private boolean enabled = false;
+        private int maxMergedChars = 3600;
+        private int maxChunksPerBlock = 3;
+        private int maxChunkIndexGap = 1;
+        private int maxPerDocument = 3;
+        private int finalContextK = 6;
     }
 
     @Data

@@ -22,9 +22,9 @@ import sys
 
 import mhr_lib as L  # noqa: E402
 from lib_rag_eval import (  # noqa: E402
-    METRIC_KEYS,
     aggregate,
     load_golden,
+    metric_keys_for,
 )
 
 DEFAULT_FOCUS = 6
@@ -83,10 +83,11 @@ def main():
     if args.subset_first:
         ids = {r["id"] for r in load_golden(L.GOLDEN_PATH)[: args.subset_first]}
         for tag, D in (("A", A), ("B", B)):
+            metric_keys = metric_keys_for(D["config"].get("ks"))
             sub = [r for r in D["perQuestion"]
                    if r.get("id") in ids and not r.get("refusal") and r.get("metrics")]
             D["_sub"] = sub
-            D["_subOverall"] = aggregate(sub, METRIC_KEYS)
+            D["_subOverall"] = aggregate(sub, metric_keys)
         na, nb = len(A["_sub"]), len(B["_sub"])
         print(f"[子集] 只比 golden 前 {args.subset_first} 题的交集：A 命中 {na} / B 命中 {nb}")
         if min(na, nb) == 0:
@@ -96,8 +97,9 @@ def main():
             D["overall"] = D["_subOverall"]
             D["counts"] = dict(D["counts"], scored=len(D["_sub"]))
             by_cat = {}
+            metric_keys = metric_keys_for(D["config"].get("ks"))
             for c in sorted({r["category"] for r in D["_sub"]}):
-                by_cat[c] = aggregate([r for r in D["_sub"] if r["category"] == c], METRIC_KEYS)
+                by_cat[c] = aggregate([r for r in D["_sub"] if r["category"] == c], metric_keys)
             D["byQuestionType"] = by_cat
             D["overallMultiDoc"] = None
 
