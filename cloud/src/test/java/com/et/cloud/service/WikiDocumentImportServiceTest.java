@@ -29,6 +29,54 @@ class WikiDocumentImportServiceTest {
     }
 
     @Test
+    void importMarkdownSeparatesRecognizedFrontMatterFromArticleBody() {
+        String markdown = "---\n"
+                + "title: \"重庆应急物资保障\"\n"
+                + "channel: 媒体视角\n"
+                + "pubDate: 2026-09-03 00:00:00\n"
+                + "sourceUrl: https://www.cq.gov.cn/article\n"
+                + "author: 李明\n"
+                + "---\n"
+                + "# 正文标题\n\n文章正文内容。";
+
+        ImportedWikiDocument result = importService.parse(file("article.md", "text/markdown", markdown), null);
+
+        assertEquals("重庆应急物资保障", result.getTitle());
+        assertTrue(result.getMetadataJson().contains("\"publishedAt\":\"2026-09-03 00:00:00\""),
+                result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"sourceUrl\":\"https://www.cq.gov.cn/article\""),
+                result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"sourceSite\":\"www.cq.gov.cn\"")
+                        || result.getMetadataJson().contains("\"sourceSite\":\"cq.gov.cn\""),
+                result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"originalAuthor\":\"李明\""),
+                result.getMetadataJson());
+        assertFalse(result.getContent().contains("title:"), result.getContent());
+        assertFalse(result.getContent().contains("sourceUrl:"), result.getContent());
+        assertTrue(result.getContent().contains("文章正文内容"), result.getContent());
+    }
+
+    @Test
+    void importMarkdownSeparatesInlineLegacyMetadataBlockFromArticleBody() {
+        String markdown = "--- title: \"重庆实行一策一图\" column: mtsj channel: \"媒体视角\" "
+                + "pubDate: 2026-09-03 00:00:00 sourceUrl: https://www.cq.gov.cn/article "
+                + "metadataId: 16028718 bodyShort: false\n"
+                + "正文第一段内容。\n\n正文第二段内容。";
+
+        ImportedWikiDocument result = importService.parse(file("article.md", "text/markdown", markdown), null);
+
+        assertEquals("重庆实行一策一图", result.getTitle());
+        assertTrue(result.getMetadataJson().contains("\"publishedAt\":\"2026-09-03 00:00:00\""),
+                result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"sourceSite\":\"cq.gov.cn\""), result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"sourceUrl\":\"https://www.cq.gov.cn/article\""),
+                result.getMetadataJson());
+        assertFalse(result.getContent().contains("column:"), result.getContent());
+        assertFalse(result.getContent().contains("bodyShort:"), result.getContent());
+        assertTrue(result.getContent().contains("正文第一段内容"), result.getContent());
+    }
+
+    @Test
     void importHtmlIsCleanedToStructuredMarkdown() {
         String rawHtml = "<!DOCTYPE html><html><head><title>页面标题</title><style>h1{color:red}</style></head>"
                 + "<body><nav>导航菜单</nav><main>"
@@ -81,6 +129,23 @@ class WikiDocumentImportServiceTest {
         assertTrue(result.getContent().contains("# Archived"), result.getContent());
         assertTrue(result.getContent().contains("归档正文"), result.getContent());
         assertTrue(result.getMetadataJson().contains("\"sourceExtension\":\"htm\""));
+    }
+
+    @Test
+    void importHtmlExtractsAvailableArticleMetadata() {
+        String rawHtml = "<html><head>"
+                + "<meta property='article:published_time' content='2026-09-03'>"
+                + "<meta property='og:site_name' content='重庆市人民政府网站'>"
+                + "<meta name='author' content='李明'>"
+                + "</head><body><article><h1>文章标题</h1><p>文章正文内容足够长。</p></article></body></html>";
+
+        ImportedWikiDocument result = importService.parse(file("article.html", "text/html", rawHtml), null);
+
+        assertTrue(result.getMetadataJson().contains("\"publishedAt\":\"2026-09-03\""), result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"sourceSite\":\"重庆市人民政府网站\""),
+                result.getMetadataJson());
+        assertTrue(result.getMetadataJson().contains("\"originalAuthor\":\"李明\""), result.getMetadataJson());
+        assertTrue(result.getContent().contains("文章正文内容"), result.getContent());
     }
 
     @Test

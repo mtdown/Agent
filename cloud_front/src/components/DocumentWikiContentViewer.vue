@@ -67,6 +67,7 @@ const htmlSrcDoc = computed(() => {
 
 .plain-content {
   white-space: pre-wrap;
+  text-indent: 2em;
 }
 
 /* ---- Warm-theme overrides for the Markdown preview -----------------
@@ -129,6 +130,10 @@ const htmlSrcDoc = computed(() => {
 .markdown-preview :deep(.md-editor-preview pre code) {
   background: var(--wiki-muted);
   color: var(--wiki-text);
+}
+
+.markdown-preview :deep(.md-editor-preview p) {
+  text-indent: 2em;
 }
 
 .markdown-preview :deep(.md-editor-preview pre) {

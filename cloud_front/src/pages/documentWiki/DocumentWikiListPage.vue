@@ -33,6 +33,7 @@
         </section>
         <section v-else class="content-section">
           <WikiSearchBar
+            v-if="!selectedDocument.id"
             v-model="searchParams"
             :all-space-options="allSpaceOptions"
             @search="doSearch"

@@ -1,10 +1,7 @@
 <template>
   <article v-if="selectedDocument.id" class="document-preview">
-    <a-flex justify="space-between" align="center" wrap="wrap" gap="middle">
-      <a-space align="center" wrap>
-        <a-button type="text" class="back-button" @click="emit('back')">← 返回列表</a-button>
-        <h3>{{ selectedDocument.title }}</h3>
-      </a-space>
+    <div class="preview-toolbar">
+      <a-button class="back-button" @click="emit('back')">返回列表</a-button>
       <a-space wrap>
         <a-button @click="emit('move', selectedDocument)">移动</a-button>
         <a-button
@@ -17,17 +14,25 @@
         <a-button v-else @click="emit('edit', selectedDocument)">编辑</a-button>
         <a-button danger @click="emit('delete', selectedDocument)">删除</a-button>
       </a-space>
-    </a-flex>
-    <a-space wrap class="meta">
-      <a-tag v-for="tag in selectedDocument.tags" :key="tag">{{ tag }}</a-tag>
-      <span>作者：{{ selectedDocument.user?.userName ?? selectedDocument.userId ?? '-' }}</span>
-      <span>编辑于：{{ formatTime(selectedDocument.editTime) }}</span>
-    </a-space>
-    <a-typography-paragraph v-if="selectedDocument.summary" type="secondary">
-      {{ selectedDocument.summary }}
-    </a-typography-paragraph>
+    </div>
+    <h1 class="article-title">{{ selectedDocument.title }}</h1>
+    <div class="article-metadata">
+      <span v-if="publicationTime">时间：{{ publicationTime }}</span>
+      <span v-if="sourceSite">
+        来源：
+        <a
+          v-if="sourceHref"
+          :href="sourceHref"
+          target="_blank"
+          rel="noopener noreferrer"
+        >{{ sourceSite }}</a>
+        <span v-else>{{ sourceSite }}</span>
+      </span>
+      <span v-if="articleMetadata.originalAuthor">原文作者：{{ articleMetadata.originalAuthor }}</span>
+      <span>创建人：{{ selectedDocument.user?.userName ?? selectedDocument.userId ?? '-' }}</span>
+    </div>
     <DocumentWikiContentViewer
-      :content="selectedDocument.content"
+      :content="displayContent"
       :content-format="selectedDocument.contentFormat"
     />
   </article>
@@ -171,6 +176,115 @@ const confirmJump = () => {
   emit('jumpToPage', target)
   pageInput.value = undefined
 }
+
+interface ArticleMetadata {
+  publishedAt?: string
+  sourceSite?: string
+  originalAuthor?: string
+}
+
+const metadataText = (value: unknown) =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined
+
+interface ParsedLegacyMetadata {
+  publishedAt?: string
+  sourceSite?: string
+  sourceUrl?: string
+  originalAuthor?: string
+  body: string
+}
+
+const parseLegacyArticleMetadata = (content?: string): ParsedLegacyMetadata => {
+  const raw = content ?? ''
+  const lines = raw.split(/\r?\n/)
+  const values: Record<string, string> = {}
+  let consumed = 0
+  let foundMetadata = false
+  for (const line of lines) {
+    const normalized = line.trim().replace(/^---\s*/, '').replace(/\s*---$/, '')
+    if (!normalized) {
+      if (foundMetadata) consumed += 1
+      else if (consumed === 0) consumed += 1
+      continue
+    }
+    const match = normalized.match(/^(?:\*\*)?([\w-]+)(?:\*\*)?\s*:\s*(.*)$/)
+    if (!match) break
+    const key = match[1].toLowerCase()
+    if (!['title', 'column', 'channel', 'pubdate', 'sourceurl', 'metadataid', 'bodyshort', 'author', 'originalauthor', 'source', 'sourcesite'].includes(key)) break
+    foundMetadata = true
+    consumed += 1
+    let value = match[2].replace(/\*\*/g, '').trim()
+    const markdownLink = value.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/i)
+    if (markdownLink) {
+      const linkLabel = markdownLink[1].trim()
+      if (/^https?:\/\//i.test(linkLabel)) {
+        try { values.sourceSite ??= new URL(markdownLink[2]).hostname.replace(/^www\./i, '') } catch { /* keep optional */ }
+      } else {
+        values.sourceSite ??= linkLabel
+      }
+      values.sourceUrl ??= markdownLink[2].trim()
+      value = markdownLink[2].trim()
+    }
+    values[key] = value.replace(/^['"]|['"]$/g, '')
+  }
+  if (!foundMetadata) return { body: raw }
+  while (lines[consumed]?.trim() === '' || /^\s*(?:---|___|\*\*\*)\s*$/.test(lines[consumed] ?? '')) consumed += 1
+  const sourceUrl = values.sourceurl ?? values.sourceUrl
+  if (sourceUrl && !values.sourceSite) {
+    try { values.sourceSite = new URL(sourceUrl).hostname.replace(/^www\./i, '') } catch { /* ignore invalid old metadata */ }
+  }
+  return {
+    publishedAt: values.pubdate,
+    sourceSite: values.sourcesite ?? values.source ?? values.sourceSite,
+    sourceUrl: sourceUrl,
+    originalAuthor: values.originalauthor ?? values.author,
+    body: lines.slice(consumed).join('\n'),
+  }
+}
+
+const legacyMetadata = computed(() => parseLegacyArticleMetadata(props.selectedDocument.content))
+const displayContent = computed(() => legacyMetadata.value.body)
+
+const articleMetadata = computed<ArticleMetadata>(() => {
+  try {
+    const parsed = JSON.parse(props.selectedDocument.metadataJson ?? '{}')
+    return {
+      publishedAt: metadataText(parsed.publishedAt) ?? legacyMetadata.value.publishedAt,
+      sourceSite: metadataText(parsed.sourceSite) ?? legacyMetadata.value.sourceSite,
+      originalAuthor: metadataText(parsed.originalAuthor) ?? legacyMetadata.value.originalAuthor,
+    }
+  } catch {
+    return {
+      publishedAt: legacyMetadata.value.publishedAt,
+      sourceSite: legacyMetadata.value.sourceSite,
+      originalAuthor: legacyMetadata.value.originalAuthor,
+    }
+  }
+})
+
+const sourceHref = computed(() => {
+  const candidate = (props.selectedDocument.sourceUrl ?? legacyMetadata.value.sourceUrl)?.trim()
+  if (!candidate) return undefined
+  try {
+    const parsed = new URL(candidate)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : undefined
+  } catch {
+    return undefined
+  }
+})
+
+const sourceSite = computed(() => {
+  if (articleMetadata.value.sourceSite) return articleMetadata.value.sourceSite
+  if (!sourceHref.value) return undefined
+  return new URL(sourceHref.value).hostname.replace(/^www\./i, '')
+})
+
+const publicationTime = computed(() => {
+  const raw = articleMetadata.value.publishedAt
+  if (!raw) return undefined
+  const formatted = formatTime(raw)
+  return formatted === '-' ? raw : formatted
+})
 </script>
 <style scoped>
 /* 列表主体：占满父级剩余高度；位置栏固定在顶部，a-list 的数据区在栏内滚动，
@@ -228,10 +342,33 @@ const confirmJump = () => {
   color: #999;
 }
 .back-button {
-  padding: 0 4px;
-  color: var(--wiki-text-muted);
+  flex-shrink: 0;
 }
-.back-button:hover {
+.preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.article-title {
+  margin: 22px 0 16px;
+  color: var(--wiki-text);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+.article-metadata {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0 0 22px;
+  color: var(--wiki-text-muted);
+  text-align: center;
+}
+.article-metadata a {
   color: #a14f16;
 }
 .result-title {
@@ -246,9 +383,6 @@ const confirmJump = () => {
 }
 .document-preview {
   padding-top: 4px;
-}
-.meta {
-  margin-bottom: 14px;
 }
 .summary {
   color: #666;

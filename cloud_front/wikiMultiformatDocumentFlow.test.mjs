@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const readSource = (path) => readFile(new URL(path, import.meta.url), 'utf8')
 
-const [apiSource, pageSource, treeSource, listSource, editorSource, viewerSource, detailSource] =
+const [apiSource, pageSource, treeSource, listSource, editorSource, viewerSource, detailSource, typesSource] =
   await Promise.all([
     readSource('./src/api/documentWikiController.ts'),
     readSource('./src/pages/documentWiki/DocumentWikiListPage.vue'),
@@ -13,6 +13,7 @@ const [apiSource, pageSource, treeSource, listSource, editorSource, viewerSource
     readSource('./src/components/DocumentWikiEditor.vue'),
     readSource('./src/components/DocumentWikiContentViewer.vue'),
     readSource('./src/pages/documentWiki/DocumentWikiDetailPage.vue'),
+    readSource('./src/api/typings.d.ts'),
   ])
 
 test('document wiki API exposes local document import endpoint', () => {
@@ -105,4 +106,36 @@ test('html documents are preview-only in the preview header, workspace and detai
   assert.match(listSource, /HTML 原页面文档本阶段仅支持预览，不支持编辑/)
   assert.match(pageSource, /HTML 原页面文档本阶段仅支持预览，不支持编辑/)
   assert.match(detailSource, /contentFormat\s*!==\s*'html'/)
+})
+
+test('article preview displays extracted provenance separately from its Wiki creator', () => {
+  assert.match(listSource, /publishedAt/)
+  assert.match(listSource, /sourceSite/)
+  assert.match(listSource, /originalAuthor/)
+  assert.match(listSource, /metadataJson/)
+  assert.match(listSource, /noopener noreferrer/)
+  assert.match(listSource, /创建人/)
+  assert.match(typesSource, /metadataJson\?: string/)
+  assert.match(typesSource, /sourceUrl\?: string/)
+  assert.doesNotMatch(listSource, /<span>作者：\{\{ selectedDocument\.user/)
+})
+
+test('article preview hides leading legacy metadata and uses it as display fallback', () => {
+  assert.match(listSource, /parseLegacyArticleMetadata/)
+  assert.match(listSource, /displayContent/)
+  assert.match(listSource, /pubdate/)
+  assert.match(listSource, /sourceUrl/)
+  assert.match(listSource, /markdownLink = value\.match\(/)
+})
+
+test('article preview centers its title and indents body paragraphs', () => {
+  assert.match(listSource, /class="article-title"/)
+  assert.match(listSource, /text-align:\s*center/)
+  assert.doesNotMatch(listSource, /<a-button type="text" class="back-button"/)
+  assert.match(viewerSource, /text-indent:\s*2em/)
+})
+
+test('document detail preview hides the search bar until returning to the list', () => {
+  assert.match(pageSource, /<WikiSearchBar\s+v-if="!selectedDocument\.id"/)
+  assert.match(pageSource, /const goBack\s*=/)
 })
