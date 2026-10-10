@@ -33,6 +33,12 @@ public class DocumentWikiVis implements Serializable {
      */
     private String contentFormat;
 
+    /** Canonical source URL for imported article documents. */
+    private String sourceUrl;
+
+    /** Optional source article metadata stored as JSON. */
+    private String metadataJson;
+
     /**
      * Short summary.
      */

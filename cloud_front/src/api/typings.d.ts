@@ -289,7 +289,9 @@ declare namespace API {
     editTime?: string
     folderId?: string | number
     id?: string | number
+    metadataJson?: string
     spaceId?: string | number
+    sourceUrl?: string
     summary?: string
     tags?: string[]
     title?: string

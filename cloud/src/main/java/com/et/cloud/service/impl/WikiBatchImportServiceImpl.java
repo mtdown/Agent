@@ -87,13 +87,20 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
                 if (StrUtil.isBlank(markdown)) {
                     throw new BusinessException(ErrorCode.PARAMS_ERROR, "未能从页面提取有效文本内容");
                 }
+                ArticleMetadataExtractor.ParsedMarkdown parsed =
+                        ArticleMetadataExtractor.parseMarkdownFrontMatter(markdown);
+                markdown = parsed.getContent();
+                Map<String, String> articleMetadata = ArticleMetadataExtractor.extract(page.getHtml(),
+                        StrUtil.blankToDefault(page.getFinalUrl(), url));
+                parsed.getMetadata().forEach(articleMetadata::putIfAbsent);
                 ImportedWikiDocument imported = new ImportedWikiDocument();
-                imported.setTitle(resolveUrlTitle(page));
+                imported.setTitle(resolveUrlTitle(page, articleMetadata.get("articleTitle")));
                 imported.setContent(markdown);
                 imported.setContentFormat("markdown");
                 imported.setSourceType("URL");
-                imported.setSourceUrl(StrUtil.blankToDefault(page.getFinalUrl(), url));
-                imported.setMetadataJson(buildUrlMetadata(page, url));
+                imported.setSourceUrl(StrUtil.blankToDefault(articleMetadata.get("sourceUrl"),
+                        StrUtil.blankToDefault(page.getFinalUrl(), url)));
+                imported.setMetadataJson(buildUrlMetadata(page, url, imported.getSourceUrl(), articleMetadata));
                 Long documentId = saveImported(imported, wikiSpace, folderId, loginUser);
                 results.add(BatchImportItemResult.success(url, documentId, imported.getTitle()));
             } catch (Exception e) {
@@ -219,10 +226,13 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         return normalized;
     }
 
-    private String resolveUrlTitle(FetchedPage page) {
+    private String resolveUrlTitle(FetchedPage page, String articleTitle) {
         String title = StrUtil.blankToDefault(page.getPageTitle(), "").trim();
         if (!title.isEmpty()) {
             return truncate(title);
+        }
+        if (StrUtil.isNotBlank(articleTitle)) {
+            return truncate(articleTitle.trim());
         }
         String fallback = page.getFinalUrl();
         try {
@@ -244,13 +254,15 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         return value.length() <= MAX_TITLE_LENGTH ? value : value.substring(0, MAX_TITLE_LENGTH);
     }
 
-    private String buildUrlMetadata(FetchedPage page, String requestedUrl) {
+    private String buildUrlMetadata(FetchedPage page, String requestedUrl, String sourceUrl,
+                                    Map<String, String> articleMetadata) {
         Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("sourceUrl", StrUtil.blankToDefault(page.getFinalUrl(), requestedUrl));
+        metadata.put("sourceUrl", sourceUrl);
         metadata.put("requestedUrl", requestedUrl);
         metadata.put("sourceType", "URL");
         metadata.put("importedAs", "markdown");
         metadata.put("importedAt", Instant.now().toString());
+        metadata.putAll(articleMetadata);
         return JSONUtil.toJsonStr(metadata);
     }
 

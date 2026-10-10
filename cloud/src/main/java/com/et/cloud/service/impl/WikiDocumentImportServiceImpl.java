@@ -37,6 +37,7 @@ public class WikiDocumentImportServiceImpl implements WikiDocumentImportService 
 
         String contentFormat;
         String content;
+        String sourceHtml = null;
         if ("md".equals(extension)) {
             contentFormat = "markdown";
             content = readText(multipartFile);
@@ -47,17 +48,24 @@ public class WikiDocumentImportServiceImpl implements WikiDocumentImportService 
             // cleaner selects the article container, drops scripts/overlays/sharing controls and
             // UI-only lines, then keeps h1-h6 headings and plain text blocks.
             contentFormat = "markdown";
-            content = WebPageMarkdownCleaner.toMarkdown(readText(multipartFile));
+            sourceHtml = readText(multipartFile);
+            content = WebPageMarkdownCleaner.toMarkdown(sourceHtml);
             ThrowUtils.throwIf(StrUtil.isBlank(content), ErrorCode.PARAMS_ERROR, "未能从 HTML 中提取有效文本内容");
         }
+        ArticleMetadataExtractor.ParsedMarkdown parsed = ArticleMetadataExtractor.parseMarkdownFrontMatter(content);
+        content = parsed.getContent();
         ThrowUtils.throwIf(StrUtil.isBlank(content), ErrorCode.PARAMS_ERROR, "文件内容不能为空");
 
+        Map<String, String> articleMetadata = ArticleMetadataExtractor.extract(sourceHtml, null);
+        parsed.getMetadata().forEach(articleMetadata::putIfAbsent);
+
         ImportedWikiDocument imported = new ImportedWikiDocument();
-        imported.setTitle(resolveTitle(title, originalFilename));
+        imported.setTitle(resolveTitle(title, articleMetadata.get("articleTitle"), originalFilename));
         imported.setContent(content);
         imported.setContentFormat(contentFormat);
         imported.setSourceType("UPLOAD");
-        imported.setMetadataJson(buildMetadataJson(multipartFile, extension, contentFormat));
+        imported.setSourceUrl(articleMetadata.get("sourceUrl"));
+        imported.setMetadataJson(buildMetadataJson(multipartFile, extension, contentFormat, articleMetadata));
         return imported;
     }
 
@@ -69,7 +77,8 @@ public class WikiDocumentImportServiceImpl implements WikiDocumentImportService 
         }
     }
 
-    private String buildMetadataJson(MultipartFile multipartFile, String extension, String contentFormat) {
+    private String buildMetadataJson(MultipartFile multipartFile, String extension, String contentFormat,
+                                     Map<String, String> articleMetadata) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("sourceFileName", multipartFile.getOriginalFilename());
         metadata.put("sourceExtension", extension);
@@ -77,12 +86,16 @@ public class WikiDocumentImportServiceImpl implements WikiDocumentImportService 
         metadata.put("sourceSize", multipartFile.getSize());
         metadata.put("importedAs", contentFormat);
         metadata.put("importedAt", Instant.now().toString());
+        metadata.putAll(articleMetadata);
         return JSONUtil.toJsonStr(metadata);
     }
 
-    private String resolveTitle(String title, String originalFilename) {
+    private String resolveTitle(String title, String articleTitle, String originalFilename) {
         if (StrUtil.isNotBlank(title)) {
             return title.trim();
+        }
+        if (StrUtil.isNotBlank(articleTitle)) {
+            return articleTitle.trim();
         }
         String filename = StrUtil.blankToDefault(originalFilename, "未命名文档");
         int dotIndex = filename.lastIndexOf('.');

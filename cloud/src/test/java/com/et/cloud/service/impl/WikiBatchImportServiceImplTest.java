@@ -125,6 +125,56 @@ class WikiBatchImportServiceImplTest {
     }
 
     @Test
+    void urlImportExtractsPublicationSourceAndAuthorMetadata() throws IOException {
+        String html = "<html><head>"
+                + "<meta property='article:published_time' content='2026-09-03T00:00:00+08:00'>"
+                + "<meta property='og:site_name' content='重庆市人民政府网站'>"
+                + "<meta name='author' content='李明'>"
+                + "</head><body><main><h1>应急保障</h1><p>真正的新闻正文内容</p></main></body></html>";
+        WikiBatchImportServiceImpl service = newService(url -> page(url, "应急保障", html));
+        prepareSpace();
+        when(documentWikiService.save(any())).thenReturn(true);
+
+        service.importUrls(request(11L, null,
+                Collections.singletonList("https://news.example.com/report")), loginUser);
+
+        ArgumentCaptor<DocumentWiki> captor = ArgumentCaptor.forClass(DocumentWiki.class);
+        verify(documentWikiService).save(captor.capture());
+        DocumentWiki saved = captor.getValue();
+        assertTrue(saved.getMetadataJson().contains("\"publishedAt\":\"2026-09-03T00:00:00+08:00\""),
+                saved.getMetadataJson());
+        assertTrue(saved.getMetadataJson().contains("\"sourceSite\":\"重庆市人民政府网站\""),
+                saved.getMetadataJson());
+        assertTrue(saved.getMetadataJson().contains("\"originalAuthor\":\"李明\""),
+                saved.getMetadataJson());
+        assertEquals("https://news.example.com/report", saved.getSourceUrl());
+        assertEquals(7L, saved.getUserId(), "Wiki creator remains the authenticated user");
+    }
+
+    @Test
+    void urlImportExtractsArticleMetadataFromJsonLdAndAllowsMissingAuthor() throws IOException {
+        String html = "<html><head><script type='application/ld+json'>"
+                + "{\"@context\":\"https://schema.org\",\"@type\":\"NewsArticle\","
+                + "\"datePublished\":\"2026-09-03\",\"publisher\":{\"name\":\"新闻网站\"}}"
+                + "</script></head><body><article><h1>应急保障</h1>"
+                + "<p>真正的新闻正文内容</p></article></body></html>";
+        WikiBatchImportServiceImpl service = newService(url -> page(url, "应急保障", html));
+        prepareSpace();
+        when(documentWikiService.save(any())).thenReturn(true);
+
+        List<BatchImportItemResult> results = service.importUrls(request(11L, null,
+                Collections.singletonList("https://news.example.com/report")), loginUser);
+
+        assertEquals(BatchImportItemResult.STATUS_SUCCESS, results.get(0).getStatus());
+        ArgumentCaptor<DocumentWiki> captor = ArgumentCaptor.forClass(DocumentWiki.class);
+        verify(documentWikiService).save(captor.capture());
+        String metadata = captor.getValue().getMetadataJson();
+        assertTrue(metadata.contains("\"publishedAt\":\"2026-09-03\""), metadata);
+        assertTrue(metadata.contains("\"sourceSite\":\"新闻网站\""), metadata);
+        assertTrue(!metadata.contains("originalAuthor"), metadata);
+    }
+
+    @Test
     void urlImportFallsBackToUrlSegmentWhenPageHasNoTitle() throws IOException {
         WikiBatchImportServiceImpl service = newService(url -> page(url, "", articleHtml()));
         prepareSpace();
