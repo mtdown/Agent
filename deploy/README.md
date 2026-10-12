@@ -75,7 +75,19 @@ Settings → Secrets and variables → Actions：
 git add -A && git commit -m "..." && git push
 ```
 
-约 5–8 分钟后线上更新完毕。构建失败时 Actions 直接红灯，不会触碰线上正在跑的版本。
+推送到 `feature/deploy-cicd开发` 或 `main` 即触发，约 5–8 分钟后线上更新完毕
+（**首次部署 10–20 分钟**，因为要装依赖、传 65MB jar、拉 MySQL 镜像）。
+
+构建失败时 Actions 直接红灯，不会触碰线上正在跑的版本；
+`app.jar` 在部署前会被备份成 `app.jar.bak`，随时 `bash rollback.sh` 回滚。
+
+想不推送代码就手动重跑一次（比如只改了服务器上的 `.env`）：
+
+```bash
+cd /opt/cloudwiki && bash deploy.sh
+```
+
+GitHub Actions 页面也支持 `Run workflow` 手动触发（无需新提交）。
 
 ## 服务器上的目录
 
@@ -106,12 +118,43 @@ cd /opt/cloudwiki && bash rollback.sh
 
 | 现象 | 处理 |
 |---|---|
-| Actions 红灯 | 看 Actions 日志：通常是 maven/npm 构建失败 |
-| 首页打不开 | 服务器上 `docker compose logs --tail=200 backend` |
-| 后端反复重启 | 多半是 Redis/MySQL 密码不一致，或某个必填环境变量为空 |
+| Actions 红灯 | 看 Actions 日志的 `[ERROR]` 行；**"Node 20 弃用警告"是干扰项，不会让 job 失败** |
+| Actions 红灯但站点其实是好的 | `deploy.sh` 健康检查只等 300 秒，超时会报红但容器仍在后台启动，**以 `docker compose ps` 为准** |
+| 首页能开、接口全 502 | 后端没起来。首页是 Nginx 吐静态文件，与后端无关；看 `docker compose logs --tail=120 backend` |
+| 后端反复重启 + `UnsupportedEncodingException: utf8mb4` | JDBC 的 `characterEncoding` 只认 Java 字符集名，必须写 `UTF-8`（见下方"已踩过的坑"） |
+| 后端反复重启（其他原因） | 多半是 Redis/MySQL 密码不一致，或某个必填环境变量为空（如 `DOC_PASSWORD`） |
+| 编译报 `cannot find symbol: toList()` 等 | 用了 Java 16+ API，但目标是 Java 11；本机 JDK 17 编得过、CI 的 JDK 11 编不过 |
 | 拉镜像超时 | 确认 `/etc/docker/daemon.json` 里的加速器已生效，`systemctl restart docker` |
 | 中文乱码 | 确认 MySQL 启动参数里的 `utf8mb4` 已生效 |
 | 时间差 8 小时 | 容器已设 `TZ=Asia/Shanghai`，若仍异常检查宿主机 `timedatectl` |
+
+## 已踩过的坑（2026-10-12 首次部署实录）
+
+1. **`characterEncoding=utf8mb4` 会让后端启动失败**。MySQL Connector/J 的这个参数只接受
+   **Java 字符集名**（`UTF-8`），写 MySQL 字符集名 `utf8mb4` 会抛 `UnsupportedEncodingException`，
+   Spring Boot 启动失败 → 容器崩溃重启 → Nginx 502。服务端字符集由 `--character-set-server=utf8mb4`
+   指定，驱动会自动协商，JDBC URL 里写 `UTF-8` 即可。
+2. **本机 JDK 17 会掩盖 Java 16+ API 误用**。pom 里只有 `source/target 11` 时，javac 仍按 JDK 17 的
+   API 表面编译，`Stream.toList()` 之类本机编得过、CI 的真 JDK 11 才炸。已加 `<release>11</release>`
+   作为护栏，本机就能提前暴露。
+3. **健康检查只探首页会造成"假成功"**。首页由 Nginx 直接吐静态文件，后端挂了也返回 200。
+   现在 `deploy.sh` 同时探 `/` 和 `/api/user/get/login`，后者非 000/502/503 才算后端活着。
+4. **首次部署 10–20 分钟属正常**（Maven/npm 无缓存 + 65MB jar 上传 + 拉取 MySQL 镜像）；
+   之后每次 5–8 分钟。
+
+## 首次上线后：建第一个账号
+
+`schema-init.sql` 只建表、**0 条业务数据**，所以线上库是空的。第一件事是走**注册**（不是登录）：
+
+1. 浏览器注册一个账号（默认普通用户角色）
+2. 需要管理员时，在服务器上提升角色：
+
+```bash
+cd /opt/cloudwiki
+source .env
+docker compose exec mysql mysql -uroot -p"$DB_PASSWORD" picture \
+  -e "UPDATE user SET userRole='admin' WHERE userAccount='你的账号'"
+```
 
 ## 备案通过后切 80/443
 

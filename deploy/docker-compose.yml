@@ -61,7 +61,10 @@ services:
     environment:
       TZ: Asia/Shanghai
       # 库名固定 picture（application.yml 默认值），主机名用 compose 服务名 mysql
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/picture?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8mb4
+      # characterEncoding 只认 Java 字符集名，写 utf8mb4 会抛
+      # java.io.UnsupportedEncodingException 导致启动失败；服务端字符集由 --character-set-server
+      # 指定为 utf8mb4，驱动会自动协商，这里写 UTF-8 即可。
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/picture?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_REDIS_HOST: redis
