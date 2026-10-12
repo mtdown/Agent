@@ -17,7 +17,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
-      # 2G 内存机器上 MySQL 默认缓冲池过大，必须压到 128M
+      # 显式固定缓冲池（128M 本身就是 MySQL 8.0+ 的默认值，这里写出来是防镜像默认值漂移）
       - --innodb-buffer-pool-size=128M
       - --performance-schema=OFF
     volumes:
