@@ -1,0 +1,164 @@
+# 部署方法
+
+## 一句话
+
+代码推送到 GitHub → GitHub Actions 自动构建（后端 jar + 前端 dist）→ SSH 上传到阿里云 ECS → Docker Compose 重启容器。全程无人值守，本机不再需要跑任何东西。
+
+## 架构
+
+```
+浏览器/手机
+    │  http://服务器:8080
+    ▼
+Nginx 容器（托管前端 dist，转发 /api）
+    │  内网
+    ▼
+后端容器（Spring Boot 8123，context-path=/api）
+    │  内网
+    ├──► MySQL 9.4 容器（库名 picture，数据卷持久化）
+    └──► Redis 7 容器（session + Sa-Token，设密码）
+
+对外只暴露 8080（备案后改 80/443）。
+3306 / 6379 / 8123 一律不映射到宿主机，数据库与缓存不暴露公网。
+```
+
+## 首次部署（一次性）
+
+**1. 服务器初始化**（装 Docker + 国内镜像加速器）
+
+因为 `get.docker.com` 在国内 ECS 上连不上，用阿里云 Docker CE 源：
+
+```bash
+apt-get update
+apt-get install -y ca-certificates curl gnupg lsb-release
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+systemctl enable --now docker
+```
+
+并写入加速器 `/etc/docker/daemon.json`（否则拉镜像会卡死）：
+
+```json
+{
+  "registry-mirrors": ["https://docker.m.daocloud.io", "https://hub-mirror.c.163.com"]
+}
+```
+
+以上两步等价于直接执行 `deploy/setup-server.sh`（但该脚本里的 `get.docker.com` 在国内不通，实际按上面命令走）。
+
+**2. 在 GitHub 仓库填 Secrets**
+
+Settings → Secrets and variables → Actions：
+
+| Secret | 说明 |
+|---|---|
+| `SSH_PRIVATE_KEY` | ECS 密钥对 `.pem` 全文（含 BEGIN/END 行） |
+| `SERVER_HOST` | 公网 IP |
+| `SERVER_USER` | root |
+| `DB_PASSWORD` / `REDIS_PASSWORD` | 自己设定 |
+| `COS_SECRET_ID` / `COS_SECRET_KEY` | 可留空，compose 会兜底占位值 |
+| `RAG_EMBEDDING_API_KEY` | DashScope（embedding + rerank 共用） |
+| `RAG_LLM_API_KEY` | 回答生成模型 |
+| `DOC_USERNAME` / `DOC_PASSWORD` | knife4j 接口文档口令（密码必填） |
+
+**3. 推送代码**
+
+推到 `feature/deploy-cicd开发` 或 `main` 即触发 Actions。
+
+## 日常更新
+
+```bash
+git add -A && git commit -m "..." && git push
+```
+
+推送到 `feature/deploy-cicd开发` 或 `main` 即触发，约 5–8 分钟后线上更新完毕
+（**首次部署 10–20 分钟**，因为要装依赖、传 65MB jar、拉 MySQL 镜像）。
+
+构建失败时 Actions 直接红灯，不会触碰线上正在跑的版本；
+`app.jar` 在部署前会被备份成 `app.jar.bak`，随时 `bash rollback.sh` 回滚。
+
+想不推送代码就手动重跑一次（比如只改了服务器上的 `.env`）：
+
+```bash
+cd /opt/cloudwiki && bash deploy.sh
+```
+
+GitHub Actions 页面也支持 `Run workflow` 手动触发（无需新提交）。
+
+## 服务器上的目录
+
+```
+/opt/cloudwiki/
+├── app.jar            当前后端（app.jar.bak 是上一版，用于回滚）
+├── dist/              前端静态产物
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── schema-init.sql    首次启动自动建表（纯结构，无业务数据）
+├── deploy.sh          部署 / 健康检查
+├── rollback.sh        回滚到上一版
+└── .env               由 CI 生成，含真实密钥（不进版本库）
+```
+
+MySQL 首次启动且数据卷为空时，会自动执行 `schema-init.sql` 建 11 张表；已有数据卷时不会重复执行。
+
+## 回滚
+
+```bash
+cd /opt/cloudwiki && bash rollback.sh
+```
+
+把 `app.jar.bak` 换回并重启后端容器，数据不受影响。
+
+## 排障
+
+| 现象 | 处理 |
+|---|---|
+| Actions 红灯 | 看 Actions 日志的 `[ERROR]` 行；**"Node 20 弃用警告"是干扰项，不会让 job 失败** |
+| Actions 红灯但站点其实是好的 | `deploy.sh` 健康检查只等 300 秒，超时会报红但容器仍在后台启动，**以 `docker compose ps` 为准** |
+| 首页能开、接口全 502 | 后端没起来。首页是 Nginx 吐静态文件，与后端无关；看 `docker compose logs --tail=120 backend` |
+| 后端反复重启 + `UnsupportedEncodingException: utf8mb4` | JDBC 的 `characterEncoding` 只认 Java 字符集名，必须写 `UTF-8`（见下方"已踩过的坑"） |
+| 后端反复重启（其他原因） | 多半是 Redis/MySQL 密码不一致，或某个必填环境变量为空（如 `DOC_PASSWORD`） |
+| 编译报 `cannot find symbol: toList()` 等 | 用了 Java 16+ API，但目标是 Java 11；本机 JDK 17 编得过、CI 的 JDK 11 编不过 |
+| 拉镜像超时 | 确认 `/etc/docker/daemon.json` 里的加速器已生效，`systemctl restart docker` |
+| 中文乱码 | 确认 MySQL 启动参数里的 `utf8mb4` 已生效 |
+| 时间差 8 小时 | 容器已设 `TZ=Asia/Shanghai`，若仍异常检查宿主机 `timedatectl` |
+
+## 已踩过的坑（2026-10-12 首次部署实录）
+
+1. **`characterEncoding=utf8mb4` 会让后端启动失败**。MySQL Connector/J 的这个参数只接受
+   **Java 字符集名**（`UTF-8`），写 MySQL 字符集名 `utf8mb4` 会抛 `UnsupportedEncodingException`，
+   Spring Boot 启动失败 → 容器崩溃重启 → Nginx 502。服务端字符集由 `--character-set-server=utf8mb4`
+   指定，驱动会自动协商，JDBC URL 里写 `UTF-8` 即可。
+2. **本机 JDK 17 会掩盖 Java 16+ API 误用**。pom 里只有 `source/target 11` 时，javac 仍按 JDK 17 的
+   API 表面编译，`Stream.toList()` 之类本机编得过、CI 的真 JDK 11 才炸。已加 `<release>11</release>`
+   作为护栏，本机就能提前暴露。
+3. **健康检查只探首页会造成"假成功"**。首页由 Nginx 直接吐静态文件，后端挂了也返回 200。
+   现在 `deploy.sh` 同时探 `/` 和 `/api/user/get/login`，后者非 000/502/503 才算后端活着。
+4. **首次部署 10–20 分钟属正常**（Maven/npm 无缓存 + 65MB jar 上传 + 拉取 MySQL 镜像）；
+   之后每次 5–8 分钟。
+
+## 首次上线后：建第一个账号
+
+`schema-init.sql` 只建表、**0 条业务数据**，所以线上库是空的。第一件事是走**注册**（不是登录）：
+
+1. 浏览器注册一个账号（默认普通用户角色）
+2. 需要管理员时，在服务器上提升角色：
+
+```bash
+cd /opt/cloudwiki
+source .env
+docker compose exec mysql mysql -uroot -p"$DB_PASSWORD" picture \
+  -e "UPDATE user SET userRole='admin' WHERE userAccount='你的账号'"
+```
+
+## 备案通过后切 80/443
+
+1. 改 `/opt/cloudwiki/.env`：`HTTP_PORT=80`
+2. 改 `deploy/docker-compose.yml` 的 ports 为 `"80:80"` 并追加 `"443:443"`
+3. 在服务器上执行 `certbot --nginx` 申请免费证书（自动续期）
+4. `cd /opt/cloudwiki && bash deploy.sh`

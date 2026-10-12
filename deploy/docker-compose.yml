@@ -1,0 +1,113 @@
+# 线上编排：MySQL + Redis + 后端 + Nginx（前端静态文件）
+# 所有服务只在内部网络 cw 互通，只有 nginx 对外暴露端口。
+# 3306 / 6379 / 8123 一律不映射到宿主机，避免数据库与缓存暴露到公网。
+
+services:
+  mysql:
+    # 与本地开发容器保持一致（本地实测 Ver 9.4.0）。若该 tag 拉取失败，可改用 mysql:9。
+    image: mysql:9.4
+    container_name: cw-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: picture
+      TZ: Asia/Shanghai
+    command:
+      # 字符集必须显式指定，否则可能落到 latin1 导致中文乱码
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      # 显式固定缓冲池（128M 本身就是 MySQL 8.0+ 的默认值，这里写出来是防镜像默认值漂移）
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动且数据卷为空时自动建表（只含结构，不含任何业务数据）
+      - ./schema-init.sql:/docker-entrypoint-initdb.d/schema-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks:
+      - cw
+
+  redis:
+    image: redis:7-alpine
+    container_name: cw-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TZ: Asia/Shanghai
+    # spring-session + Sa-Token 都依赖 Redis，必须设密码
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - cw
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cw-backend
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      # 库名固定 picture（application.yml 默认值），主机名用 compose 服务名 mysql
+      # characterEncoding 只认 Java 字符集名，写 utf8mb4 会抛
+      # java.io.UnsupportedEncodingException 导致启动失败；服务端字符集由 --character-set-server
+      # 指定为 utf8mb4，驱动会自动协商，这里写 UTF-8 即可。
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/picture?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: "6379"
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # COS 已停服：application.yml 里 ${COS_SECRET_ID} 没有默认值，
+      # 传空会让 BasicCOSCredentials 抛异常导致启动失败，所以这里兜底成非空占位值。
+      # 后果只是图片/附件上传不可用，RAG 检索与问答不受影响。
+      COS_SECRET_ID: ${COS_SECRET_ID:-cos-disabled}
+      COS_SECRET_KEY: ${COS_SECRET_KEY:-cos-disabled}
+      RAG_EMBEDDING_API_KEY: ${RAG_EMBEDDING_API_KEY:-}
+      RAG_LLM_API_KEY: ${RAG_LLM_API_KEY:-}
+      # 不传 RAG_RERANK_API_KEY：让 application.yml 自己回退到 embedding key
+      DOC_USERNAME: ${DOC_USERNAME:-admin}
+      DOC_PASSWORD: ${DOC_PASSWORD}
+      JAVA_OPTS: -Xmx512m -Xms256m -XX:MaxMetaspaceSize=160m -Djava.awt.headless=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cw
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cw-nginx
+    restart: unless-stopped
+    ports:
+      # 备案通过前用 8080；备案通过后改成 "80:80" 并追加 "443:443"
+      - "${HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - cw
+
+volumes:
+  mysql-data:
+  redis-data:
+
+networks:
+  cw:
+    driver: bridge

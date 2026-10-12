@@ -138,7 +138,8 @@ public class RagLlmClient {
                     httpClient.send(request, HttpResponse.BodyHandlers.ofLines());
             if (response.statusCode() != 200) {
                 // non-stream error body: join lines for the message
-                String errText = String.join("\n", response.body().toList());
+                // 注意：项目目标 Java 11，不能用 Stream.toList()（Java 16+）
+                String errText = String.join("\n", response.body().collect(java.util.stream.Collectors.toList()));
                 cb.error = "LLM 响应异常 HTTP " + response.statusCode() + ": " + truncate(errText);
                 return FAILED;
             }
