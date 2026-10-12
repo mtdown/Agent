@@ -1,0 +1,13 @@
+# 部署脚本只在 Linux 服务器上执行，必须保持 LF 行尾。
+# 否则 Windows 的 core.autocrlf 会把它转成 CRLF，Linux 执行时报
+# bad interpreter: /bin/sh^M
+*.sh text eol=lf
+
+# 部署目录与 CI 配置同样保持 LF
+deploy/** text eol=lf
+.github/** text eol=lf
+
+# 二进制产物不参与行尾转换
+*.jar binary
+*.png binary
+*.jpg binary
