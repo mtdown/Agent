@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>云策库 CloudPolicy Wiki · 面试速览站</title>
+<style>
+  :root{
+    --bg:#0f1115; --bg2:#151922; --bg3:#1c2130; --line:#2a3140;
+    --fg:#e6e9ef; --fg2:#a8b0c0; --fg3:#75809a;
+    --accent:#5b9dff; --accent2:#7c5cff; --ok:#3ecf8e; --warn:#f5a623; --hot:#ff6b6b;
+    --mono:"JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.7;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.88em;background:var(--bg3);padding:1px 5px;border-radius:4px;color:#c8d3e8}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 80px}
+
+  /* ---------- header ---------- */
+  header.hero{
+    background:linear-gradient(160deg,#151b2b 0%,#0f1115 70%);
+    border-bottom:1px solid var(--line);padding:44px 0 34px;margin-bottom:28px;
+  }
+  .hero h1{margin:0 0 6px;font-size:28px;letter-spacing:.5px}
+  .hero .sub{color:var(--fg2);font-size:15px;margin-bottom:18px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+  .badge{background:var(--bg3);border:1px solid var(--line);border-radius:20px;padding:3px 12px;font-size:12px;color:var(--fg2)}
+  .badge.hl{border-color:var(--accent);color:var(--accent);background:rgba(91,157,255,.10)}
+  .badge.ok{border-color:var(--ok);color:var(--ok);background:rgba(62,207,142,.10)}
+
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .metric{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .metric .v{font-family:var(--mono);font-size:22px;color:var(--accent);line-height:1.2}
+  .metric .k{font-size:12px;color:var(--fg3);margin-top:2px}
+  .metric .d{font-size:11px;color:var(--fg3);margin-top:4px}
+
+  /* ---------- protocol bar ---------- */
+  .toolbar{
+    position:sticky;top:0;z-index:50;background:rgba(15,17,21,.94);backdrop-filter:blur(8px);
+    border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:26px;
+    display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  }
+  .toolbar .lb{font-size:12px;color:var(--fg3)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{
+    background:var(--bg2);border:0;color:var(--fg2);padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;
+  }
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:var(--accent);color:#08101f;font-weight:600}
+  .hint{font-size:11px;color:var(--fg3);margin-left:auto}
+
+  /* ---------- sections ---------- */
+  section{margin-bottom:44px;scroll-margin-top:70px}
+  h2{
+    font-size:20px;margin:0 0 4px;padding-left:11px;border-left:4px solid var(--accent);
+  }
+  h2 .en{font-size:12px;color:var(--fg3);font-weight:400;margin-left:8px}
+  .lead{color:var(--fg2);margin:0 0 18px;font-size:13px}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--fg)}
+
+  /* ---------- nav ---------- */
+  nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:30px}
+  nav.toc a{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:6px 14px;font-size:13px;color:var(--fg2)}
+  nav.toc a:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th{background:var(--bg3);text-align:left;padding:10px 12px;font-weight:600;color:var(--fg2);font-size:12px;white-space:nowrap}
+  td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top;color:var(--fg)}
+  td.k{white-space:nowrap;color:var(--fg2)}
+  tr:hover td{background:rgba(91,157,255,.04)}
+
+  /* ---------- module card ---------- */
+  .card{
+    background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;
+  }
+  .card.star{border-color:rgba(124,92,255,.55);box-shadow:0 0 0 1px rgba(124,92,255,.15) inset}
+  .card-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}
+  .card-head .id{font-family:var(--mono);font-size:12px;color:var(--fg3);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+  .card-head h3{margin:0;font-size:17px}
+  .tag{font-size:11px;border-radius:20px;padding:2px 9px;border:1px solid var(--line);color:var(--fg3)}
+  .tag.hl{border-color:var(--accent2);color:#b9a6ff;background:rgba(124,92,255,.12)}
+  .tag.ok{border-color:var(--ok);color:var(--ok);background:rgba(62,207,142,.10)}
+  .tag.warn{border-color:var(--warn);color:var(--warn);background:rgba(245,166,35,.10)}
+  .card p{margin:6px 0}
+  .row{display:grid;grid-template-columns:96px 1fr;gap:8px;margin:7px 0;font-size:13px}
+  .row .lbl{color:var(--fg3);font-size:12px;padding-top:1px}
+  .flow{font-family:var(--mono);font-size:12px;background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:#c8d3e8;white-space:pre-wrap;line-height:1.65}
+
+  .files{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+  .fp{
+    display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+    background:var(--bg3);border:1px solid var(--line);border-radius:6px;padding:4px 8px;
+  }
+  .fp .kind{font-size:10px;color:var(--fg3);border:1px solid var(--line);border-radius:3px;padding:0 5px;flex:none}
+  .fp a{flex:1;word-break:break-all;color:#8fc2ff}
+  .fp .ln{color:var(--warn);flex:none}
+  .fp button{
+    flex:none;background:transparent;border:1px solid var(--line);color:var(--fg3);
+    border-radius:4px;font-size:10px;padding:1px 6px;cursor:pointer;font-family:inherit;
+  }
+  .fp button:hover{color:var(--accent);border-color:var(--accent)}
+
+  .diff{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .diff .t{font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:6px}
+  .diff ul{margin:0;padding-left:18px}
+  .diff li{margin-bottom:7px;font-size:13px;color:var(--fg)}
+  .diff li b{color:var(--warn);font-weight:600}
+  .diff li .fix{color:var(--ok)}
+  .diff li i{color:var(--fg3);font-style:normal;font-size:12px}
+
+  /* ---------- dependency ---------- */
+  .layers{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+  .layer{border:1px solid var(--line);border-radius:10px;background:var(--bg2);padding:12px 14px}
+  .layer .lt{font-size:12px;color:var(--fg3);margin-bottom:8px;letter-spacing:1px}
+  .layer .boxes{display:flex;flex-wrap:wrap;gap:8px}
+  .box{
+    border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12px;background:var(--bg3);
+  }
+  .box b{color:var(--fg);font-weight:600}
+  .box span{color:var(--fg3)}
+  .box.c{background:rgba(91,157,255,.12);border-color:rgba(91,157,255,.45)}
+  .box.c b{color:#8fc2ff}
+  .box.v{background:rgba(124,92,255,.12);border-color:rgba(124,92,255,.45)}
+  .box.v b{color:#b9a6ff}
+  .box.g{background:rgba(62,207,142,.10);border-color:rgba(62,207,142,.40)}
+  .box.g b{color:var(--ok)}
+  .arrowdown{text-align:center;color:var(--fg3);font-size:18px;line-height:1;margin:-4px 0}
+  .deplist{font-size:13px}
+  .deplist li{margin-bottom:6px}
+
+  /* ---------- qa ---------- */
+  .qa{border:1px solid var(--line);border-radius:10px;background:var(--bg2);margin-bottom:10px;overflow:hidden}
+  .qa summary{
+    cursor:pointer;padding:12px 16px;font-size:14px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:baseline;
+  }
+  .qa summary::-webkit-details-marker{display:none}
+  .qa summary:hover{background:rgba(91,157,255,.06)}
+  .qa summary .no{font-family:var(--mono);font-size:11px;color:var(--fg3);flex:none}
+  .qa summary .lv{font-size:10px;border-radius:12px;padding:1px 8px;border:1px solid var(--line);color:var(--fg3);flex:none}
+  .qa summary .lv.s{border-color:var(--hot);color:var(--hot);background:rgba(255,107,107,.10)}
+  .qa summary .lv.a{border-color:var(--warn);color:var(--warn);background:rgba(245,166,35,.10)}
+  .qa .body{padding:0 16px 14px;border-top:1px solid var(--line);font-size:13px}
+  .qa .body p{margin:10px 0}
+  .qa .body .say{color:var(--fg)}
+  .qa .body .data{color:var(--fg2);background:var(--bg3);border-left:3px solid var(--ok);padding:8px 12px;border-radius:0 6px 6px 0;margin:10px 0}
+  .qa .body .trap{color:var(--fg2);background:var(--bg3);border-left:3px solid var(--hot);padding:8px 12px;border-radius:0 6px 6px 0;margin:10px 0}
+  .qa .body ul{margin:8px 0;padding-left:18px}
+
+  .callout{
+    background:var(--bg3);border:1px solid var(--line);border-left:4px solid var(--accent2);
+    border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;font-size:13px;color:var(--fg2);
+  }
+  .callout b{color:var(--fg)}
+  .callout.warn{border-left-color:var(--warn)}
+
+  footer{border-top:1px solid var(--line);padding-top:18px;color:var(--fg3);font-size:12px}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--accent);color:#08101f;padding:8px 18px;border-radius:20px;font-size:13px;
+    opacity:0;pointer-events:none;transition:.25s;z-index:99;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>云策库 · CloudPolicy Wiki</h1>
+    <div class="sub">企业知识库 Agent —— 以 Wiki 沉淀知识，以 RAG 打通政策解读问答</div>
+    <div class="badges">
+      <span class="badge hl">目标岗位：大模型应用开发</span>
+      <span class="badge hl">重点：检索链路 + 评测体系</span>
+      <span class="badge">定位：个人技术展示项目</span>
+      <span class="badge ok">全仓库拆解（cloud / cloud_front / eval / openspec）</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="v">0.7930</div><div class="k">recall@6</div><div class="d">改造前 0.5623，+23.1pt</div></div>
+      <div class="metric"><div class="v">0.9223</div><div class="k">docRecall@6</div><div class="d">文档级召回</div></div>
+      <div class="metric"><div class="v">0.6262</div><div class="k">MRR</div><div class="d">正确段落平均第 1.6 位</div></div>
+      <div class="metric"><div class="v">0.905</div><div class="k">hitRate@6</div><div class="d">前 6 条至少命中 1 条</div></div>
+      <div class="metric"><div class="v">0</div><div class="k">权限泄漏</div><div class="d">双 API-Key 对照</div></div>
+      <div class="metric"><div class="v">423</div><div class="k">评测题量</div><div class="d">399 计分 / 216 篇 / 2061 块</div></div>
+      <div class="metric"><div class="v">516ms</div><div class="k">端到端 mean</div><div class="d">p95 600ms（单并发）</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="toolbar">
+    <span class="lb">文件路径链接协议：</span>
+    <div class="seg" id="protoSeg">
+      <button data-p="file" class="on">file://（系统关联程序）</button>
+      <button data-p="idea">idea://（IDEA 打开）</button>
+      <button data-p="jetbrains">jetbrains://</button>
+    </div>
+    <span class="hint">点路径在 IDEA / 编辑器打开，点「复制」拷 <code>路径:行号</code> 后可 Ctrl+Shift+N 粘贴跳转</span>
+  </div>
+
+  <nav class="toc">
+    <a href="#s0">30 秒电梯陈述</a>
+    <a href="#s1">一、技术栈总览</a>
+    <a href="#s2">二、模块卡片</a>
+    <a href="#s3">三、依赖关系</a>
+    <a href="#s4">四、面试问答要点</a>
+    <a href="#s5">五、按模块复习路径</a>
+  </nav>
+
+  <!-- ================= 电梯陈述 ================= -->
+  <section id="s0">
+    <h2>30 秒电梯陈述<span class="en">自我介绍时用</span></h2>
+    <p class="lead">先说清"解决谁的什么问题"，再说技术，最后用可核验的数字收口。</p>
+    <div class="callout">
+      <b>一句话：</b>这是一个企业知识库 + RAG 问答系统。文档以 Markdown 沉淀进多空间 Wiki，
+      自动切片向量化；用户提问时先做权限过滤，再走"文号规则层 + 向量 + BM25 三路召回 → RRF 融合 → 语义重排"，
+      最后由大模型基于证据流式作答，句末带引用角标可溯源。<br><br>
+      <b>我最想讲的不是"我接了个大模型"，而是"我怎么证明它变好了"：</b>
+      我建了一套 423 题的评测集，把 <code>recall@6</code> 从 0.5623 提到 0.7930，
+      并且量化了"同数据重跑抖动 0.13 个百分点"作为数值可信下限——小于这个的差异我不当成改进证据。
+    </div>
+    <div class="callout warn">
+      <b>定位口径（已确认）：</b>这是<b>个人技术展示项目</b>，不是线上业务。
+      可以坦白说"没有真实流量"，但要把重点转向<b>架构完整度、工程严谨性和数据驱动的优化闭环</b>——
+      这恰好是大模型应用岗最看重的三件事。
+    </div>
+  </section>
+
+  <!-- ================= 技术栈 ================= -->
+  <section id="s1">
+    <h2>一、技术栈总览<span class="en">逐项：是什么 + 在项目里干什么</span></h2>
+    <p class="lead">面试官问"用了什么技术"时，<b>不要念清单</b>，要念"这项技术解决了我哪个具体问题"。</p>
+
+    <table>
+      <thead><tr><th style="width:120px">类别</th><th style="width:190px">技术选型</th><th>在项目中承担的具体作用（面试话术）</th></tr></thead>
+      <tbody>
+        <tr><td class="k">语言</td><td>Java 11</td><td>后端全量实现。RAG 链路中向量余弦、BM25、RRF 融合、重排编排全部手写，没有引入向量库——<b>这是刻意的，为了把检索链路完全暴露出来可测可调</b>。</td></tr>
+        <tr><td class="k">框架</td><td>Spring Boot 2.7.6</td><td>依赖注入 + 自动装配；<code>@ConfigurationProperties(prefix="rag")</code> 把整条检索链路的参数（池深、rrfK、重排开关）外置成配置，A/B 实验不用改代码。</td></tr>
+        <tr><td class="k">AOP / 事件</td><td>spring-boot-starter-aop、<code>@TransactionalEventListener</code></td><td>① 空间权限用注解 + AOP 声明式校验；② 文档变更事件在 <b>AFTER_COMMIT</b> 才触发索引，避免读到未提交数据。</td></tr>
+        <tr><td class="k">ORM</td><td>MyBatis-Plus 3.5.9</td><td>实体 CRUD + <code>QueryWrapper</code>；回收站场景<b>手写 SQL 绕过 MP 全局逻辑删除</b>才能查到已删数据。</td></tr>
+        <tr><td class="k">认证</td><td>Sa-Token 1.44</td><td>站点主登录态 + 空间登录态 <code>StpKit.SPACE</code> <b>双认证域隔离</b>；RAG 开放 API 走 <code>X-API-Key</code> 第三套鉴权。</td></tr>
+        <tr><td class="k">构建</td><td>Maven（<code>cloud/pom.xml</code>）</td><td><code>mvn spring-boot:run</code> 起服务；打包 <code>mvn -DskipTests package</code>。</td></tr>
+        <tr><td class="k">数据存储</td><td>MySQL 8</td><td><b>唯一持久化</b>。文档表 <code>document_wiki</code>、切片表 <code>wiki_chunk</code>（向量以 float32 小端 BLOB 存 <code>embedding</code> 列）、API Key 表 <code>rag_api_key</code>。另配 FULLTEXT + ngram 做文档标题全文检索。</td></tr>
+        <tr><td class="k">缓存</td><td>Redis 7 + Caffeine 3.1</td><td>分布式 Session / 业务缓存 + 本地缓存；检索侧另有<b>进程内缓存</b>：向量快照与 BM25 倒排索引按空间懒加载、写时失效（copy-on-write 整体替换）。</td></tr>
+        <tr><td class="k">向量检索</td><td>自研 <code>InMemoryCosineVectorStore</code></td><td>暴力余弦 + 按空间分片快照。规模是 2061 块，完全够用；<b>接口抽象成 <code>VectorStore</code>，量大了换 ES / Milvus 只换 Bean</b>。</td></tr>
+        <tr><td class="k">词法检索</td><td>自研 <code>LexicalIndex</code>（BM25）</td><td>CJK bigram 分词，<b>零外部分词器依赖</b>。把候选池 oracle@50 从 0.8148 抬到 0.8600——这是 <code>recall@6</code> 涨 23pt 的关键之一。</td></tr>
+        <tr><td class="k">Embedding</td><td>DashScope <code>qwen3.7-text-embedding-flash</code>（1024 维）</td><td>OpenAI 兼容协议，批量 10 条/次。客户端带<b>幂等重试</b>（云端网关会回收空闲 keep-alive，第一发常踩死连接）。</td></tr>
+        <tr><td class="k">重排</td><td><code>qwen3.7-text-rerank</code>（cross-encoder）</td><td>候选池 50 → 精排截断 top-6。<b>失败即降级</b>回融合序，绝不把请求打挂。</td></tr>
+        <tr><td class="k">大模型</td><td>OpenAI 兼容接口（DeepSeek 默认，可切 DashScope）</td><td>SSE 流式生成答案；<b>思考型 / 快速型双模型档位</b>可切换。</td></tr>
+        <tr><td class="k">对象存储</td><td>腾讯云 COS</td><td>文档附件与图片；缩略图 / 原图分离，上传按文件魔数校验防伪装。</td></tr>
+        <tr><td class="k">前端</td><td>Vue 3.5 + Vite 6 + TS 5.6 + Ant Design Vue 4.2 + Pinia</td><td>双栏 Wiki 工作台（空间树 + 文档列表 + Markdown 编辑器）+ AI 助手页（SSE 流式、引用角标、调用明细时间线）。</td></tr>
+        <tr><td class="k">接口契约</td><td>Knife4j 4.4 + <code>@umijs/openapi</code></td><td>后端出 OpenAPI JSON → 前端自动生成带类型的请求函数。int64 统一映射 string，根治雪花 ID 精度丢失。</td></tr>
+        <tr><td class="k">评测</td><td>Python 3 + 自研 runner（<code>eval/</code>）</td><td>423 题数据集 + HTTP 模式真实打服务端；产出 <code>recall@k / docRecall@k / mrr / hitRate@k / 泄漏</code>，并做分组与跨版本对比。</td></tr>
+        <tr><td class="k">部署</td><td>本地一键脚本 + cloudflared 隧道</td><td><code>start-dev.ps1</code> / <code>stop-dev.ps1</code> 统一启停（后端 8123、前端 3000）；<code>start-main-dev.ps1</code> 给 main 验收用。<b>密钥走根目录 <code>.env.dev</code>，不进版本库</b>。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ================= 模块卡片 ================= -->
+  <section id="s2">
+    <h2>二、模块划分<span class="en">9 个模块 · 职责 / 流程 / 文件 / 依赖 / 难点</span></h2>
+    <p class="lead">
+      标 <span class="tag hl">核心亮点</span> 的三个模块（M3 索引 / M4 检索 / M8 评测）是本次面试的主战场，
+      建议能把实现文件讲到行号级别。
+    </p>
+
+    <!-- M4 -->
+    <div class="card star">
+      <div class="card-head">
+        <span class="id">M4</span><h3>RAG 检索链路</h3>
+        <span class="tag hl">核心亮点</span><span class="tag">权限过滤 · 三路召回 · RRF · 重排</span>
+      </div>
+      <p><b>核心职责：</b>一次查询 → 权限过滤 → 文号精确钉位 → 向量 + BM25 双通道召回 → RRF 融合成候选池 → 语义重排 → 返回 top-6 证据，并输出分步耗时。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">用户提问
+  ├─ 1. 权限过滤   effectiveSpaceIds = 可见空间 ∩ 请求空间      → 空则直接返回（零泄漏）
+  ├─ 2. 文号钉位   正则抽公文号 → docNumber 精确命中组（score=1.0），组上限 200
+  ├─ 3. 查询分支   默认仅原问题；可选多查询（改写 0.7 / 假设答案 0.6）
+  ├─ 4. 双通道     向量通道（余弦，池深 50） + BM25 通道（CJK bigram，池深 50）
+  ├─ 5. RRF 融合   按名次融合（k=60，取文献默认值，不针对评测集调参）→ 融合池 50
+  ├─ 6. 证据合并   同文档相邻块合并（默认关）
+  ├─ 7. 语义重排   融合池 → qwen3.7-text-rerank → 截断 top-6（失败降级融合序）
+  └─ 8. 组装       钉位组占前排槽位，重排结果填剩余槽位</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-rag-retrieval/spec.md">openspec/specs/wiki-rag-retrieval/spec.md</a></div>
+        <div class="fp"><span class="kind">design</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/changes/archive/2026-09-16-boost-rag-passage-recall/design.md">openspec/changes/archive/2026-09-16-boost-rag-passage-recall/design.md</a></div>
+        <div class="fp"><span class="kind">yaml</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/resources/application.yml" data-line="82">cloud/src/main/resources/application.yml:82（rag.retrieval 全量参数与实测注释）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java" data-line="75">rag/RagSearchServiceImpl.java:75</a><span class="ln">search() 主流程</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java" data-line="565">rag/RagSearchServiceImpl.java:565</a><span class="ln">findDocNumberHits() 文号层</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java" data-line="265">rag/RagSearchServiceImpl.java:265</a><span class="ln">orderDocNumberGroup() 钉位组内排序</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java" data-line="203">rag/RagSearchServiceImpl.java:203</a><span class="ln">rerankOrFallback() 降级</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/InMemoryCosineVectorStore.java" data-line="37">rag/InMemoryCosineVectorStore.java:37</a><span class="ln">向量通道</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/LexicalIndex.java" data-line="123">rag/LexicalIndex.java:123</a><span class="ln">CJK bigram 分词</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RrfFusion.java" data-line="33">rag/RrfFusion.java:33</a><span class="ln">RRF 融合</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagRerankClient.java" data-line="60">rag/RagRerankClient.java:60</a><span class="ln">重排客户端</span></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagProperties.java" data-line="88">rag/RagProperties.java:88</a><span class="ln">全部可调参数</span></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>→ M1（可见空间集合）、M3（<code>wiki_chunk</code> 数据与缓存失效通知）；← 被 M5、M6 调用</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案（每个都带实测数字，这是本模块最值钱的部分）</div>
+        <ul>
+          <li><b>难点 1：权限泄漏必须为零。</b> <span class="fix">方案：不"检索后再过滤"，而是<b>先算 effective = 可见 ∩ 请求</b>，向量库与 BM25 只拿到这个集合，模型永远没有机会看到越权内容。</span> <i>验证：D 类 10 题用成员 / 非成员双 API Key 对照，leakCount = 0。</i></li>
+          <li><b>难点 2：公文文号在纯向量下几乎不可分</b>（"〔2026〕66 号" vs "〔2026〕67 号"）。 <span class="fix">方案：加规则层精确命中，命中组 <code>score=1.0</code> 高于一切余弦值，<b>钉位在前排</b>。</span> <i>验证：B 类 9 题 docRecall@6 = 1.000、hitRate@6 = 1.000。</i></li>
+          <li><b>难点 3（第二层坑）：钉位组不能进 RRF 融合。</b> <span class="fix">实测把钉位组混进融合后，B 类 oracle@50 从 0.7506 摊薄到 0.4129，端到端还要再掉约 24pt ⇒ 改成"钉位组独立占槽 + 组内按相关性重排"。</span> <i>另一处同源缺陷：早期精确层满额后会整段跳过向量检索，等于"只返回位置最靠前的 topK 块"，已修。</i></li>
+          <li><b>难点 4：余弦相似度和 BM25 不在同一量纲，不能直接加权。</b> <span class="fix">用 RRF 按<b>名次</b>融合（<code>1/(k+rank)</code>）。k 取文献默认 60 且<b>刻意不用评测集调参</b>——这样对外声称的收益才是干净的。</span></li>
+          <li><b>难点 5：池深怎么定？</b> <span class="fix">实测四档：深度 20 → oracle 0.7690 / 实测 0.7590；深度 50 → 0.8600 / 0.7930（mean 516ms，p95 600ms）；深度 100 → 0.9061 / 0.8030（mean 720ms，p95 928ms）。重排精度随池深衰减（吃到上限 98.7% → 92.2% → 88.6%），<b>50→100 只多 1.0pt 却多 190ms ⇒ 默认定 50</b>。</span></li>
+          <li><b>难点 6：外部模型依赖不能拖垮主链路。</b> <span class="fix">重排失败捕获异常后回退融合序；未运行的通道耗时记 <code>null</code> 而不是 0（避免误导成"很快"），前端按分步时间线渲染。</span></li>
+          <li><b>难点 7：开关类优化会"静默无效"。</b> <span class="fix">多查询、证据合并这类功能打开后如果没实际生效（比如分支没生成、没有可合并块），输出会和输入一模一样而指标照常出数 ⇒ 强制打日志自证（分支数 / 合并块数），区分"没效果"和"没生效"。</span></li>
+          <li><b>难点 8：怎么知道天花板在哪？</b> <span class="fix">写诊断脚本算 oracle（该池深下完美重排的理论上限）。<b>结论：池深 50 的 oracle 是 0.8600，实测 0.7930，未兑现的 18.52pt 里 73.3% 属于"池里已有、重排没排进 top-6"</b> ⇒ 主瓶颈是<b>段落级排序</b>，不是"基础召回不足"。这一步把"继续加深度"这个错误方向直接否掉了。</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M8 -->
+    <div class="card star">
+      <div class="card-head">
+        <span class="id">M8</span><h3>RAG 评测体系</h3>
+        <span class="tag hl">核心亮点</span><span class="tag">423 题 · 七类题型 · 数据驱动</span>
+      </div>
+      <p><b>核心职责：</b>把"RAG 好不好"从一个主观感受变成可复现、可分组、可跨版本对比的数字，并且用它反推优化方向。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">1. 语料准备   216 篇政务文档入库 → 2061 块 + 向量 → corpus_audit.py 体检
+2. 数据集构建 七类题型 generate_*.py 出题 → merge → llm_judge 预筛 → 人工复核
+              → validate.py 五道闸门（quote 逐字校验）→ gen_manifest.py → golden.v2.jsonl
+3. 运行评测   run_eval.py --probe 预检 → HTTP 模式真实打后端 → 每题取 top10 → 本地截断算 K
+4. 产出报告   results/*.json + audit/baseline-report.md + compare_baselines.py 跨版本对比
+5. 定向诊断   diag_*.py：天花板 / 证据广度 / 池回收率 / topK 权衡</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/rag-eval-flow/spec.md">openspec/specs/rag-eval-flow/spec.md</a></div>
+        <div class="fp"><span class="kind">change</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/changes/add-rag-eval-dataset">openspec/changes/add-rag-eval-dataset（在建）</a></div>
+        <div class="fp"><span class="kind">change</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/changes/archive/2026-09-16-document-rag-eval-flow/design.md">openspec/changes/archive/2026-09-16-document-rag-eval-flow/design.md</a></div>
+        <div class="fp"><span class="kind">doc</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/README.md">eval/README.md（操作手册 + 改动影响面）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">data</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/golden.v2.jsonl">eval/golden.v2.jsonl（423 题正式数据集）</a></div>
+        <div class="fp"><span class="kind">py</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/run_eval.py" data-line="56">eval/scripts/run_eval.py:56（runner 入口）</a></div>
+        <div class="fp"><span class="kind">py</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/lib_rag_eval.py" data-line="356">eval/scripts/lib_rag_eval.py:356（打分内核 compute_metrics）</a></div>
+        <div class="fp"><span class="kind">py</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/validate.py">eval/scripts/validate.py（gold 摘抄逐字校验）</a></div>
+        <div class="fp"><span class="kind">py</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/compare_baselines.py">eval/scripts/compare_baselines.py（跨版本对比）</a></div>
+        <div class="fp"><span class="kind">py</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/diag_gold_ceiling.py">eval/scripts/diag_gold_ceiling.py（天花板诊断）</a></div>
+        <div class="fp"><span class="kind">py</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/diag_pool_recovery.py">eval/scripts/diag_pool_recovery.py（池回收率诊断）</a></div>
+        <div class="fp"><span class="kind">json</span><a data-path="C:/Users/origin/IdeaProjects/Agent/eval/results/baseline-20260916-201335-http.json">eval/results/baseline-20260916-201335-http.json（对外基线）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>HTTP 模式真实打 M6 开放 API（不写业务库、不触发索引重建，全程只读）；与英文 MultiHop-RAG 赛道<b>共享同一份打分内核</b>防止指标口径漂移。</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案</div>
+        <ul>
+          <li><b>难点 1：gold 锚点绑什么？</b> <span class="fix">绑逻辑坐标 <code>docId + chunkIndex</code>，<b>禁止绑数据库主键 chunkId</b>。因为索引重建是"旧行置 INVALID + 插新行"，重建后同一逻辑块会拿到全新主键，绑主键的 gold 会全部失效。</span></li>
+          <li><b>难点 2：防 gold 幻觉。</b> <span class="fix">标准答案始终来自人类文本（LLM 只负责把官方解读"翻译"成问题）；每题 <code>gold[].quote</code> 必须<b>程序校验逐字存在于该 chunk</b>（<code>quote_hit</code>），这是唯一自动防线。</span></li>
+          <li><b>难点 3：混算 overall 会被题型配比污染。</b> <span class="fix">强制分组看：单文档 235 题 0.864 / 跨文档 89 题 0.809 / 配对 54 题 0.439 / 文号 9 题 0.685。<b>跨版本比较必须同组比</b>，否则改个出题配比就能"刷高"指标。</span></li>
+          <li><b>难点 4：多大差异才算改进？</b> <span class="fix">连续两次同数据重跑 <code>recall@6</code> 极差 <b>0.13 个百分点</b> ⇒ 把它作为数值可信下限，<b>小于 0.2pt 的差异不作为改进证据</b>。</span></li>
+          <li><b>难点 5：抬答案集 K 不算达标。</b> <span class="fix"><code>recall@k</code> 对 k 单调不减，所以 <code>recall@10 = 0.8515</code> 只是换口径；实测仅 14% 的题受益、证据密度从 19.3% 掉到 13.7%，而 <code>docRecall@10 = 0.9674</code> 已近饱和 ⇒ <b>对外只用 pool=50 的 recall@6</b>。</span></li>
+          <li><b>难点 6：把评测集本身当工程对象迭代。</b> <span class="fix">先用置信区间量化"考卷够不够用"，再定位根因——发现出题只在<b>标题书名号</b>里找政策名，159 篇解读类只配上 31 对。放宽到正文匹配后：配对 31 → 150，文档覆盖 17% → 85%，切片覆盖 15.3% → 27.6%，置信区间收窄到 ±11.2%。</span></li>
+          <li><b>难点 7：切块粒度会污染指标本身。</b> <span class="fix">把评测单元从"单个 chunk"改成"连续证据区"，全体 <code>recall@6</code> 从 0.7930 → 0.8533，而单文档 / 跨文档（占 81%）几乎不变 ⇒ 说明不是放水，是修正了度量失真。<b>结论：任何切块改动前必须先让评测与切块解耦。</b></span></li>
+          <li><b>难点 8：泛化性检验。</b> <span class="fix">另开英文 MultiHop-RAG 赛道（609 篇新闻 / 2556 题），自带脚本与结果目录，<b>只共享打分内核</b>，避免两套数据的指标定义各说各话。</span></li>
+        </ul>
+      </div>
+      <div class="callout">
+        <b>当前对外基线（引用时用这一份）：</b><code>eval/results/baseline-20260916-201335-http.json</code>，
+        423 题 / 399 计分，pool=50，embedding <code>qwen3.7-text-embedding-flash</code>：
+        <b>recall@6 0.7930 · docRecall@6 0.9223 · hitRate@6 0.905 · mrr 0.6262 · 泄漏 0</b>，
+        mean 516ms / p95 600ms。
+      </div>
+    </div>
+
+    <!-- M3 -->
+    <div class="card star">
+      <div class="card-head">
+        <span class="id">M3</span><h3>RAG 索引管线</h3>
+        <span class="tag hl">核心亮点</span><span class="tag">切片 · 向量化 · 生命周期</span>
+      </div>
+      <p><b>核心职责：</b>文档变更 → 切片 → 批量 embedding → 写 <code>wiki_chunk</code>；并覆盖失效 / 恢复 / 迁移 / 全量重建 / 孤儿对账。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">文档保存/删除/恢复/移动/空间删除
+  → 发布 WikiDocumentChangedEvent
+  → @TransactionalEventListener(AFTER_COMMIT) + @Async("ragIndexExecutor")
+  → 旧切片置 INVALID → MarkdownChunker.chunk(content, profile)
+  → 批量 embed（10 条/批）→ saveBatch → 通知向量库 + BM25 索引同时失效该空间</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-rag-pipeline/spec.md">openspec/specs/wiki-rag-pipeline/spec.md</a></div>
+        <div class="fp"><span class="kind">design</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/changes/archive/2026-09-16-add-wiki-rag-pipeline/design.md">openspec/changes/archive/2026-09-16-add-wiki-rag-pipeline/design.md</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/WikiRagIndexListener.java">rag/WikiRagIndexListener.java（事件路由，9 种变更类型）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/WikiRagIndexServiceImpl.java" data-line="64">rag/WikiRagIndexServiceImpl.java:64（doIndexDocument）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/WikiRagIndexServiceImpl.java" data-line="218">rag/WikiRagIndexServiceImpl.java:218（双通道统一失效）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/MarkdownChunker.java" data-line="46">rag/MarkdownChunker.java:46（按标题层级切块）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/ChunkerProfile.java" data-line="32">rag/ChunkerProfile.java:32（中英双档参数）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagEmbeddingClient.java" data-line="59">rag/RagEmbeddingClient.java:59（批量 + 幂等重试）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/VectorCodec.java">rag/VectorCodec.java（float32 小端编解码）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>← M1 文档事件；→ 为 M4 提供数据；→ M9 提供管理员重建 / 对账入口</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案</div>
+        <ul>
+          <li><b>难点 1：索引不能污染写路径，也不能读到未提交数据。</b> <span class="fix">用 <code>@TransactionalEventListener(phase = AFTER_COMMIT, fallbackExecution = true)</code> + 专属线程池 <code>ragIndexExecutor</code> 异步执行；索引失败只记日志，<b>绝不影响文档保存</b>。</span></li>
+          <li><b>难点 2：切片失效策略。</b> <span class="fix">"旧行置 INVALID + 插新行"而不是物理删——回收站恢复时可以按 <code>contentVersion</code> 直接翻转回来，版本漂移了才重建。</span></li>
+          <li><b>难点 3（红线）：非 Markdown 会零切片且静默。</b> <span class="fix"><code>contentFormat != markdown</code> 直接跳过索引（设计如此），所以导入链路必须兜底设成 markdown，否则文档存进去了却永远检索不到，且不报错。</span></li>
+          <li><b>难点 4：中英混排语料切块参数不通用。</b> <span class="fix">抽出 <code>ChunkerProfile</code>：中文 600 字符上限 / 100 最小 / 80 重叠 / 句末"。；"；英文 1800 字符（中文 600 字符的 token 质量等价）/ 100 重叠 / 句末".!?;"并识别缩写（Mr. / e.g.）与首字母缩写（U.S.），<b>保证不会把单词或数字切成两半</b>。语言判定是纯函数、不问模型 ⇒ 重索引结果确定可复现。</span></li>
+          <li><b>难点 5：重建时语言要取文档记录的 language，不能重新检测。</b> <span class="fix">重新检测可能选到另一套 profile，导致所有 chunk 重新编号、已绑定的评测锚点全部失效。</span></li>
+          <li><b>难点 6：云端 embedding 的假性失败。</b> <span class="fix">网关会静默回收空闲 keep-alive，空闲后第一发常踩死连接抛 Connection reset ⇒ 幂等 POST 安全重试（1 次原始 + 2 次重试，300ms/1000ms 退避）；HTTP 层错误（鉴权/限流）重试无益直接抛。</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M5 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="id">M5</span><h3>答案层：SSE 流式问答</h3>
+        <span class="tag">引用溯源 · 拒答 · 可观测</span>
+      </div>
+      <p><b>核心职责：</b>把检索到的证据拼成带编号的 prompt → 大模型流式生成 → 句末引用角标 → 回传分步耗时；零命中时直接拒答、不调模型。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">ask() → SseEmitter(120s) → CompletableFuture.runAsync
+  → 1. 调 M4 检索（权限已在检索层过滤）
+  → 2. emit meta：生效空间 / 授权文档数 / 引用列表（编号 + 文号 + 标题）
+  → 3. hits 为空 → emit delta 拒答文案 → emit done（llmMs=0）→ complete
+  → 4. 流式调 LLM，reason / delta 分别下发
+  → 5. emit done：finishReason + usage + 分步耗时时间线 → complete
+客户端断开 / 超时 → future.cancel(true) 中断仍在跑的 LLM 调用</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/rag-llm-generation/spec.md">openspec/specs/rag-llm-generation/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/ai-assistant-chat/spec.md">openspec/specs/ai-assistant-chat/spec.md</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagAskServiceImpl.java" data-line="44">rag/RagAskServiceImpl.java:44（SYSTEM_PROMPT）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagAskServiceImpl.java" data-line="100">rag/RagAskServiceImpl.java:100（runAsk 编排）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagAskServiceImpl.java" data-line="145">rag/RagAskServiceImpl.java:145（零命中短路）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagLlmClient.java">rag/RagLlmClient.java（SSE 解析 + 首字前失败重试一次）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/controller/WikiRagController.java">controller/WikiRagController.java</a></div>
+        <div class="fp"><span class="kind">vue</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue" data-line="461">cloud_front/src/pages/aiAssistant/AiAssistantPage.vue:461</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>→ M4 检索；为 M7 前端提供 SSE 协议（meta / reason / delta / done / error）</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案（含诚实的认知边界）</div>
+        <ul>
+          <li><b>难点 1：编排逻辑要可单测。</b> <span class="fix">抽出 <code>EventSink</code> 接口（emit / complete），SSE 只是一个适配器 ⇒ 不需要真实 HTTP 连接就能测问答编排。</span></li>
+          <li><b>难点 2：不 complete 就会挂死。</b> <span class="fix">SSE 必须显式 <code>emitter.complete()</code>，否则连接会挂到 120s 超时、前端 await 永不 resolve。</span></li>
+          <li><b>难点 3：客户端断开要真的停。</b> <span class="fix"><code>onCompletion</code> / <code>onTimeout</code> 里 <code>future.cancel(true)</code>，中断还在流的 LLM 调用，避免资源空转。</span></li>
+          <li><b>难点 4：文号不能让模型编。</b> <span class="fix">引用元数据全部走 <code>meta.citations</code> 下发，前端渲染角标<b>不信任 LLM 文本里出现的任何文号</b>；system prompt 里也明令禁止自行编造文号。</span></li>
+          <li><b>难点 5：流式重渲染。</b> <span class="fix">Vue3 Proxy 会绕过，流式 delta 不触发重渲染（表现为文字积压、点一下才整段蹦出）⇒ 消息对象用 <code>markRaw</code>。见前端第 461 行注释。</span></li>
+          <li><b>认知边界（建议主动说，加分）：</b> <i>① 换更强的生成模型<b>不解决</b>问题——英文 MHR 100 题实测 <code>qwen3.8-max</code> 非思考档正确率 +7pt，但 McNemar p=0.1671 <b>不显著</b>、INCORRECT 20→20 一道没修好（只是换了一批错题），实质未答率还从 5.68% 恶化到 20.45%。② LLM-as-Judge 实测精准率仅 6% ⇒ <b>faithfulness 不能当判据</b>，只用零成本的引用覆盖率 / 误拒率 / 拒答正确率 / 文号合规率。③ 中文答案层至今<b>没有"正确率"这个口径</b>（没有可靠判官），只有上述四项零成本指标。</i></li>
+          <li><b>已知缺口（诚实表述）：</b> <i>答案层缺少"证据充分性"判定——目前唯一的硬拒答触发点是 <code>hits.isEmpty()</code>。检索层单阈值方案已被数据否决：有答案题最低分 0.4169 &lt; 无答案题最高分 0.6153，两段分布重叠，<b>不存在能一刀切的阈值</b> ⇒ 拒答必须放到答案层做。这是下一步要补的。</i></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M1 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="id">M1</span><h3>Wiki 文档与空间域</h3>
+        <span class="tag">业务主域 · 权限模型</span>
+      </div>
+      <p><b>核心职责：</b>文档 CRUD 与版本、空间（公开 / 团队 / 个人）与文件夹树、团队角色 RBAC、回收站生命周期。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">创建/编辑文档 → 保存（contentVersion + contentHash）→ 发 WikiDocumentChangedEvent
+删除  → 逻辑删 → 回收站 → 恢复（版本未漂移则直接复用切片）/ 物理删（真删切片）
+移动  → 切片 spaceId 迁移 + 双空间缓存失效
+空间  → 公开 / 团队 / 个人；团队空间成员 admin / editor 角色由 JSON 配置驱动</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-document/spec.md">openspec/specs/wiki-document/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-space/spec.md">openspec/specs/wiki-space/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-recycle-bin/spec.md">openspec/specs/wiki-recycle-bin/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-document-model/spec.md">openspec/specs/wiki-document-model/spec.md</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/controller/DocumentWikiController.java">controller/DocumentWikiController.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/DocumentWikiServiceImpl.java">service/impl/DocumentWikiServiceImpl.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/WikiSpaceServiceImpl.java">service/impl/WikiSpaceServiceImpl.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/mapper/DocumentWikiMapper.java">mapper/DocumentWikiMapper.java（手写 SQL 绕过逻辑删除）</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/manager/auth/StpKit.java">manager/auth/StpKit.java（空间独立认证域）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>被 M2（导入）、M3（索引）、M4（权限可见集）依赖；不反向依赖任何 RAG 模块 ✓</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案</div>
+        <ul>
+          <li><b>难点 1：MyBatis-Plus 全局逻辑删除会让回收站查不到数据。</b> <span class="fix">手写 SQL 绕过全局过滤器，单独实现恢复 / 物理删除链路。</span></li>
+          <li><b>难点 2：19 位雪花 ID 在前端丢精度。</b> <span class="fix"><code>JsonConfig</code> 把返回的 <code>Long</code> 统一序列化成 <code>String</code>；前端 openapi 生成时 int64 映射 <code>string | number</code>。</span></li>
+          <li><b>难点 3：B 端"在某个空间是什么角色"的授权。</b> <span class="fix">Sa-Token 多账户体系建独立认证域 <code>StpKit.SPACE</code>，与主登录态完全隔离；角色→权限映射放 JSON 配置 + 自定义注解 AOP 声明式校验。</span></li>
+          <li><b>难点 4：文档列表 N+1 查询。</b> <span class="fix">作者信息改批量 <code>listByIds</code> 一次查出后映射，替换逐条查。</span></li>
+          <li><b>难点 5：中文全文检索不能走 LIKE。</b> <span class="fix">MySQL FULLTEXT + ngram 分词，替换无法走索引的 <code>LIKE '%kw%'</code>。</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M2 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="id">M2</span><h3>文档导入与格式转换</h3>
+        <span class="tag">批量 · 多格式 · 网页抓取</span>
+      </div>
+      <p><b>核心职责：</b>批量 URL / 文件导入；HTML→Markdown 转换；JSON 文档两层切分（L1 JSON→documents，L2 text→chunks）。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">批量导入请求（URL 列表 / 文件列表，默认上限 20 项、单文档 10MB）
+  → WebPageFetcher 抓取 → WebPageMarkdownCleaner 清洗 → HtmlToMarkdownConverter 转 MD
+  → 组装 ImportedWikiDocument（顺带天然形成 docMap）
+  → 逐项落库（contentFormat 兜底 markdown）→ 逐项触发 M3 索引
+  → 返回 BatchImportItemResult 逐项结果（成功/失败与原因）</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/batch-document-import/spec.md">openspec/specs/batch-document-import/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-multiformat-document-import/spec.md">openspec/specs/wiki-multiformat-document-import/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/json-document-import/spec.md">openspec/specs/json-document-import/spec.md</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/WikiBatchImportServiceImpl.java">service/impl/WikiBatchImportServiceImpl.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/WikiDocumentImportServiceImpl.java">service/impl/WikiDocumentImportServiceImpl.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/HtmlToMarkdownConverter.java">service/impl/HtmlToMarkdownConverter.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/JsonDocumentSplitter.java">service/impl/JsonDocumentSplitter.java（L1 切分）</a></div>
+        <div class="fp"><span class="kind">dto</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/model/dto/ImportedWikiDocument.java">model/dto/ImportedWikiDocument.java（接缝模型）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>→ M1 落库、→ M3 触发索引；与 M8 评测语料准备直接相关（216 篇语料由此入库）</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案</div>
+        <ul>
+          <li><b>难点 1（红线）：contentFormat 未传会导致零切片且静默成功。</b> <span class="fix">控制器层兜底：未传即默认 <code>markdown</code>。这类"存进去了但永远检索不到且不报错"的问题是最难排查的一类缺陷。</span></li>
+          <li><b>难点 2：导入失败不能整批回滚。</b> <span class="fix">按项独立处理并返回 <code>BatchImportItemResult</code> 逐项结果，一项失败不影响其余。</span></li>
+          <li><b>难点 3：元数据长度上限。</b> <span class="fix">需关注 <code>MAX_METADATA_LENGTH=2048</code> 与 <code>MAX_TITLE_LENGTH=128</code>，超长 title 会被截断——这会影响检索时"文档标题"这个强信号的完整性。</span></li>
+          <li><b>遗留未处理（可主动提）：</b> <i><code>chunk.docNumber</code> 目前是"正文里出现的文号"而不是"文档自身的文号"，新闻稿引用了公文号就会污染文号精确层。这是已知的下一步待修项。</i></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M6 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="id">M6</span><h3>开放检索 API 与密钥鉴权</h3>
+        <span class="tag">X-API-Key · 只读</span>
+      </div>
+      <p><b>核心职责：</b>对外暴露两个只读端点 <code>POST /open/rag/search</code>、<code>/open/rag/ask</code>，用 <code>X-API-Key</code> 替代登录态。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">请求带 X-API-Key → RagApiKeyService.resolveUser(key) 解析出 key 的 owner（User）
+→ 直接调与站内完全相同的 RagSearchService / RagAskService
+⇒ key 只能看到它 owner 可见的空间，权限逻辑零分叉</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/open-rag-api/spec.md">openspec/specs/open-rag-api/spec.md</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/controller/OpenRagController.java">controller/OpenRagController.java</a></div>
+        <div class="fp"><span class="kind">java</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagApiKeyServiceImpl.java">rag/RagApiKeyServiceImpl.java</a></div>
+        <div class="fp"><span class="kind">vue</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/api/ragController.ts">cloud_front/src/api/ragController.ts（自动生成）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>→ 复用 M4 / M5；<b>被 M8 评测 runner 真实调用</b>（这就是"评测打的是真实系统"的原因）</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案</div>
+        <ul>
+          <li><b>难点：开放端点最容易出的安全事故是"另写一套检索逻辑然后忘了过滤权限"。</b> <span class="fix">强制走同一套服务层，只是把鉴权方式换成 API Key ⇒ 权限逻辑零分叉，也就没有"外部接口漏权限"的可能。</span> <i>配套：只开放两个只读端点，密钥可签发 / 吊销。</i></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M7 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="id">M7</span><h3>前端工作台</h3>
+        <span class="tag">Vue3 · SSE · 自动生成 API</span>
+      </div>
+      <p><b>核心职责：</b>双栏 Wiki 工作台（空间树 + 文档列表 + Markdown 编辑器 + 批量导入页）与 AI 助手页（流式回答 + 引用角标 + 调用明细时间线）。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">路由 /documentWiki → DocumentWikiListPage（左空间树 + 右文档列表 + 管理模式全选）
+/documentWiki/:id → 详情 / 编辑（Markdown 编辑器，粘贴拖拽图片自动上传）
+/documentWiki/batch → 批量导入
+/aiAssistant → 提问 → SSE 接收 meta/delta/done → 渲染角标引用 + 分步耗时时间线</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-layout/spec.md">openspec/specs/wiki-layout/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-navigation-tree/spec.md">openspec/specs/wiki-navigation-tree/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-document-list/spec.md">openspec/specs/wiki-document-list/spec.md</a></div>
+        <div class="fp"><span class="kind">spec</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/specs/wiki-search/spec.md">openspec/specs/wiki-search/spec.md</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">vue</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/pages/documentWiki/DocumentWikiListPage.vue">pages/documentWiki/DocumentWikiListPage.vue</a></div>
+        <div class="fp"><span class="kind">vue</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/pages/documentWiki/DocumentWikiBatchImportPage.vue">pages/documentWiki/DocumentWikiBatchImportPage.vue</a></div>
+        <div class="fp"><span class="kind">vue</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/components/DocumentWikiEditor.vue">components/DocumentWikiEditor.vue</a></div>
+        <div class="fp"><span class="kind">vue</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue">pages/aiAssistant/AiAssistantPage.vue</a></div>
+        <div class="fp"><span class="kind">ts</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/router/index.ts">router/index.ts（路由 + 懒加载）</a></div>
+        <div class="fp"><span class="kind">ts</span><a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/access.ts">access.ts（前端权限守卫）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>→ 调 M1 / M2 / M6 的 HTTP 接口；api 层由后端 OpenAPI 自动生成</div></div>
+      <div class="diff">
+        <div class="t">技术难点与解决方案</div>
+        <ul>
+          <li><b>难点 1：流式渲染卡住。</b> <span class="fix">Vue3 的 Proxy 会被绕过，流式 delta 不触发重渲染（表现为文字积压、点一下才整段蹦出）⇒ 消息对象用 <code>markRaw</code>。</span></li>
+          <li><b>难点 2：前后端接口类型漂移。</b> <span class="fix">Knife4j 出 OpenAPI JSON → <code>@umijs/openapi</code> 自动生成带类型的请求函数与类型定义，int64 统一映射 string。</span></li>
+          <li><b>难点 3：雪花 ID 精度。</b> <span class="fix">后端 Long→String 序列化 + 前端 int64→string 映射，双端同时治。</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- M9 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="id">M9</span><h3>工程治理与协作流程</h3>
+        <span class="tag">OpenSpec · 分支 · 脚本</span>
+      </div>
+      <p><b>核心职责：</b>用 OpenSpec 管理需求与执行、统一分支与上传流程、脚本化启停服务、问题台账留痕。</p>
+      <div class="row"><div class="lbl">业务流程</div><div class="flow">start-task.ps1 从 origin/main 建任务分支（feature/xxx开发 | fix/xxx修复）
+→ openspec new change &lt;change-id&gt; → proposal.md / design.md / specs / tasks.md
+→ 编码 + IssueLog.xlsx 记录问题 → start-dev.ps1 自测 → 汇报结果
+→ upload.ps1 推送任务分支 → 远程发起 MR → 负责人验收后合并 main</div></div>
+      <div class="row"><div class="lbl">设计文件</div><div class="files">
+        <div class="fp"><span class="kind">doc</span><a data-path="C:/Users/origin/IdeaProjects/Agent/AGENTS.md">AGENTS.md（团队开发规范，强制流程）</a></div>
+        <div class="fp"><span class="kind">md</span><a data-path="C:/Users/origin/IdeaProjects/Agent/README.md">README.md（对外展示窗口）</a></div>
+        <div class="fp"><span class="kind">md</span><a data-path="C:/Users/origin/IdeaProjects/Agent/docs/asset-registry.md">docs/asset-registry.md（无版本保护资产登记）</a></div>
+        <div class="fp"><span class="kind">md</span><a data-path="C:/Users/origin/IdeaProjects/Agent/docs/history">docs/history/（已停更台账归档）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">实现文件</div><div class="files">
+        <div class="fp"><span class="kind">ps1</span><a data-path="C:/Users/origin/IdeaProjects/Agent/start-task.ps1">start-task.ps1（建任务分支）</a></div>
+        <div class="fp"><span class="kind">ps1</span><a data-path="C:/Users/origin/IdeaProjects/Agent/upload.ps1">upload.ps1（提交并推送，禁止合并 main）</a></div>
+        <div class="fp"><span class="kind">ps1</span><a data-path="C:/Users/origin/IdeaProjects/Agent/start-dev.ps1">start-dev.ps1 / stop-dev.ps1（一键启停 + 隧道）</a></div>
+        <div class="fp"><span class="kind">xlsx</span><a data-path="C:/Users/origin/IdeaProjects/Agent/IssueLog.xlsx">IssueLog.xlsx（问题台账）</a></div>
+        <div class="fp"><span class="kind">dir</span><a data-path="C:/Users/origin/IdeaProjects/Agent/openspec">openspec/（26 个 capability spec + 9 个在建 change + 归档）</a></div>
+      </div></div>
+      <div class="row"><div class="lbl">依赖</div><div>横切全部模块；不参与运行时</div></div>
+      <div class="diff">
+        <div class="t">可讲的点（大模型应用岗不必深挖，但要能一句话说清）</div>
+        <ul>
+          <li><b>需求可追溯：</b>每个能力都有 spec，每个改动有 proposal / design / tasks，归档在 <code>openspec/changes/archive/</code> ⇒ 面试问"为什么这么做"，能直接翻出当时的设计决策和实测数据。</li>
+          <li><b>文档分代：</b>根目录只放现役文档，旧笔记进 <code>docs/legacy-notes/</code>、停更台账进 <code>docs/history/</code>、无版本保护资产登记在 <code>asset-registry.md</code>（删任何文件前先查它）。</li>
+          <li><b>环境红线：</b>git 写操作只用系统 Git（内置 PortableGit 建带子目录的分支会静默失败）；不留常驻后台进程；禁止绕过 start-dev.ps1 私自起后端。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 依赖 ================= -->
+  <section id="s3">
+    <h2>三、模块依赖关系<span class="en">分层 + 关键约束</span></h2>
+    <p class="lead">一句话概括：<b>业务域（M1）不反向依赖任何 RAG 模块</b>，RAG 通过"事件"单向挂在文档生命周期上——这是这套架构最值得讲的设计决策。</p>
+
+    <div class="layers">
+      <div class="layer">
+        <div class="lt">展示层</div>
+        <div class="boxes">
+          <div class="box"><b>M7</b> <span>前端工作台 · SSE 消费</span></div>
+        </div>
+      </div>
+      <div class="arrowdown">▼ HTTP / SSE</div>
+      <div class="layer">
+        <div class="lt">接口层</div>
+        <div class="boxes">
+          <div class="box"><b>M1 控制器</b> <span>站内（Cookie 登录态）</span></div>
+          <div class="box v"><b>M6</b> <span>OpenRagController（X-API-Key，只读）</span></div>
+        </div>
+      </div>
+      <div class="arrowdown">▼</div>
+      <div class="layer">
+        <div class="lt">服务层</div>
+        <div class="boxes">
+          <div class="box"><b>M1</b> <span>文档 / 空间 / 权限 / 回收站</span></div>
+          <div class="box"><b>M2</b> <span>导入与格式转换</span></div>
+          <div class="box c"><b>M5</b> <span>答案层编排（EventSink → SSE）</span></div>
+          <div class="box c"><b>M4</b> <span>检索链路</span></div>
+        </div>
+      </div>
+      <div class="arrowdown">▼ AFTER_COMMIT 事件（异步，单向）</div>
+      <div class="layer">
+        <div class="lt">索引层</div>
+        <div class="boxes">
+          <div class="box c"><b>M3</b> <span>切片 → embedding → wiki_chunk → 双通道缓存失效</span></div>
+        </div>
+      </div>
+      <div class="arrowdown">▼</div>
+      <div class="layer">
+        <div class="lt">数据 / 外部依赖</div>
+        <div class="boxes">
+          <div class="box g"><b>MySQL 8</b> <span>wiki_chunk（向量 BLOB）/ document_wiki / rag_api_key</span></div>
+          <div class="box g"><b>Redis + Caffeine</b></div>
+          <div class="box g"><b>DashScope</b> <span>embedding + rerank</span></div>
+          <div class="box g"><b>LLM</b> <span>OpenAI 兼容流式</span></div>
+          <div class="box g"><b>COS</b></div>
+        </div>
+      </div>
+      <div class="arrowdown">▼ 侧翼：只读 HTTP 调用真实系统（不写库）</div>
+      <div class="layer">
+        <div class="lt">评测层（旁路，不进运行时）</div>
+        <div class="boxes">
+          <div class="box v"><b>M8</b> <span>423 题数据集 + runner + 诊断脚本 → 打 M6 的 /open/rag/search</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>依赖关系的四条硬约束（面试时讲这四条）</h3>
+    <ul class="deplist">
+      <li><b>① 单向依赖。</b>M1（文档域）<b>不 import 任何 rag 包</b>；RAG 通过 <code>WikiDocumentChangedEvent</code> 挂在文档生命周期上。好处：关掉 RAG，Wiki 照样是完整可用的产品；RAG 索引挂了也只记日志，不影响文档保存。</li>
+      <li><b>② 索引必须在事务提交之后。</b><code>AFTER_COMMIT</code> + 异步线程池，同时解决"读到未提交数据"和"embedding 慢调用拖垮写接口"两个问题。</li>
+      <li><b>③ 权限是检索的前置条件，不是后置过滤器。</b>M4 先算 effective 空间集再交给通道，M5/M6 都无权绕过——开放端点也走同一服务层，所以权限逻辑零分叉。</li>
+      <li><b>④ 评测是旁路，只读。</b>M8 通过 M6 的公开端点打真实系统，脚本承诺"不写业务库、不改后端、不触发索引重建"（执行前后 <code>wiki_chunk</code> 恒为 2061 行全 ACTIVE），所以<b>评测不会污染被测系统</b>。</li>
+    </ul>
+
+    <h3>一次提问的完整调用链（面试白板画这个）</h3>
+    <div class="flow">前端 AiAssistantPage.vue
+  → POST /api/rag/ask（SseEmitter）            [M5 RagAskServiceImpl]
+      → RagSearchService.search(user, req)      [M4]
+          → WikiSpaceService.listVisibleSpaceIds          → permissionMs
+          → countActiveDocs                                → docCountMs
+          → findDocNumberHits（文号正则 + 精确命中）        → docNumberMs
+          → RagEmbeddingClient.embed(query)                → embedMs
+          → InMemoryCosineVectorStore.search(50)           → vectorMs
+          → LexicalIndex.search BM25(50)                   → lexicalMs
+          → RrfFusion.fuse(k=60, 50)                       → fusionMs
+          → RagRerankClient.rerank（失败则降级）            → rerankMs
+      → emit meta（引用列表）
+      → RagLlmClient.streamChat（SSE 逐 token）            → firstTokenMs / llmMs
+      → emit done（含 steps 分步耗时时间线）
+  → 前端渲染角标引用 + 展开调用明细</div>
+  </section>
+
+  <!-- ================= 问答 ================= -->
+  <section id="s4">
+    <h2>四、面试问答要点<span class="en">按频率分级 · 点击展开</span></h2>
+    <p class="lead">
+      <span class="tag" style="border-color:var(--hot);color:var(--hot)">必背</span> 高频且决定成败；
+      <span class="tag" style="border-color:var(--warn);color:var(--warn)">加分</span> 体现深度；
+      普通标记 = 常规题。每个答案都配了<b>可核验数据</b>，说数字比说形容词有说服力。
+    </p>
+
+    <h3>A. 项目介绍类</h3>
+
+    <details class="qa">
+      <summary><span class="no">Q1</span><span class="lv s">必背</span>用两分钟介绍一下这个项目</summary>
+      <div class="body">
+        <p class="say">按"背景 → 我做了什么 → 怎么证明有效 → 边界"四段讲。</p>
+        <ul>
+          <li><b>背景：</b>企业知识库常见的痛点是"文档存下来了但找不到、找到了不敢信"。我想做的不是又一个聊天机器人，而是让知识<b>可检索、可追问、可溯源</b>。</li>
+          <li><b>我做了什么：</b>两阶段。第一阶段是 Wiki 知识库本体（多空间、Markdown 编辑、权限、回收站）；第二阶段在它上面建完整 RAG 链路——文档切片向量化、权限过滤检索、AI 流式问答、开放检索 API。</li>
+          <li><b>怎么证明有效：</b>建了 423 题评测集，<code>recall@6</code> 从 0.5623 提到 0.7930（+23.1pt），文档级与段落级召回的差距从 30.7pt 收窄到 12.9pt——说明优化真正作用在<b>段落定位</b>而不只是把文档捞回来。</li>
+          <li><b>边界：</b>这是个人技术展示项目，没有真实线上流量；规模是 216 篇 / 2061 块，向量检索用内存暴力余弦，量大了要换 ES 或 Milvus——接口已经抽象好了，换 Bean 即可。</li>
+        </ul>
+        <div class="data"><b>收口数字：</b>recall@6 0.7930 · docRecall@6 0.9223 · mrr 0.6262 · 权限泄漏 0 · 单并发 mean 516ms / p95 600ms。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q2</span><span class="lv s">必背</span>这个项目最难的/你最得意的部分是什么？</summary>
+      <div class="body">
+        <p class="say">答"用评测反推优化方向"，不要答"接了大模型"。</p>
+        <ul>
+          <li><b>难在判断瓶颈在哪。</b>基线出来后我看到 <code>docRecall@6</code> 远高于 <code>recall@6</code>，判定瓶颈在<b>段落定位</b>而不是文档召回；优化后两者落差从 30.7pt 收窄到 12.9pt，验证了诊断方向是对的。</li>
+          <li><b>更得意的是"量化可信下限"。</b>我连续两次跑同一份数据，<code>recall@6</code> 极差 0.13 个百分点，于是把它定成数值可信下限——<b>小于 0.2pt 的差异我不当成改进证据</b>。这让我能区分"真的变好了"和"只是抖动"。</li>
+          <li><b>还有一条：我先算天花板再优化。</b>池深 50 的 oracle（完美重排的理论上限）是 0.8600，实测 0.7930，未兑现的 18.52pt 里 73.3% 属于"池里已有、重排没排进 top-6"。这一步直接否掉了"继续加深候选池"这个方向——因为边际兑现率 50→100 只有 21.5%，加 190ms 只换 1.0pt。</li>
+        </ul>
+        <div class="data">四档池深实测：20 → oracle 0.7690 / 实测 0.7590；50 → 0.8600 / 0.7930（516ms）；100 → 0.9061 / 0.8030（720ms）。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q3</span><span class="lv a">加分</span>为什么不用 LangChain / LlamaIndex 或者现成的向量库？</summary>
+      <div class="body">
+        <p class="say">这是个价值观问题，答"可控"和"可测"。</p>
+        <ul>
+          <li>我的目标不是最快跑通 demo，而是<b>搞清楚每一段链路各自贡献多少</b>。框架把融合、重排、切块都封装了，我就没法回答"这一段值不值"。</li>
+          <li>自研之后我才能做 oracle 分析——把重排换成"完美重排"算天花板，从而知道 73.3% 的缺口来自排序而非召回。<b>这个结论用黑盒框架是拿不到的。</b></li>
+          <li>但我并没有排斥替换：<code>VectorStore</code> 是接口，现在是内存暴力余弦实现，量大了换 ES / Milvus 只换 Bean。骨子里是"先用自研把参数摸清楚，再决定要不要换"。</li>
+          <li>补充一个诚实的点：<b>依赖少也有代价</b>——BM25 是我自己写的 CJK bigram，没有专业分词器的能力；规模上 2061 块够用，百万级就得换。</li>
+        </ul>
+      </div>
+    </details>
+
+    <h3>B. RAG 技术深度类（主战场）</h3>
+
+    <details class="qa">
+      <summary><span class="no">Q4</span><span class="lv s">必背</span>完整讲一遍检索链路，每一段为什么这么设计</summary>
+      <div class="body">
+        <p class="say">按"权限 → 规则 → 召回 → 融合 → 精排"五段讲，每段带一句理由。</p>
+        <ul>
+          <li><b>① 权限过滤先做。</b>effective = 可见空间 ∩ 请求空间，向量库和 BM25 只拿到这个集合。不是检索完再过滤——那样模型已经看到越权内容了。</li>
+          <li><b>② 文号规则层。</b>公文文号在纯向量下几乎不可分（"〔2026〕66 号" vs "67 号"），所以加精确命中，score 置 1.0 高于一切余弦值。</li>
+          <li><b>③ 双通道召回。</b>向量通道负责语义，BM25 通道（CJK bigram）负责字面精确匹配。单靠向量时，gold 块经常排在 top-K 之外。</li>
+          <li><b>④ RRF 融合。</b>余弦和 BM25 量纲不同，不能直接加权，所以按名次融合 <code>1/(k+rank)</code>。k 取文献默认 60 且<b>不用评测集调参</b>。</li>
+          <li><b>⑤ 语义重排。</b>融合池 50 条交给 cross-encoder 精排截断 top-6。</li>
+        </ul>
+        <div class="data">BM25 通道的价值有实测：候选池 oracle@50 从 0.8148 抬到 0.8600。文号层：B 类 9 题 docRecall@6 与 hitRate@6 均为 1.000。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q5</span><span class="lv s">必背</span>为什么用 RRF 而不是加权求和？</summary>
+      <div class="body">
+        <p class="say">核心是"量纲不可比"+"不引入需要标定的参数"。</p>
+        <ul>
+          <li>余弦相似度落在 [-1,1] 且分布集中，BM25 是无上界的累加分——<b>两者不在一个尺度上</b>，加权求和必须先归一化，而归一化系数需要在本语料上标定。</li>
+          <li>RRF 只用<b>名次</b>（<code>1/(k+rank)</code>），天然跨通道可比，不需要任何标定。</li>
+          <li>我把 k 留在文献默认值 60 且<b>刻意不用评测集调它</b>——一旦调了，我对外声称的 +23.1pt 就混进了"针对考卷调参"的成分，收益就不干净了。这是我主动选择的取舍：<b>宁愿少一点指标，也要结论可信。</b></li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q6</span><span class="lv s">必背</span>候选池深度为什么定 50？</summary>
+      <div class="body">
+        <p class="say">这是"用数据做取舍"的标准答案，一定要把三档数字背下来。</p>
+        <ul>
+          <li>重排只能重排池子里已有的东西，所以池深决定 recall 的<b>理论上限</b>（oracle）。</li>
+          <li>我测了三档：深度 20 → oracle 0.7690 / 实测 0.7590；深度 50 → 0.8600 / 0.7930；深度 100 → 0.9061 / 0.8030。</li>
+          <li>关键观察是<b>重排精度随池深衰减</b>：实测吃到的天花板比例 98.7% → 92.2% → 88.6%。也就是说池越深，重排"从 N 里挑 6"越挑不准。</li>
+          <li>所以 50→100：oracle 多 4.6pt，实测只多 <b>1.0pt</b>，代价是 mean 从 516ms 涨到 720ms（+190ms）。<b>不划算，定 50。</b></li>
+        </ul>
+        <div class="data">延迟结构：深度 50 = mean 516ms / p95 600ms；深度 100 = mean 720ms / p95 928ms（同一 120 题取样、单并发、客户端端到端）。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q7</span><span class="lv a">加分</span>你怎么定位"瓶颈到底在召回还是在排序"？</summary>
+      <div class="body">
+        <p class="say">答 oracle 分析（把排序器换成"完美排序"看上限）。</p>
+        <ul>
+          <li><b>方法：</b>写诊断脚本，对同一批候选池用 gold 直接做"完美重排"，算出该池深下的理论上限（oracle），再和实测对比。</li>
+          <li><b>结果：</b>池深 50 的 oracle 是 0.8600，实测 0.7930，缺口 18.52pt。把这 18.52pt 拆开：<b>73.3% 属于"池里已经有、重排没排进 top-6"</b>，只有约 27% 是"池里根本没有"。</li>
+          <li><b>结论：</b>主瓶颈是<b>段落级排序</b>，不是基础召回不足。</li>
+          <li><b>由此否掉的错误方向：</b>继续加深候选池。边际兑现率 20→50 是 37.5%，50→100 只有 21.5%。</li>
+          <li><b>另一条同源结论：</b>真正的变量不是题型而是 <b>gold 段落数</b>。399 题全部是单文档；gold≥3 段的 64 题（16% 题量）贡献了 <b>55.2% 的缺口</b>，而单段题 237 题（59.4%）已经做到 0.9494。</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q8</span><span class="lv a">加分</span>切块策略怎么定的？有没有踩坑？</summary>
+      <div class="body">
+        <p class="say">讲"按标题层级切 + 中英双档参数 + 一个反直觉的发现"。</p>
+        <ul>
+          <li><b>基本策略：</b>按 Markdown 标题层级切块，保留 heading path；超长小节按段落再切，过短小节向前合并，相邻块带重叠（中文 80 字符）避免上下文被切断。</li>
+          <li><b>坑 1：中英不能共用一套参数。</b>英文新闻段落常 800–1030 字符，中文 600 的上限会把它机械切断、切在单词中间 ⇒ 抽 <code>ChunkerProfile</code>：中文 600 / 重叠 80 / 句末"。；"，英文 1800（token 质量等价）/ 重叠 100 / 句末".!?;"，并识别 <code>Mr.</code>、<code>e.g.</code> 这类缩写和 <code>U.S.</code> 首字母缩写，保证不切碎单词和数字。</li>
+          <li><b>坑 2：语言判定必须确定。</b>纯函数、不问模型，所以重索引结果可复现。而且<b>重建时要读文档记录的 language，不能重新检测</b>——重检测可能选到另一套 profile，导致所有 chunk 重新编号、已绑定的评测锚点全废。</li>
+          <li><b>坑 3（最重要，反直觉）：切块粒度会污染指标本身。</b>把评测单元从"单个 chunk"改成"连续证据区"后，全体 <code>recall@6</code> 从 0.7930 → 0.8533，但单文档 / 跨文档（占 81%）几乎不变 ⇒ 说明不是放水，是修正了度量失真。<b>结论：任何切块改动前必须先让评测与切块解耦，否则你分不清是系统变好了还是尺子变了。</b></li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q9</span><span class="lv a">加分</span>权限过滤是怎么保证零泄漏的？</summary>
+      <div class="body">
+        <ul>
+          <li><b>设计原则：权限是检索的前置条件，不是后置过滤器。</b>先算 effective = 用户可见空间 ∩ 请求空间，向量通道和 BM25 通道<b>只拿到这个集合</b>，模型永远没有机会看到越权内容。</li>
+          <li><b>开放端点也不开后门：</b><code>X-API-Key</code> 解析出 owner 之后，走的是与站内<b>完全相同</b>的服务层，所以权限逻辑零分叉，不存在"外部接口漏权限"。</li>
+          <li><b>怎么验证：</b>D 类题用成员 / 非成员两个 API Key 做镜像对照，<code>leakCount = 0</code>。泄漏指标是<b>一票否决</b>，不进 overall 平均——因为平均值会把"漏得少"美化成"没漏"。</li>
+        </ul>
+        <div class="data">10 题权限镜像：leakCount 0 / leakRate 0.0 / leakedIds 空。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q10</span><span class="lv a">加分</span>幻觉怎么控制？拒答怎么做？</summary>
+      <div class="body">
+        <ul>
+          <li><b>控制幻觉的手段：</b>① system prompt 明确"资料不足以回答时明确说明未能找到依据，不得编造"；② 文号只能出现在资料标注里，禁止编造；③ <b>引用元数据全部走 meta 事件下发，前端不信任 LLM 文本里出现的任何文号</b>。</li>
+          <li><b>拒答现状（诚实）：</b>唯一的硬拒答触发点是 <code>hits.isEmpty()</code>。</li>
+          <li><b>为什么没做"相关度阈值拒答"：</b>数据否决了。有答案题的 top1 分数最低 0.4169，无答案题最高 0.6153——<b>两段分布重叠，不存在能一刀切的阈值</b>。实测权衡：若阈值设到能拦住 100% 无答案题，会误杀 32% 的有答案题。<b>所以拒答必须放到答案层做，检索层单阈值这条路走不通。</b></li>
+          <li><b>另一个诚实点：</b>我试过用 LLM-as-Judge 评 faithfulness，实测精准率只有 <b>6%</b> ⇒ 不能当判据。现在只用四项零成本指标：引用覆盖率 / 误拒率 / 拒答正确率 / 文号合规率。</li>
+        </ul>
+        <div class="trap"><b>陷阱提醒：</b>如果面试官追问"那你的拒答准确率是多少"，不要编。<b>中文答案层至今没有"正确率"这个口径</b>（没有可靠判官），只有上述四项零成本指标。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q11</span><span class="lv a">加分</span>换更强的生成模型能解决问题吗？</summary>
+      <div class="body">
+        <p class="say">这题是送分题——答"不能，我有数据"，直接体现你不被"换大模型"这种直觉方案带跑。</p>
+        <ul>
+          <li>我在英文 MHR 数据集 100 题上做了对照：<code>qwen3.8-max</code> 非思考档正确率 +7pt，但 <b>McNemar p = 0.1671，不显著</b>。</li>
+          <li>更关键：<b>INCORRECT 从 20 道变成 20 道，一道都没修好</b>——只是换了一批错题。</li>
+          <li>还付出了代价：实质未答率 5.68% → <b>20.45%</b>（显著恶化，p=0.0029），引用覆盖率 −8.2pt，耗时 <b>×1.99</b>。</li>
+          <li><b>结论：瓶颈既不在 prompt、也不在生成模型，在检索层。</b></li>
+        </ul>
+        <div class="data">补充一个方法论上的自我约束：该实验的判官（qwen3.8-flash）和回答模型（qwen3.8-max）同家族，所以那 +7pt 要打折看——<b>我会主动说明这个实验设计的局限</b>。</div>
+        <div class="trap"><b>同源结论：</b>prompt 的可靠作用域是<b>措辞</b>不是<b>判断</b>。我试过在 prompt 里下发相关度信号 + 两态指令，无可测增益。</div>
+      </div>
+    </details>
+
+    <h3>C. 评测与数据驱动类（差异化竞争力）</h3>
+
+    <details class="qa">
+      <summary><span class="no">Q12</span><span class="lv s">必背</span>评测集是怎么建的？gold 怎么标？</summary>
+      <div class="body">
+        <ul>
+          <li><b>规模与构成：</b>423 题 / 七类题型（单文档 235、跨文档 89、配对 54、无答案 14、合成 12、权限 10、文号 9），其中 399 题计分。</li>
+          <li><b>gold 绑逻辑坐标而非主键：</b><code>docId + chunkIndex</code>，禁止绑 <code>chunkId</code>。因为索引重建是"旧行置 INVALID + 插新行"，重建后同一逻辑块拿到全新主键，绑主键的 gold 会全部失效。</li>
+          <li><b>防标注幻觉：</b>标准答案始终来自人类文本，LLM 只把官方解读"翻译"成问题；每题 <code>gold[].quote</code> 必须<b>程序校验逐字存在于该 chunk</b>（<code>quote_hit</code>），这是唯一自动防线。</li>
+          <li><b>全程只读：</b>脚本不写业务库、不改后端、不触发索引重建，执行前后 <code>wiki_chunk</code> 恒为 2061 行全 ACTIVE。</li>
+        </ul>
+        <div class="data">覆盖度：文档覆盖 37/216（17%）→ 183/216（85%），切片覆盖 15.3% → 27.6%。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q13</span><span class="lv s">必背</span>指标怎么选？为什么必须分组看？</summary>
+      <div class="body">
+        <ul>
+          <li><b>四个主指标：</b><code>recall@6</code>（段落级召回，主口径）、<code>docRecall@6</code>（文档级）、<code>mrr</code>（排序质量）、<code>hitRate@6</code>（至少命中一条）。再加<b>权限泄漏（一票否决）</b>。</li>
+          <li><b>必须分组的原因：</b>题型难度差异极大——单文档 0.864 vs 配对 0.439（相差 42pt）。<b>混算 overall 会被题型配比直接污染</b>：改一下出题比例就能"刷高"指标。所以跨版本比较必须同组比。</li>
+          <li><b>不用 recall@10 当主口径：</b><code>recall@k</code> 对 k 单调不减，所以 <code>recall@10 = 0.8515</code> 只是换口径不算改进。实测仅 14% 的题受益、证据密度从 19.3% 掉到 13.7%，而 <code>docRecall@10 = 0.9674</code> 已近饱和。</li>
+        </ul>
+        <div class="data">分组基线：单文档 235 题 0.864 · 跨文档 89 题 0.809 · 配对 54 题 0.439 · 文号 9 题 0.685（docRecall@6 = 1.000）。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q14</span><span class="lv a">加分</span>怎么判断一次改动是真的有效还是抖动？</summary>
+      <div class="body">
+        <ul>
+          <li><b>先量化抖动本身：</b>同一份数据连续跑两次，<code>recall@6</code> 极差 0.13 个百分点 ⇒ 这就是本评测的<b>数值可信下限</b>。</li>
+          <li><b>定规则：</b>小于 0.2pt 的差异不作为改进证据。这条规则救过我好几次——有几次"涨了"其实就是噪声。</li>
+          <li><b>再看统计显著性：</b>答案层对照用 McNemar 检验（如换模型那次 p=0.1671 不显著），不要只看百分点差。</li>
+          <li><b>还要防"静默无效"：</b>多查询、证据合并这类开关功能，如果没实际生效（分支没生成 / 没有可合并块），输出会和输入一模一样而指标照常出数 ⇒ 强制打日志自证分支数 / 合并块数，区分"没效果"和"没生效"。<b>这个坑我踩过一次。</b></li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q15</span><span class="lv a">加分</span>有没有改过评测集本身？为什么？</summary>
+      <div class="body">
+        <p class="say">这题很能区分"跑过评测"和"建过评测"。</p>
+        <ul>
+          <li>改过，而且理由是先量化再定位：<b>先用置信区间判断"考卷够不够用"</b>，发现样本不足以分辨差异。</li>
+          <li><b>根因定位：</b>出题逻辑只在文档<b>标题的书名号</b>里找政策名，导致 159 篇解读类只配上 31 对（128 篇媒体视角的只中 4 篇）。</li>
+          <li><b>修复：</b>放宽到正文匹配 ⇒ 配对数 31 → 150，文档覆盖 17% → 85%，可分辨样本 29 → 76，置信区间收窄到 ±11.2%。</li>
+          <li><b>心法：</b>把评测集本身当工程对象迭代，而不是一次性产物。<b>考卷不可信的时候，任何指标都没有意义。</b></li>
+          <li><b>泛化检验：</b>另开英文 MultiHop-RAG 赛道（609 篇新闻 / 2556 题），自带脚本与结果目录，<b>只共享打分内核</b>——刻意让两套数据共用同一份"怎么量"，防止指标定义各说各话。</li>
+        </ul>
+      </div>
+    </details>
+
+    <h3>D. 工程实现类</h3>
+
+    <details class="qa">
+      <summary><span class="no">Q16</span>索引为什么不用定时任务全量重建，而用事件驱动？</summary>
+      <div class="body">
+        <ul>
+          <li><b>时效性：</b>文档保存后立刻可检索，不等调度窗口。</li>
+          <li><b>正确性：</b>用 <code>@TransactionalEventListener(phase = AFTER_COMMIT)</code>，保证不会读到未提交的数据；<code>fallbackExecution = true</code> 兜底无事务场景。</li>
+          <li><b>不阻塞写路径：</b>异步线程池 <code>ragIndexExecutor</code>（核心 2 / 最大 4 / 队列 200）；索引失败只记日志，<b>绝不影响文档保存</b>。</li>
+          <li><b>生命周期完整：</b>9 种变更类型各有处理（创建/更新/逻辑删/恢复/物理删/移动/空间逻辑删/空间恢复/空间物理删），并有孤儿 chunk 对账兜底。</li>
+          <li><b>缓存一致：</b>切块变更后<b>同时</b>失效向量快照与 BM25 倒排（单一通知点），否则词法通道会继续吐已删文档的内容。</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q17</span>SSE 流式有哪些坑？</summary>
+      <div class="body">
+        <ul>
+          <li><b>必须显式 complete。</b>不调 <code>emitter.complete()</code> 连接会挂到 120s 超时，前端 await 永不 resolve。</li>
+          <li><b>客户端断开要真的停。</b><code>onCompletion</code> / <code>onTimeout</code> 里 <code>future.cancel(true)</code> 中断还在流的 LLM 调用。</li>
+          <li><b>编排要可单测。</b>抽 <code>EventSink</code> 接口，SSE 只是适配器，不需要真实 HTTP 就能测问答流程。</li>
+          <li><b>前端流式重渲染。</b>Vue3 的 Proxy 会被绕过，delta 不触发重渲染（文字积压、点一下才整段蹦出）⇒ 消息对象用 <code>markRaw</code>。</li>
+          <li><b>可观测性。</b>done 事件带分步耗时时间线（permission / docCount / docNumber / embed / vector / rerank / firstToken / llm），前端可展开。<b>没有这个，我根本做不出 oracle 分析。</b></li>
+          <li><b>零命中短路。</b>hits 为空直接回拒答文案，<code>llmMs = 0</code>，不浪费一次模型调用。</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q18</span>外部模型调用失败怎么办？</summary>
+      <div class="body">
+        <ul>
+          <li><b>分层降级：</b>重排是可选通道，失败捕获异常后回退融合序，<b>绝不把请求打挂</b>；embedding 不可用时索引降级、靠回填和对账兜底。</li>
+          <li><b>重试要有依据：</b>embedding 是幂等 POST 可安全重试（1 次原始 + 2 次，300ms/1000ms 退避）。原因很具体——云端网关会静默回收空闲 keep-alive，空闲后第一发常踩死连接抛 Connection reset，重试即新建连接恢复。<b>不重试就会对用户报错。</b></li>
+          <li><b>不重试的场景：</b>HTTP 层错误（鉴权 / 限流 / 参数）重试无益，直接抛。</li>
+          <li><b>LLM 只重试"首字之前"：</b>已经吐出部分内容再重试会造成重复内容，所以首字后失败立即上抛。</li>
+          <li><b>耗时记账诚实：</b>没运行的通道耗时记 <code>null</code> 而不是 0，避免把"没跑"渲染成"很快"。</li>
+        </ul>
+      </div>
+    </details>
+
+    <h3>E. 反问与陷阱类</h3>
+
+    <details class="qa">
+      <summary><span class="no">Q19</span><span class="lv s">必背</span>这个系统现在最大的短板是什么？</summary>
+      <div class="body">
+        <p class="say">主动暴露短板非常加分，但必须<b>同时给出你定位到的根因</b>——否则就是自曝其短。</p>
+        <ul>
+          <li><b>短板 1：答案层没有"证据充分性"判定。</b>唯一硬拒答是 <code>hits.isEmpty()</code>。我已用数据证明检索层单阈值走不通（有答案题最低分 0.4169 &lt; 无答案题最高分 0.6153，分布重叠），<b>所以正解是把判定放到答案层</b>——这是下一步第一优先级。</li>
+          <li><b>短板 2：段落级排序仍是主瓶颈。</b>池深 50 未兑现的 18.52pt 里 73.3% 属于"池里已有但没排进 top-6"。下一步方向：① 文档分组配额重排（先例是文号钉位组，零新模型依赖）；② 查询改写 / 多路召回；③ 切块（但必须先做评测解耦）。</li>
+          <li><b>短板 3：中文答案层缺乏可靠判官。</b>没有"正确率"这个口径，只有四项零成本指标；英文侧有 LLM 判官但精度存疑（同家族模型判自己要打折）。</li>
+          <li><b>短板 4：规模。</b>向量检索是内存暴力余弦，2061 块够用，量大了必须换 ES / Milvus（接口已抽象好）。</li>
+          <li><b>已知 bug（主动提）：</b><code>chunk.docNumber</code> 取的是"正文里出现的文号"而非"文档自身的文号"，新闻稿引用公文号就会污染文号精确层。</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q20</span><span class="lv s">必背</span>（陷阱）既然 recall@10 有 0.8515，为什么不把 topK 提到 10？</summary>
+      <div class="body">
+        <p class="say">这是典型的"用换口径冒充改进"，必须当场识破。</p>
+        <ul>
+          <li><code>recall@k</code> 对 k <b>单调不减</b>，抬 k 一定会涨，<b>这不叫优化，叫换尺子</b>。</li>
+          <li>实测：仅 14% 的题受益；证据密度从 19.3% 掉到 13.7%（同样的 6 条里塞进更多无关内容，反而稀释 prompt）；<code>docRecall@10 = 0.9674</code> 已近饱和，说明"多给几条"解决不了剩下的问题。</li>
+          <li><b>我的对外口径锁死在 pool=50 的 recall@6。</b></li>
+        </ul>
+        <div class="trap">同类陷阱还有："换了个 embedding 模型指标涨了 0.15pt" → 低于 0.2pt 可信下限，不算；"这次跑出来比上次高" → 先看是不是同数据同配置。</div>
+      </div>
+    </details>
+
+    <details class="qa">
+      <summary><span class="no">Q21</span>如果要上生产，你还会补什么？</summary>
+      <div class="body">
+        <ul>
+          <li><b>检索层：</b>换专业向量库（ES / Milvus）+ 专业中文分词器；候选池与重排做异步并行；加结果缓存。</li>
+          <li><b>答案层：</b>补证据充分性判定与拒答；引入可靠的判官体系（人工标注金标 + 跨家族模型交叉验证）。</li>
+          <li><b>工程：</b>embedding 调用加限流与配额；重排超时熔断；检索链路加 traceId 全链路追踪；索引失败进死信队列而不是只记日志。</li>
+          <li><b>评测：</b>把评测接进 CI，任何改动自动跑回归并与基线对比，超阈值就报警。</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ================= 复习路径 ================= -->
+  <section id="s5">
+    <h2>五、按模块复习路径<span class="en">建议 2 小时过一轮</span></h2>
+    <table>
+      <thead><tr><th style="width:52px">顺序</th><th style="width:150px">模块</th><th>打开这些文件（点即跳转）</th><th style="width:190px">一句话记忆点</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>M4 检索链路</td><td>
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java" data-line="75">RagSearchServiceImpl.java:75</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RrfFusion.java" data-line="33">RrfFusion.java:33</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/LexicalIndex.java" data-line="123">LexicalIndex.java:123</a>
+        </td><td>权限先行 / 文号钉位 / 双通道 / RRF(k=60 不调) / 重排降级</td></tr>
+        <tr><td>2</td><td>M8 评测体系</td><td>
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/eval/README.md">eval/README.md</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/eval/scripts/lib_rag_eval.py" data-line="356">lib_rag_eval.py:356</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/eval/results/baseline-20260916-201335-http.json">baseline-20260916-201335-http.json</a>
+        </td><td>gold 绑逻辑坐标 / quote 逐字校验 / 分组看 / 0.13pt 可信下限</td></tr>
+        <tr><td>3</td><td>M3 索引管线</td><td>
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/WikiRagIndexServiceImpl.java" data-line="64">WikiRagIndexServiceImpl.java:64</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/MarkdownChunker.java" data-line="46">MarkdownChunker.java:46</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/ChunkerProfile.java" data-line="32">ChunkerProfile.java:32</a>
+        </td><td>AFTER_COMMIT + 异步 / 中英双档 / 非 markdown 零切片红线</td></tr>
+        <tr><td>4</td><td>M5 答案层</td><td>
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/rag/RagAskServiceImpl.java" data-line="100">RagAskServiceImpl.java:100</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue" data-line="461">AiAssistantPage.vue:461</a>
+        </td><td>EventSink 可单测 / 必须 complete / 文号不信任模型 / markRaw</td></tr>
+        <tr><td>5</td><td>M1+M6 权限</td><td>
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/controller/OpenRagController.java">OpenRagController.java</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/manager/auth/StpKit.java">StpKit.java</a>
+        </td><td>开放端点复用同一服务层 ⇒ 权限零分叉</td></tr>
+        <tr><td>6</td><td>收口</td><td>
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/README.md">README.md（对外口径）</a> ·
+          <a data-path="C:/Users/origin/IdeaProjects/Agent/openspec/changes/archive/2026-09-16-boost-rag-passage-recall/design.md">boost-rag-passage-recall/design.md</a>
+        </td><td>只讲 pool=50 的 recall@6；内部细节不外放</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      <b>三个不要：</b>
+      ① 不要说"中文正确率"——中文答案层没有这个口径，只有四项零成本指标；
+      ② 不要用 <code>recall@10</code> 当成绩——那是换口径；
+      ③ 不要把内部缺陷（切块污染指标、判官不准、答案层未重跑）当成对外亮点讲，但<b>被追问短板时要主动、带根因地说</b>。
+    </div>
+  </section>
+
+  <footer>
+    本页由项目代码实测核对生成 · 数据取自 <code>eval/results/baseline-20260916-201335-http.json</code>（423 题 / 399 计分 / pool=50）
+    与 <code>cloud/src/main/resources/application.yml</code> 中的实测注释。<br>
+    岗位方向：大模型应用开发 · 能力重点：检索链路与评测体系 · 生成于 2026-10-10
+  </footer>
+</div>
+
+<div class="toast" id="toast">已复制</div>
+
+<script>
+(function () {
+  var PROTO = 'file';
+  var links = Array.prototype.slice.call(document.querySelectorAll('a[data-path]'));
+  var toast = document.getElementById('toast');
+  var timer = null;
+
+  function buildHref(path, line) {
+    var p = String(path).replace(/\\/g, '/');
+    if (PROTO === 'file') {
+      return 'file:///' + p;
+    }
+    if (PROTO === 'idea') {
+      return 'idea://open?file=' + encodeURIComponent(p) + (line ? '&line=' + line : '');
+    }
+    return 'jetbrains://idea/navigate/reference?project=Agent&path=' + encodeURIComponent(p)
+      + (line ? '&line=' + line : '');
+  }
+
+  function apply() {
+    links.forEach(function (a) {
+      a.href = buildHref(a.getAttribute('data-path'), a.getAttribute('data-line'));
+      a.target = '_blank';
+      a.rel = 'noopener';
+    });
+  }
+
+  document.getElementById('protoSeg').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function (b) { b.classList.remove('on'); });
+    btn.classList.add('on');
+    PROTO = btn.getAttribute('data-p');
+    apply();
+  });
+
+  // 给代码文件行加复制按钮
+  document.querySelectorAll('.fp').forEach(function (fp) {
+    var a = fp.querySelector('a[data-path]');
+    if (!a) return;
+    var b = document.createElement('button');
+    b.textContent = '复制';
+    b.addEventListener('click', function (e) {
+      e.preventDefault();
+      var txt = a.getAttribute('data-path') + (a.getAttribute('data-line') ? ':' + a.getAttribute('data-line') : '');
+      copy(txt);
+    });
+    fp.appendChild(b);
+  });
+
+  function copy(txt) {
+    function done() {
+      toast.textContent = '已复制：' + txt;
+      toast.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(function () { toast.classList.remove('show'); }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done, function () { fallback(txt, done); });
+    } else {
+      fallback(txt, done);
+    }
+  }
+  function fallback(txt, done) {
+    var ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  apply();
+})();
+</script>
+</body>
+</html>
