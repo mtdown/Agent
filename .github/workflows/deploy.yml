@@ -77,6 +77,19 @@ jobs:
       - name: 打包
         run: tar czf bundle.tar.gz -C bundle .
 
+      - name: 校验部署所需 Secrets
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+        run: |
+          fail=0
+          [ -n "$SSH_KEY" ] || { echo "::error::Secret SSH_PRIVATE_KEY 为空"; fail=1; }
+          [ -n "$HOST" ]    || { echo "::error::Secret SERVER_HOST 为空"; fail=1; }
+          [ -n "$USER" ]    || { echo "::error::Secret SERVER_USER 为空"; fail=1; }
+          [ "$fail" = "0" ] || exit 1
+          echo "    Secrets 齐备，目标 ${USER}@${HOST}"
+
       - name: 上传到服务器并部署
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -86,9 +99,21 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          export SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o LogLevel=ERROR"
+          # 阿里云密钥对多为 RSA，而 OpenSSH 8.8+ 默认禁用 ssh-rsa，
+          # 不显式放开会报 "no mutual signature algorithm" / "no matching host key type"。
+          export SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o LogLevel=ERROR \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 \
+            -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa"
+
+          echo "== 测试 SSH 连通性 =="
+          ssh $SSH_OPTS "$USER@$HOST" 'echo SSH-OK; whoami; docker compose version' || {
+            echo "::error::SSH 登录失败。请检查：1) SERVER_HOST/SERVER_USER 是否正确；"
+            echo "::error::2) 服务器安全组入方向是否放行 22；"
+            echo "::error::3) SSH_PRIVATE_KEY 是否是该 ECS 实例绑定的密钥对私钥（含 BEGIN/END 行）。"
+            exit 1
+          }
 
           ssh $SSH_OPTS "$USER@$HOST" 'mkdir -p /opt/cloudwiki'
           scp $SSH_OPTS bundle.tar.gz "$USER@$HOST:/opt/cloudwiki/bundle.tar.gz"
