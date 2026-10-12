@@ -144,6 +144,10 @@
                 <configuration>
                     <source>11</source>
                     <target>11</target>
+                    <!-- release 会强制按 Java 11 的 API 表面编译（而不只是字节码版本）。
+                         不加这一项时，本机 JDK 17 能编过用到 Java 16+ API 的代码（如 Stream.toList()），
+                         到了 CI 的真 JDK 11 才报错。 -->
+                    <release>11</release>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
