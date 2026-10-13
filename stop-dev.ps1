@@ -18,7 +18,7 @@
 #
 #  A port that is still occupied is NEVER reported as success.
 # ============================================================
-$ports = @(8123, 3000)
+$ports = @(8123, 8124, 3000)
 $failures = New-Object System.Collections.Generic.List[string]
 $stoppedAny = $false
 
@@ -122,6 +122,6 @@ if ($failures.Count -gt 0) {
 if ($stoppedAny) {
     Write-Host 'All dev services stopped.'
 } else {
-    Write-Host 'No dev services are listening on ports 8123/3000 - nothing to stop.'
+    Write-Host 'No dev services are listening on ports 8123/8124/3000 - nothing to stop.'
 }
 exit 0

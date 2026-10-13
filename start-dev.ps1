@@ -42,11 +42,13 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $cloudDir = Join-Path $root 'cloud'
+$agentDir = Join-Path $root 'cloud_agent'
 $frontDir = Join-Path $root 'cloud_front'
 $tmpDir = Join-Path $root 'tmp'
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
 $backendPort = 8123
+$agentPort = 8124
 $frontPort = 3000
 $tunnelPidFile = Join-Path $tmpDir 'tunnel.pid'
 
@@ -113,7 +115,7 @@ function Clear-DevPort {
 # Full stop used by the Enter handler: backend + frontend + tunnel.
 function Stop-DevServices {
     Write-Host '==> Stopping dev services (backend, frontend, tunnel) ...'
-    foreach ($port in @($backendPort, $frontPort)) {
+    foreach ($port in @($backendPort, $agentPort, $frontPort)) {
         $listenerPids = Get-PortListenerPids -Port $port
         if ($listenerPids.Count -eq 0) {
             Write-Host "    Port $port has no listener"
@@ -130,7 +132,7 @@ function Stop-DevServices {
     Stop-DevTunnel
     Start-Sleep -Seconds 2
     $busy = @()
-    foreach ($port in @($backendPort, $frontPort)) {
+    foreach ($port in @($backendPort, $agentPort, $frontPort)) {
         if ((Get-PortListenerPids -Port $port).Count -gt 0) { $busy += $port }
     }
     if ($busy.Count -eq 0) {
@@ -147,7 +149,7 @@ if (-not (Port-InUse 6379)) { Write-Host '    WARN: Redis (6379) not listening. 
 # a leftover tunnel would point at a dead port, so it is killed too.
 Stop-DevTunnel
 $portsClear = $true
-foreach ($p in @($backendPort, $frontPort)) {
+foreach ($p in @($backendPort, $agentPort, $frontPort)) {
     if (-not (Clear-DevPort -Port $p)) { $portsClear = $false }
 }
 if (-not $portsClear) { exit 1 }
@@ -190,10 +192,22 @@ function Import-DevEnvFile {
     }
 }
 Import-DevEnvFile
+if (-not $env:AGENT_INTERNAL_KEY) {
+    $secretBytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
+    $env:AGENT_INTERNAL_KEY = [Convert]::ToBase64String($secretBytes)
+    Write-Host '    Generated an ephemeral Agent service key for this run.'
+}
 
 Write-Host "==> [2/4] Building backend jar (mvn -DskipTests package) ..."
 Push-Location $cloudDir
 try { mvn -DskipTests package -q; if ($LASTEXITCODE -ne 0) { throw 'maven build failed' } }
+finally { Pop-Location }
+
+Write-Host '==> Building Agent jar (mvn -DskipTests package) ...'
+Push-Location $agentDir
+try { mvn -DskipTests package -q; if ($LASTEXITCODE -ne 0) { throw 'agent maven build failed' } }
 finally { Pop-Location }
 
 Write-Host "==> [3/4] Starting backend on 127.0.0.1:$backendPort ..."
@@ -207,6 +221,18 @@ $backendProc = Start-Process -FilePath $javaExe `
     -RedirectStandardError $backendErr `
     -WindowStyle Hidden -PassThru
 Write-Host "    backend PID: $($backendProc.Id) (log: $backendLog)"
+
+Write-Host "==> Starting Agent on 127.0.0.1:$agentPort ..."
+$agentJar = Join-Path $agentDir 'target\cloud-agent-0.0.1-SNAPSHOT.jar'
+$agentLog = Join-Path $tmpDir 'dev-agent.log'
+$agentErr = Join-Path $tmpDir 'dev-agent.err.log'
+$agentProc = Start-Process -FilePath $javaExe `
+    -ArgumentList @('-jar', "`"$agentJar`"") `
+    -WorkingDirectory $agentDir `
+    -RedirectStandardOutput $agentLog `
+    -RedirectStandardError $agentErr `
+    -WindowStyle Hidden -PassThru
+Write-Host "    Agent PID: $($agentProc.Id) (log: $agentLog)"
 
 $frontLog = Join-Path $tmpDir 'dev-frontend.log'
 $frontErr = Join-Path $tmpDir 'dev-frontend.err.log'
@@ -247,15 +273,22 @@ Write-Host "    frontend launcher PID: $($frontProc.Id) (log: $frontLog)"
 Write-Host ''
 Write-Host 'Waiting for services to come up ...'
 $backendUp = $false
+$agentUp = $false
 $frontUp = $false
 for ($i = 0; $i -lt 90; $i++) {
     if (-not $backendUp -and (Port-InUse $backendPort)) { $backendUp = $true; Write-Host "    backend up on $backendPort" }
+    if (-not $agentUp -and (Port-InUse $agentPort)) { $agentUp = $true; Write-Host "    Agent up on $agentPort" }
     if (-not $frontUp -and (Port-InUse $frontPort)) { $frontUp = $true; Write-Host "    frontend up on $frontPort" }
-    if ($backendUp -and $frontUp) { break }
+    if ($backendUp -and $agentUp -and $frontUp) { break }
     Start-Sleep -Seconds 1
 }
 if (-not $backendUp) {
     Write-Host '    ERROR: backend did not start in time. See tmp/dev-backend.log'
+    Stop-DevServices
+    exit 1
+}
+if (-not $agentUp) {
+    Write-Host '    ERROR: Agent did not start in time. See tmp/dev-agent.log'
     Stop-DevServices
     exit 1
 }

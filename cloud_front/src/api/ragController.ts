@@ -55,6 +55,7 @@ export interface RagAskRequest {
 export interface RagAskUsage {
   promptTokens?: number
   completionTokens?: number
+  totalTokens?: number
 }
 
 /** 检索子步骤耗时（未执行的阶段为 null，如文号命中占满 topK 时跳过向量化） */
@@ -85,6 +86,8 @@ export interface RagAskDone {
   promptMs?: number
   /** LLM 首个输出 delta 的耗时（未产出为 null） */
   firstTokenMs?: number | null
+  /** Agent preview: time to first answer-body delta */
+  firstAnswerMs?: number | null
   /** LLM 流式调用总耗时 */
   llmMs?: number
   /** 检索子步骤耗时明细 */
@@ -154,9 +157,10 @@ export async function ragAskUsingStream(
   body: RagAskRequest,
   handlers: RagAskHandlers,
   signal?: AbortSignal,
+  path = '/api/rag/ask',
 ): Promise<void> {
   const base = (request.defaults.baseURL || '') as string
-  const resp = await fetch(base + '/api/rag/ask', {
+  const resp = await fetch(base + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -182,6 +186,14 @@ export async function ragAskUsingStream(
       handleFrame(frame, handlers)
     }
   }
+}
+
+export async function agentAskUsingStream(
+  query: string,
+  handlers: RagAskHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  return ragAskUsingStream({ query }, handlers, signal, '/api/agent/stream')
 }
 
 function handleFrame(frame: string, handlers: RagAskHandlers) {
