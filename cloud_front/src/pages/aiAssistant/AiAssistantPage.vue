@@ -10,6 +10,7 @@
           </div>
           <a-checkbox
             :checked="allSpaces"
+            :disabled="agentPreview"
             :indeterminate="!allSpaces && selectedSpaceIds.length > 0"
             @change="toggleAllSpaces"
           >
@@ -21,16 +22,20 @@
             class="space-group"
             :options="spaceOptions"
           />
-          <a-tag v-if="lastMeta" class="scope-tag" color="orange">
+          <a-tag v-if="lastMeta && !agentPreview" class="scope-tag" color="orange">
             本次检索：{{ lastMeta.effectiveSpaceIds?.length ?? 0 }} 个空间 /
             {{ lastMeta.authorizedDocCount ?? 0 }} 篇授权文档
           </a-tag>
-          <div class="thinking-switch">
+          <div class="thinking-switch" v-if="!agentPreview">
             <a-switch v-model:checked="deepThinking" size="small" />
             <span class="thinking-label">深度思考</span>
             <a-tooltip title="开启后使用思考型模型，推理更深入但等待更久；默认快速模型秒级响应">
               <QuestionCircleOutlined class="thinking-tip" />
             </a-tooltip>
+          </div>
+          <div class="thinking-switch">
+            <a-switch v-model:checked="agentPreview" size="small" :disabled="streaming" />
+            <span class="thinking-label">Agent 技术预览</span>
           </div>
           <a-button type="link" size="small" class="open-api-btn" @click="openKeyDrawer">
             <ApiOutlined /> 开放 API
@@ -48,7 +53,7 @@
               </a-tag>
             </div>
             <p class="hint-scope">
-              回答仅基于所选空间内已授权文档，引用文号可点击在右侧打开原文。
+              {{ agentPreview ? '当前预览尚未接入知识库，回答不代表政策文档依据。' : '回答仅基于所选空间内已授权文档，引用文号可点击在右侧打开原文。' }}
             </p>
           </div>
 
@@ -102,6 +107,12 @@
                 </div>
                 <!-- 耗时与 token 统计 -->
                 <div v-if="msg.stats" class="stats-line">
+                  <template v-if="msg.agentPreview">
+                    <span>tokens {{ msg.stats.usage?.totalTokens ?? '不可用' }}</span>
+                    <span>首字 {{ msg.stats.firstAnswerMs == null ? '不可用' : formatMs(msg.stats.firstAnswerMs) }}</span>
+                    <span>总生成 {{ msg.stats.totalMs == null ? '不可用' : formatMs(msg.stats.totalMs) }}</span>
+                  </template>
+                  <template v-else>
                   <span v-if="msg.trace?.totalMs != null">总计 {{ formatMs(msg.trace.totalMs) }}</span>
                   <span v-if="msg.stats.thinkingMs != null">思考 {{ formatMs(msg.stats.thinkingMs) }}</span>
                   <span v-if="msg.stats.answerMs != null">回答 {{ formatMs(msg.stats.answerMs) }}</span>
@@ -111,6 +122,7 @@
                     }}
                   </span>
                   <span v-if="msg.stats.deepThinking" class="stats-mode">深度思考模式</span>
+                  </template>
                 </div>
                 <!-- 调用明细：分步耗时时间线（默认收起） -->
                 <div v-if="msg.trace" class="trace-panel">
@@ -301,6 +313,7 @@ import {
 } from '@ant-design/icons-vue'
 import { message as antMessage } from 'ant-design-vue'
 import {
+  agentAskUsingStream,
   ragAskUsingStream,
   type RagAskMeta,
   type RagAskUsage,
@@ -326,6 +339,7 @@ const spaces = ref<SpaceOption[]>([])
 const selectedSpaceIds = ref<number[]>([])
 const allSpaces = ref(true)
 const deepThinking = ref(false)
+const agentPreview = ref(false)
 
 const spaceOptions = computed(() => spaces.value)
 
@@ -361,6 +375,8 @@ const spaceLabel = (name: string, type?: number) => {
 
 // ---- 消息 ----
 interface ChatStats {
+  firstAnswerMs?: number | null
+  totalMs?: number
   thinkingMs?: number
   answerMs?: number
   usage?: RagAskUsage | null
@@ -378,6 +394,7 @@ interface ChatTrace {
   steps?: RagSearchTimings | null
 }
 interface ChatMessage {
+  agentPreview?: boolean
   role: 'user' | 'assistant'
   content: string
   reasoning?: string
@@ -463,6 +480,7 @@ const send = async () => {
     role: 'assistant',
     content: '',
     status: 'streaming',
+    agentPreview: agentPreview.value,
   })
   messages.value.push(assistantMsg)
   await scrollToBottom()
@@ -474,7 +492,18 @@ const send = async () => {
   }
 
   try {
-    await ragAskUsingStream(
+    await (assistantMsg.agentPreview ? agentAskUsingStream(query, {
+      onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
+      onDone: (done) => {
+        assistantMsg.status = 'done'
+        assistantMsg.stats = {
+          usage: done.usage ?? null,
+          firstAnswerMs: done.firstAnswerMs == null ? null : Number(done.firstAnswerMs),
+          totalMs: done.totalMs == null ? undefined : Number(done.totalMs),
+        }
+      },
+      onError: (msg) => { assistantMsg.status = 'error'; assistantMsg.error = msg },
+    }, abortController.value.signal) : ragAskUsingStream(
       body,
       {
         onMeta: (meta) => {
@@ -527,7 +556,7 @@ const send = async () => {
         },
       },
       abortController.value.signal,
-    )
+    ))
     if (assistantMsg.status === 'streaming') {
       assistantMsg.status = 'done'
     }

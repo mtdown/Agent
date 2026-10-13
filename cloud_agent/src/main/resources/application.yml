@@ -1,0 +1,12 @@
+server:
+  address: ${AGENT_BIND_ADDRESS:127.0.0.1}
+  port: ${AGENT_PORT:8124}
+agent:
+  internal-key: ${AGENT_INTERNAL_KEY:}
+  timeout-ms: ${AGENT_TIMEOUT_MS:120000}
+  max-turns: ${AGENT_MAX_TURNS:4}
+  max-tool-result-chars: ${AGENT_MAX_TOOL_RESULT_CHARS:16000}
+  model:
+    base-url: ${RAG_LLM_BASE_URL:https://api.deepseek.com}
+    api-key: ${RAG_LLM_API_KEY:}
+    name: ${RAG_LLM_FAST_MODEL:deepseek-chat}
