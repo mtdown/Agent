@@ -71,6 +71,18 @@ class InMemoryCosineVectorStoreTest {
     }
 
     @Test
+    void folderDocumentFilterRunsBeforeTopK() {
+        when(wikiChunkMapper.selectList(any(Wrapper.class))).thenReturn(List.of(
+                chunk(1L, 11L, 10L, new float[]{1f, 0f}, null),
+                chunk(2L, 12L, 10L, new float[]{0.8f, 0.2f}, null)));
+
+        List<ChunkHit> hits = vectorStore.search(new float[]{1f, 0f}, Set.of(10L), Set.of(12L), 1);
+
+        assertEquals(1, hits.size());
+        assertEquals(12L, hits.get(0).getDocId());
+    }
+
+    @Test
     void chunkChangeNotificationReloads() {
         when(wikiChunkMapper.selectList(any(Wrapper.class))).thenReturn(
                 List.of(chunk(1L, 11L, 10L, new float[]{1f}, null)),

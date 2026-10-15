@@ -29,18 +29,47 @@
           </div>
           <a-checkbox
             :checked="allSpaces"
-            :disabled="agentPreview && !agentRagEnabled"
+            :disabled="scopeDisabled"
             :indeterminate="!allSpaces && selectedSpaceIds.length > 0"
             @change="toggleAllSpaces"
           >
             全部授权空间
           </a-checkbox>
-          <a-checkbox-group
-            v-model:value="selectedSpaceIds"
-            :disabled="allSpaces || (agentPreview && !agentRagEnabled)"
-            class="space-group"
-            :options="spaceOptions"
-          />
+          <div class="space-categories">
+            <div v-for="group in spaceGroups" :key="group.type" class="space-category">
+              <a-checkbox
+                :checked="groupSelectionState(group.spaces.map((space) => space.value), currentSelection(), groupFolderIds(group)).checked"
+                :indeterminate="groupSelectionState(group.spaces.map((space) => space.value), currentSelection(), groupFolderIds(group)).indeterminate"
+                :disabled="scopeDisabled || group.spaces.length === 0"
+                @change="toggleGroup(group)"
+              >{{ group.label }}</a-checkbox>
+              <a-popover trigger="click" placement="bottomRight" :open="openSpaceGroup === group.type" @openChange="(open: boolean) => setSpaceGroupOpen(group.type, open)">
+                <a-button type="text" size="small" class="space-expand" :disabled="scopeDisabled || group.spaces.length === 0" :aria-label="`展开${group.label}子空间`">
+                  <DownOutlined />
+                </a-button>
+                <template #content>
+                  <div class="space-dropdown">
+                    <div v-for="space in group.spaces" :key="space.value" class="scope-space-node">
+                      <a-checkbox
+                        :checked="!allSpaces && selectedSpaceIds.includes(space.value)"
+                        :indeterminate="!allSpaces && !selectedSpaceIds.includes(space.value) && flatSpaceFolders(space).some((folder) => selectedFolderIds.includes(folder.id))"
+                        :disabled="scopeDisabled"
+                        @change="toggleSpace(space)"
+                      >{{ displaySpaceLabel(group, space) }}</a-checkbox>
+                      <div v-for="folder in flatSpaceFolders(space)" :key="folder.id" class="scope-folder-node" :style="{ paddingLeft: `${(folder.depth + 1) * 16}px` }">
+                        <a-checkbox
+                          :checked="folderChecked(space.value, folder)"
+                          :indeterminate="folderIndeterminate(space.value, folder)"
+                          :disabled="scopeDisabled || selectedSpaceIds.includes(space.value) || folder.ancestorIds.some((id) => selectedFolderIds.includes(id))"
+                          @change="toggleFolder(folder)"
+                        >{{ folder.label }}</a-checkbox>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </a-popover>
+            </div>
+          </div>
           <a-tag v-if="lastMeta && !agentPreview" class="scope-tag" color="orange">
             本次检索：{{ lastMeta.effectiveSpaceIds?.length ?? 0 }} 个空间 /
             {{ lastMeta.authorizedDocCount ?? 0 }} 篇授权文档
@@ -341,6 +370,7 @@ import {
   EllipsisOutlined,
   EditOutlined,
   DeleteOutlined,
+  DownOutlined,
 } from '@ant-design/icons-vue'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import {
@@ -365,54 +395,103 @@ import {
   apiBaseUrl,
 } from '@/api/ragController'
 import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController'
+import { listFolderTreeUsingGet } from '@/api/wikiFolderController'
 import { getDocumentWikiVisByIdUsingGet } from '@/api/documentWikiController'
 import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
+import {
+  groupSpaces,
+  groupSelectionState,
+  flattenFolders,
+  isScopeReady,
+  selectAllSpaces,
+  selectFolder,
+  selectGroup,
+  selectSpace,
+  toSpaceOptions,
+  toFolderOptions,
+  type FlatFolder,
+  type SpaceGroup,
+  type SpaceOption,
+  type SpaceSelection,
+} from './spaceSelection'
 
 // ---- 检索范围 ----
-interface SpaceOption {
-  label: string
-  value: number
-}
 const spaces = ref<SpaceOption[]>([])
-const selectedSpaceIds = ref<number[]>([])
+const selectedSpaceIds = ref<string[]>([])
+const selectedFolderIds = ref<string[]>([])
 const allSpaces = ref(true)
 const deepThinking = ref(false)
 const agentPreview = ref(false)
 const agentRagEnabled = ref(false)
+const openSpaceGroup = ref<number | null>(null)
 const agentConversationId = ref<string | undefined>()
 const agentConversations = ref<AgentConversation[]>([])
 const renameDialog = reactive({ open: false, saving: false, id: '', title: '' })
 
-const spaceOptions = computed(() => spaces.value)
-
-const toggleAllSpaces = () => {
-  allSpaces.value = !allSpaces.value
-  if (!allSpaces.value && selectedSpaceIds.value.length === 0 && spaces.value.length > 0) {
-    // 从"全部"切到手选时默认保留全部勾选，便于用户做减法
-    selectedSpaceIds.value = spaces.value.map((s) => s.value)
+const scopeDisabled = computed(() => agentPreview.value && !agentRagEnabled.value)
+const spaceGroups = computed(() => groupSpaces(spaces.value))
+const flatSpaceFolders = (space: SpaceOption) => flattenFolders(space.folders ?? [])
+const groupFolderIds = (group: SpaceGroup) => group.spaces.flatMap((space) => flatSpaceFolders(space).map((folder) => folder.id))
+const displaySpaceLabel = (group: SpaceGroup, space: SpaceOption) =>
+  group.spaces.length === 1 && group.type === 2 ? '公开文档'
+    : group.spaces.length === 1 && group.type === 0 ? '个人文档' : space.label
+const setSpaceGroupOpen = (type: number, open: boolean) => {
+  if (open) {
+    openSpaceGroup.value = type
+  } else if (openSpaceGroup.value === type) {
+    openSpaceGroup.value = null
   }
 }
+const currentSelection = (): SpaceSelection => ({ allSpaces: allSpaces.value, selectedIds: selectedSpaceIds.value, folderIds: selectedFolderIds.value })
+const applySelection = (selection: SpaceSelection) => {
+  allSpaces.value = selection.allSpaces
+  selectedSpaceIds.value = selection.selectedIds
+  selectedFolderIds.value = selection.folderIds ?? []
+}
+
+const toggleAllSpaces = () => {
+  applySelection(selectAllSpaces(currentSelection(), !allSpaces.value))
+}
+
+const toggleGroup = (group: SpaceGroup) => {
+  const ids = group.spaces.map((space) => space.value)
+  const folderIds = groupFolderIds(group)
+  applySelection(selectGroup(currentSelection(), ids, !groupSelectionState(ids, currentSelection(), folderIds).checked, folderIds))
+}
+
+const toggleSpace = (space: SpaceOption) => {
+  applySelection(selectSpace(currentSelection(), space.value,
+    allSpaces.value || !selectedSpaceIds.value.includes(space.value), flatSpaceFolders(space).map((folder) => folder.id)))
+}
+
+const toggleFolder = (folder: FlatFolder) => {
+  applySelection(selectFolder(currentSelection(), folder.id,
+    allSpaces.value || !selectedFolderIds.value.includes(folder.id), folder.descendantIds))
+}
+
+const folderChecked = (spaceId: string, folder: FlatFolder) =>
+  !allSpaces.value && (selectedSpaceIds.value.includes(spaceId) || selectedFolderIds.value.includes(folder.id) ||
+    folder.ancestorIds.some((id) => selectedFolderIds.value.includes(id)))
+
+const folderIndeterminate = (spaceId: string, folder: FlatFolder) =>
+  !folderChecked(spaceId, folder) && folder.descendantIds.some((id) => selectedFolderIds.value.includes(id))
 
 const loadSpaces = async () => {
   try {
     const res = await listVisibleSpaceUsingGet()
-    const list = res.data.data ?? []
-    spaces.value = list
-      .filter((s) => s.id != null)
-      .map((s) => ({
-        label: spaceLabel(s.name ?? '未命名空间', s.type),
-        value: Number(s.id),
-      }))
+    if (res.data.code !== 0) throw new Error(res.data.message || '获取空间失败')
+    spaces.value = await Promise.all(toSpaceOptions(res.data.data ?? []).map(async (space) => {
+      const folders = await listFolderTreeUsingGet({ spaceId: space.value })
+      if (folders.data.code !== 0) throw new Error(folders.data.message || '获取文件夹失败')
+      return { ...space, folders: toFolderOptions(folders.data.data ?? []) }
+    }))
+    const visible = new Set(spaces.value.map((space) => space.value))
+    const visibleFolders = new Set(spaces.value.flatMap((space) => flatSpaceFolders(space).map((folder) => folder.id)))
+    selectedSpaceIds.value = selectedSpaceIds.value.filter((id) => visible.has(id))
+    selectedFolderIds.value = selectedFolderIds.value.filter((id) => visibleFolders.has(id))
   } catch (e) {
-    antMessage.error('加载可见空间失败')
+    antMessage.error('加载可见空间或文件夹失败')
   }
-}
-
-const spaceLabel = (name: string, type?: number) => {
-  if (type === 0) return `${name}（个人）`
-  if (type === 1) return `${name}（团队）`
-  if (type === 2) return `${name}（公开）`
-  return name
 }
 
 // ---- 消息 ----
@@ -592,11 +671,11 @@ const traceSteps = (msg: ChatMessage): { label: string; ms?: number | null; skip
 const send = async () => {
   const query = inputText.value.trim()
   if (!query || streaming.value) return
+  if ((!agentPreview.value || agentRagEnabled.value) && !isScopeReady(currentSelection())) {
+    antMessage.warning('请至少选择一个知识库空间或文件夹')
+    return
+  }
   if (agentPreview.value) {
-    if (agentRagEnabled.value && !allSpaces.value && selectedSpaceIds.value.length === 0) {
-      antMessage.warning('请至少选择一个知识库空间')
-      return
-    }
     if (!agentConversationId.value) {
       await newAgentConversation()
       if (!agentConversationId.value) return
@@ -621,6 +700,7 @@ const send = async () => {
   const body = {
     query,
     spaceIds: allSpaces.value ? undefined : selectedSpaceIds.value,
+    folderIds: allSpaces.value ? undefined : selectedFolderIds.value,
     deepThinking: deepThinking.value || undefined,
   }
 
@@ -629,7 +709,8 @@ const send = async () => {
       query,
       conversationId: agentConversationId.value,
       ragMode: !agentRagEnabled.value ? 'OFF' : allSpaces.value ? 'ALL' : 'SELECTED',
-      spaceIds: agentRagEnabled.value && !allSpaces.value ? selectedSpaceIds.value.map(String) : undefined,
+      spaceIds: agentRagEnabled.value && !allSpaces.value ? selectedSpaceIds.value : undefined,
+      folderIds: agentRagEnabled.value && !allSpaces.value ? selectedFolderIds.value : undefined,
     }, {
       onMeta: (meta) => {
         if (meta.conversationId) agentConversationId.value = meta.conversationId
@@ -1137,10 +1218,48 @@ onMounted(() => {
   color: #e07a2d;
 }
 
-.space-group {
+.space-categories {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 6px 10px;
+}
+
+.space-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.space-expand {
+  padding: 0 4px;
+  color: #6b4f1d;
+}
+
+.space-dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 190px;
+  max-width: 320px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.scope-space-node {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scope-folder-node {
+  display: flex;
+  min-width: 0;
+}
+
+.space-dropdown :deep(.ant-checkbox-wrapper) {
+  margin-inline-start: 0;
+  white-space: normal;
 }
 
 .scope-tag {

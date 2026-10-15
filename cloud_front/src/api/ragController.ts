@@ -40,13 +40,15 @@ export interface RagSearchResult {
 
 export interface RagSearchRequest {
   query: string
-  spaceIds?: number[]
+  spaceIds?: string[]
+  folderIds?: string[]
   topK?: number
 }
 
 export interface RagAskRequest {
   query: string
-  spaceIds?: number[]
+  spaceIds?: string[]
+  folderIds?: string[]
   topK?: number
   /** true = 思考型模型（慢、推理深），缺省 false = 快速模型 */
   deepThinking?: boolean
@@ -57,6 +59,7 @@ export interface AgentAskRequest {
   conversationId?: string
   ragMode: 'OFF' | 'ALL' | 'SELECTED'
   spaceIds?: string[]
+  folderIds?: string[]
 }
 
 export interface RagAskUsage {

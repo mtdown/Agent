@@ -35,6 +35,11 @@ public class InMemoryCosineVectorStore implements VectorStore {
 
     @Override
     public List<ChunkHit> search(float[] queryVector, Set<Long> spaceIds, int topK) {
+        return search(queryVector, spaceIds, null, topK);
+    }
+
+    @Override
+    public List<ChunkHit> search(float[] queryVector, Set<Long> spaceIds, Set<Long> docIds, int topK) {
         List<ChunkHit> hits = new ArrayList<>();
         if (queryVector == null || queryVector.length == 0 || spaceIds == null || spaceIds.isEmpty() || topK <= 0) {
             return hits;
@@ -44,6 +49,9 @@ public class InMemoryCosineVectorStore implements VectorStore {
             for (CachedVector entry : entries) {
                 // defensive: skip stale rows that slipped into a wrong space snapshot
                 if (!spaceId.equals(entry.spaceId)) {
+                    continue;
+                }
+                if (docIds != null && !docIds.contains(entry.docId)) {
                     continue;
                 }
                 double score = cosine(queryVector, entry.vector);

@@ -6,8 +6,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.et.cloud.exception.ErrorCode;
 import com.et.cloud.exception.ThrowUtils;
 import com.et.cloud.mapper.WikiChunkMapper;
+import com.et.cloud.mapper.DocumentWikiMapper;
+import com.et.cloud.model.entity.DocumentWiki;
 import com.et.cloud.model.entity.User;
 import com.et.cloud.model.entity.WikiChunk;
+import com.et.cloud.model.entity.WikiFolder;
+import com.et.cloud.service.WikiFolderService;
 import com.et.cloud.service.WikiSpaceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,6 +58,12 @@ public class RagSearchServiceImpl implements RagSearchService {
     private WikiChunkMapper wikiChunkMapper;
 
     @Resource
+    private DocumentWikiMapper documentWikiMapper;
+
+    @Resource
+    private WikiFolderService wikiFolderService;
+
+    @Resource
     private RagEmbeddingClient ragEmbeddingClient;
 
     @Resource
@@ -86,14 +96,28 @@ public class RagSearchServiceImpl implements RagSearchService {
         long phaseStart = System.currentTimeMillis();
         List<Long> visibleSpaceIds = wikiSpaceService.listVisibleSpaceIds(loginUser);
         Set<Long> effectiveSpaceIds = new LinkedHashSet<>();
-        if (CollUtil.isEmpty(request.getSpaceIds())) {
+        boolean folderScoped = CollUtil.isNotEmpty(request.getFolderIds());
+        if (CollUtil.isEmpty(request.getSpaceIds()) && !folderScoped) {
             effectiveSpaceIds.addAll(visibleSpaceIds);
         } else {
             Set<Long> visibleSet = new LinkedHashSet<>(visibleSpaceIds);
-            for (Long spaceId : request.getSpaceIds()) {
-                if (spaceId != null && visibleSet.contains(spaceId)) {
-                    effectiveSpaceIds.add(spaceId);
+            if (request.getSpaceIds() != null) {
+                for (Long spaceId : request.getSpaceIds()) {
+                    if (spaceId != null && visibleSet.contains(spaceId)) {
+                        effectiveSpaceIds.add(spaceId);
+                    }
                 }
+            }
+        }
+        Set<Long> wholeSpaceIds = new LinkedHashSet<>(effectiveSpaceIds);
+        Set<Long> folderSubtreeIds = new LinkedHashSet<>();
+        if (folderScoped) {
+            Set<Long> visibleSet = new LinkedHashSet<>(visibleSpaceIds);
+            for (Long folderId : request.getFolderIds()) {
+                WikiFolder folder = wikiFolderService.requireVisibleFolder(folderId, null, loginUser);
+                if (!visibleSet.contains(folder.getSpaceId())) continue;
+                effectiveSpaceIds.add(folder.getSpaceId());
+                folderSubtreeIds.addAll(wikiFolderService.collectFolderSubtreeIds(folder.getSpaceId(), folder.getId()));
             }
         }
         timings.setPermissionMs(System.currentTimeMillis() - phaseStart);
@@ -105,9 +129,15 @@ public class RagSearchServiceImpl implements RagSearchService {
             return result;
         }
 
+        Set<Long> allowedDocIds = folderScoped ? resolveDocumentIds(wholeSpaceIds, folderSubtreeIds) : null;
+        if (allowedDocIds != null && allowedDocIds.isEmpty()) {
+            timings.setTotalMs(System.currentTimeMillis() - totalStart);
+            return result;
+        }
+
         // 2. authorized document count within the effective scope
         phaseStart = System.currentTimeMillis();
-        result.setAuthorizedDocCount(countActiveDocs(effectiveSpaceIds));
+        result.setAuthorizedDocCount(countActiveDocs(effectiveSpaceIds, allowedDocIds));
         timings.setDocCountMs(System.currentTimeMillis() - phaseStart);
 
         RagProperties.Retrieval retrieval = ragProperties.getRetrieval();
@@ -119,7 +149,7 @@ public class RagSearchServiceImpl implements RagSearchService {
         //    It must NOT stop the semantic/lexical channels — previously a saturated
         //    exact layer skipped vector search entirely, losing real recall.
         phaseStart = System.currentTimeMillis();
-        List<ChunkHit> docNumberGroup = findDocNumberHits(request.getQuery(), effectiveSpaceIds);
+        List<ChunkHit> docNumberGroup = findDocNumberHits(request.getQuery(), effectiveSpaceIds, allowedDocIds);
         timings.setDocNumberMs(System.currentTimeMillis() - phaseStart);
 
         // 4. Build query branches. By default this is just the original query;
@@ -143,7 +173,9 @@ public class RagSearchServiceImpl implements RagSearchService {
         List<List<ChunkHit>> vectorBranchHits = new ArrayList<>();
         if (!queryVectors.isEmpty()) {
             for (float[] queryVector : queryVectors) {
-                vectorBranchHits.add(vectorStore.search(queryVector, effectiveSpaceIds, poolSize));
+                vectorBranchHits.add(allowedDocIds == null
+                        ? vectorStore.search(queryVector, effectiveSpaceIds, poolSize)
+                        : vectorStore.search(queryVector, effectiveSpaceIds, allowedDocIds, poolSize));
             }
             timings.setVectorMs(System.currentTimeMillis() - phaseStart);
         }
@@ -152,7 +184,9 @@ public class RagSearchServiceImpl implements RagSearchService {
         List<List<ChunkHit>> lexicalBranchHits = new ArrayList<>();
         if (retrieval.getLexical().isEnabled()) {
             for (QueryBranch branch : branches) {
-                lexicalBranchHits.add(lexicalIndex.search(branch.getText(), effectiveSpaceIds, poolSize));
+                lexicalBranchHits.add(allowedDocIds == null
+                        ? lexicalIndex.search(branch.getText(), effectiveSpaceIds, poolSize)
+                        : lexicalIndex.search(branch.getText(), effectiveSpaceIds, allowedDocIds, poolSize));
             }
             timings.setLexicalMs(System.currentTimeMillis() - phaseStart);
         }
@@ -562,7 +596,7 @@ public class RagSearchServiceImpl implements RagSearchService {
      * Ordered by chunkIndex as a stable default; the caller may re-order by
      * relevance. Returns empty when the query carries no doc number.
      */
-    private List<ChunkHit> findDocNumberHits(String query, Set<Long> effectiveSpaceIds) {
+    private List<ChunkHit> findDocNumberHits(String query, Set<Long> effectiveSpaceIds, Set<Long> allowedDocIds) {
         java.util.regex.Matcher matcher = MarkdownChunker.DOC_NUMBER_PATTERN.matcher(query);
         if (!matcher.find()) {
             return new ArrayList<>();
@@ -572,9 +606,9 @@ public class RagSearchServiceImpl implements RagSearchService {
         wrapper.eq("docNumber", docNumber)
                 .in("spaceId", effectiveSpaceIds)
                 .eq("status", WikiChunk.STATUS_ACTIVE)
-                .eq("isDelete", 0)
-                .orderByAsc("chunkIndex")
-                .last("LIMIT " + DOC_NUMBER_GROUP_LIMIT);
+                .eq("isDelete", 0);
+        if (allowedDocIds != null) wrapper.in("docId", allowedDocIds);
+        wrapper.orderByAsc("chunkIndex").last("LIMIT " + DOC_NUMBER_GROUP_LIMIT);
         List<WikiChunk> chunks = wikiChunkMapper.selectList(wrapper);
         List<ChunkHit> hits = new ArrayList<>();
         if (chunks == null) {
@@ -589,13 +623,31 @@ public class RagSearchServiceImpl implements RagSearchService {
         return hits;
     }
 
-    private long countActiveDocs(Set<Long> spaceIds) {
+    private Set<Long> resolveDocumentIds(Set<Long> wholeSpaceIds, Set<Long> folderSubtreeIds) {
+        if (wholeSpaceIds.isEmpty() && folderSubtreeIds.isEmpty()) return Collections.emptySet();
+        QueryWrapper<DocumentWiki> wrapper = new QueryWrapper<>();
+        wrapper.select("id").eq("isDelete", 0).and(scope -> {
+            if (!wholeSpaceIds.isEmpty()) scope.in("spaceId", wholeSpaceIds);
+            if (!folderSubtreeIds.isEmpty()) {
+                if (!wholeSpaceIds.isEmpty()) scope.or();
+                scope.in("folderId", folderSubtreeIds);
+            }
+        });
+        List<Object> rows = documentWikiMapper.selectObjs(wrapper);
+        if (rows == null) return Collections.emptySet();
+        return rows.stream().filter(java.util.Objects::nonNull)
+                .map(value -> Long.parseLong(value.toString()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private long countActiveDocs(Set<Long> spaceIds, Set<Long> allowedDocIds) {
         if (spaceIds.isEmpty()) {
             return 0;
         }
         QueryWrapper<WikiChunk> wrapper = new QueryWrapper<>();
         wrapper.select("DISTINCT docId").in("spaceId", spaceIds)
                 .eq("status", WikiChunk.STATUS_ACTIVE).eq("isDelete", 0);
+        if (allowedDocIds != null) wrapper.in("docId", allowedDocIds);
         List<Object> docIds = wikiChunkMapper.selectObjs(wrapper);
         return docIds == null ? 0 : docIds.stream().filter(java.util.Objects::nonNull).collect(Collectors.toList()).size();
     }

@@ -104,6 +104,7 @@ public class RagAskServiceImpl implements RagAskService {
             RagSearchRequest searchRequest = new RagSearchRequest();
             searchRequest.setQuery(request.getQuery());
             searchRequest.setSpaceIds(request.getSpaceIds());
+            searchRequest.setFolderIds(request.getFolderIds());
             searchRequest.setTopK(request.getTopK());
             long retrievalStart = System.currentTimeMillis();
             RagSearchResult search = ragSearchService.search(loginUser, searchRequest);

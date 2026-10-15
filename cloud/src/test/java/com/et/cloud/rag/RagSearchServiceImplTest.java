@@ -2,7 +2,12 @@ package com.et.cloud.rag;
 
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.mapper.WikiChunkMapper;
+import com.et.cloud.mapper.DocumentWikiMapper;
+import com.et.cloud.model.entity.DocumentWiki;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.et.cloud.model.entity.User;
+import com.et.cloud.model.entity.WikiFolder;
+import com.et.cloud.service.WikiFolderService;
 import com.et.cloud.service.WikiSpaceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +57,8 @@ class RagSearchServiceImplTest {
 
     private WikiSpaceService wikiSpaceService;
     private WikiChunkMapper wikiChunkMapper;
+    private DocumentWikiMapper documentWikiMapper;
+    private WikiFolderService wikiFolderService;
     private RagEmbeddingClient embeddingClient;
     private VectorStore vectorStore;
     private LexicalIndex lexicalIndex;
@@ -64,6 +71,8 @@ class RagSearchServiceImplTest {
     void setUp() {
         wikiSpaceService = mock(WikiSpaceService.class);
         wikiChunkMapper = mock(WikiChunkMapper.class);
+        documentWikiMapper = mock(DocumentWikiMapper.class);
+        wikiFolderService = mock(WikiFolderService.class);
         embeddingClient = mock(RagEmbeddingClient.class);
         vectorStore = mock(VectorStore.class);
         lexicalIndex = mock(LexicalIndex.class);
@@ -73,6 +82,8 @@ class RagSearchServiceImplTest {
         ragSearchService = new RagSearchServiceImpl();
         ReflectionTestUtils.setField(ragSearchService, "wikiSpaceService", wikiSpaceService);
         ReflectionTestUtils.setField(ragSearchService, "wikiChunkMapper", wikiChunkMapper);
+        ReflectionTestUtils.setField(ragSearchService, "documentWikiMapper", documentWikiMapper);
+        ReflectionTestUtils.setField(ragSearchService, "wikiFolderService", wikiFolderService);
         ReflectionTestUtils.setField(ragSearchService, "ragEmbeddingClient", embeddingClient);
         ReflectionTestUtils.setField(ragSearchService, "vectorStore", vectorStore);
         ReflectionTestUtils.setField(ragSearchService, "lexicalIndex", lexicalIndex);
@@ -158,6 +169,78 @@ class RagSearchServiceImplTest {
         verify(vectorStore, never()).search(any(float[].class), anySet(), anyInt());
         verify(lexicalIndex, never()).search(anyString(), anySet(), anyInt());
         verify(embeddingClient, never()).embed(anyList());
+    }
+
+    @Test
+    void selectedFolderRestrictsCandidateDocumentsBeforeRanking() {
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L, 2L));
+        WikiFolder folder = new WikiFolder();
+        folder.setId(5L);
+        folder.setSpaceId(1L);
+        when(wikiFolderService.requireVisibleFolder(eq(5L), eq(null), any(User.class))).thenReturn(folder);
+        when(wikiFolderService.collectFolderSubtreeIds(1L, 5L)).thenReturn(List.of(5L, 6L));
+        when(documentWikiMapper.selectObjs(any())).thenReturn(List.of(101L, 102L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(101L));
+
+        RagSearchRequest request = plainRequest();
+        request.setSpaceIds(List.of());
+        request.setFolderIds(List.of(5L));
+        RagSearchResult result = search(request);
+
+        assertEquals(Set.of(1L), result.getEffectiveSpaceIds());
+        assertEquals(1, result.getAuthorizedDocCount());
+        verify(vectorStore).search(any(float[].class), eq(Set.of(1L)), eq(Set.of(101L, 102L)), anyInt());
+        verify(lexicalIndex).search(anyString(), eq(Set.of(1L)), eq(Set.of(101L, 102L)), anyInt());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<QueryWrapper<DocumentWiki>> documents = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(documentWikiMapper).selectObjs(documents.capture());
+        assertTrue(documents.getValue().getSqlSegment().contains("folderId"));
+        assertTrue(!documents.getValue().getSqlSegment().contains("spaceId"), "folder selection must not include root documents");
+    }
+
+    @Test
+    void wholeSpaceAndFolderSelectionUseUnionWithoutWideningOtherSpaces() {
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L, 2L));
+        WikiFolder folder = new WikiFolder();
+        folder.setId(5L);
+        folder.setSpaceId(1L);
+        when(wikiFolderService.requireVisibleFolder(eq(5L), eq(null), any(User.class))).thenReturn(folder);
+        when(wikiFolderService.collectFolderSubtreeIds(1L, 5L)).thenReturn(List.of(5L));
+        when(documentWikiMapper.selectObjs(any())).thenReturn(List.of(101L, 201L));
+        when(wikiChunkMapper.selectObjs(any())).thenReturn(List.of(101L, 201L));
+        RagSearchRequest request = plainRequest();
+        request.setSpaceIds(List.of(2L));
+        request.setFolderIds(List.of(5L));
+
+        RagSearchResult result = search(request);
+
+        assertEquals(Set.of(1L, 2L), result.getEffectiveSpaceIds());
+        verify(vectorStore).search(any(float[].class), eq(Set.of(1L, 2L)), eq(Set.of(101L, 201L)), anyInt());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<QueryWrapper<DocumentWiki>> documents = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(documentWikiMapper).selectObjs(documents.capture());
+        assertTrue(documents.getValue().getSqlSegment().contains("spaceId"));
+        assertTrue(documents.getValue().getSqlSegment().contains("folderId"));
+    }
+
+    @Test
+    void emptySelectedFolderDoesNotSearchItsWholeSpace() {
+        when(wikiSpaceService.listVisibleSpaceIds(any(User.class))).thenReturn(List.of(1L));
+        WikiFolder folder = new WikiFolder();
+        folder.setId(5L);
+        folder.setSpaceId(1L);
+        when(wikiFolderService.requireVisibleFolder(eq(5L), eq(null), any(User.class))).thenReturn(folder);
+        when(wikiFolderService.collectFolderSubtreeIds(1L, 5L)).thenReturn(List.of(5L));
+        when(documentWikiMapper.selectObjs(any())).thenReturn(List.of());
+        RagSearchRequest request = plainRequest();
+        request.setFolderIds(List.of(5L));
+
+        RagSearchResult result = search(request);
+
+        assertTrue(result.getHits().isEmpty());
+        assertEquals(0, result.getAuthorizedDocCount());
+        verify(vectorStore, never()).search(any(float[].class), anySet(), anySet(), anyInt());
+        verify(vectorStore, never()).search(any(float[].class), anySet(), anyInt());
     }
 
     @Test

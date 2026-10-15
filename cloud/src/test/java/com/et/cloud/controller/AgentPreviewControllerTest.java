@@ -3,12 +3,16 @@ package com.et.cloud.controller;
 import com.et.cloud.service.UserService;
 import com.et.cloud.service.WikiSpaceService;
 import com.et.cloud.rag.RagSearchService;
+import com.et.cloud.rag.RagSearchRequest;
+import com.et.cloud.rag.RagSearchResult;
 import com.et.cloud.model.entity.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import java.util.Collections;
 import java.util.Arrays;
+import java.util.List;
+import org.mockito.ArgumentCaptor;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -63,5 +67,29 @@ class AgentPreviewControllerTest {
         new AgentPreviewController(users, proxy, store, search, spaces).stream(ask, request);
         verifyNoInteractions(search);
         verifyNoInteractions(proxy);
+    }
+
+    @Test void folderOnlySelectionReachesPermissionFilteredSearch() {
+        UserService users = mock(UserService.class);
+        AgentPreviewProxy proxy = mock(AgentPreviewProxy.class);
+        AgentConversationStore store = mock(AgentConversationStore.class);
+        RagSearchService search = mock(RagSearchService.class);
+        WikiSpaceService spaces = mock(WikiSpaceService.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        User user = new User(); user.setId(1L);
+        when(users.getLoginUser(request)).thenReturn(user);
+        when(spaces.listVisibleSpaceIds(user)).thenReturn(List.of(1L));
+        when(search.search(eq(user), any(RagSearchRequest.class))).thenReturn(new RagSearchResult());
+        AgentPreviewController.Ask ask = new AgentPreviewController.Ask("q");
+        ask.conversationId = "2";
+        ask.ragMode = "SELECTED";
+        ask.folderIds = List.of("123");
+
+        new AgentPreviewController(users, proxy, store, search, spaces).stream(ask, request);
+
+        ArgumentCaptor<RagSearchRequest> captured = ArgumentCaptor.forClass(RagSearchRequest.class);
+        verify(search).search(eq(user), captured.capture());
+        assertEquals(List.of(123L), captured.getValue().getFolderIds());
+        assertEquals(List.of(), captured.getValue().getSpaceIds());
     }
 }

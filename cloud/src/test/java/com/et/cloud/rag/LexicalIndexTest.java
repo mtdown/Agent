@@ -109,6 +109,20 @@ class LexicalIndexTest {
     }
 
     @Test
+    void folderDocumentFilterRunsBeforeTopK() {
+        WikiChunk outside = chunk(100L, "低保申请");
+        outside.setDocId(11L);
+        WikiChunk inside = chunk(101L, "低保申请条件如下所述");
+        inside.setDocId(12L);
+        when(wikiChunkMapper.selectList(any())).thenReturn(List.of(outside, inside));
+
+        List<ChunkHit> hits = lexicalIndex.search("低保申请", Set.of(SPACE_ID), Set.of(12L), 1);
+
+        assertEquals(1, hits.size());
+        assertEquals(12L, hits.get(0).getDocId());
+    }
+
+    @Test
     void hitsCarryTheMetadataTheRerankerAndTheUiNeed() {
         WikiChunk chunk = chunk(100L, "低保申请条件");
         chunk.setChunkHeading("第二章 申请条件");

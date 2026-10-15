@@ -54,6 +54,10 @@ public class LexicalIndex {
      * never widens it.
      */
     public List<ChunkHit> search(String query, Set<Long> spaceIds, int topK) {
+        return search(query, spaceIds, null, topK);
+    }
+
+    public List<ChunkHit> search(String query, Set<Long> spaceIds, Set<Long> docIds, int topK) {
         List<ChunkHit> hits = new ArrayList<>();
         if (query == null || query.isBlank() || spaceIds == null || spaceIds.isEmpty() || topK <= 0) {
             return hits;
@@ -93,6 +97,9 @@ public class LexicalIndex {
             for (Map.Entry<Long, Double> e : scores.entrySet()) {
                 Snapshot.Entry entry = snapshot.entries.get(e.getKey());
                 if (entry == null) {
+                    continue;
+                }
+                if (docIds != null && !docIds.contains(entry.docId)) {
                     continue;
                 }
                 hits.add(new ChunkHit(entry.chunkId, entry.docId, entry.spaceId, entry.chunkIndex,
