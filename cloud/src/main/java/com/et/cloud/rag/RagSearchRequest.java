@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Retrieval request. spaceIds == null means "all spaces visible to the user".
+ * Retrieval request. Omitted space and folder scopes mean all visible spaces.
  */
 @Data
 public class RagSearchRequest {
@@ -16,10 +16,13 @@ public class RagSearchRequest {
     private String query;
 
     /**
-     * Requested space scope (nullable = all visible spaces). Spaces the user
+     * Requested whole-space scope (nullable without folders = all visible spaces). Spaces the user
      * cannot see are filtered out by the service, never by the caller.
      */
     private List<Long> spaceIds;
+
+    /** Selected WIKI folders; each includes its descendant folders. */
+    private List<Long> folderIds;
 
     /**
      * Top-K, falls back to the configured default.

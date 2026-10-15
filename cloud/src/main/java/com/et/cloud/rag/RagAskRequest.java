@@ -13,9 +13,12 @@ public class RagAskRequest {
     private String query;
 
     /**
-     * Optional scope; null/empty = all visible spaces.
+     * Optional whole-space scope; null/empty with no folders = all visible spaces.
      */
     private List<Long> spaceIds;
+
+    /** Optional folder subtree scope, combined with selected spaces. */
+    private List<Long> folderIds;
 
     private Integer topK;
 

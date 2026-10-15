@@ -37,6 +37,7 @@ public class AgentPreviewController {
         public String conversationId;
         public String ragMode = "OFF";
         public List<String> spaceIds;
+        public List<String> folderIds;
         public Ask() { }
         public Ask(String query) { this.query = query; }
     }
@@ -83,22 +84,34 @@ public class AgentPreviewController {
         if (!Arrays.asList("OFF", "ALL", "SELECTED").contains(mode)) throw new IllegalArgumentException("Invalid RAG mode");
 
         List<Long> selected = new ArrayList<>();
+        List<Long> selectedFolders = new ArrayList<>();
         if ("SELECTED".equals(mode)) {
-            if (ask.spaceIds == null || ask.spaceIds.isEmpty()) throw new IllegalArgumentException("Select at least one space");
+            if ((ask.spaceIds == null || ask.spaceIds.isEmpty()) &&
+                    (ask.folderIds == null || ask.folderIds.isEmpty()))
+                throw new IllegalArgumentException("Select at least one space or folder");
             Set<Long> visible = new HashSet<>(spaces.listVisibleSpaceIds(user));
-            for (String id : ask.spaceIds) {
-                long parsed = Long.parseLong(id);
-                if (visible.contains(parsed) && !selected.contains(parsed)) selected.add(parsed);
+            if (ask.spaceIds != null) {
+                for (String id : ask.spaceIds) {
+                    long parsed = Long.parseLong(id);
+                    if (visible.contains(parsed) && !selected.contains(parsed)) selected.add(parsed);
+                }
+            }
+            if (ask.folderIds != null) {
+                for (String id : ask.folderIds) {
+                    long parsed = Long.parseLong(id);
+                    if (!selectedFolders.contains(parsed)) selectedFolders.add(parsed);
+                }
             }
         }
 
         List<RagCitation> citations = new ArrayList<>();
         String evidence = null;
         RagSearchResult result = null;
-        if (!"OFF".equals(mode) && !("SELECTED".equals(mode) && selected.isEmpty())) {
+        if (!"OFF".equals(mode) && !("SELECTED".equals(mode) && selected.isEmpty() && selectedFolders.isEmpty())) {
             RagSearchRequest requestSearch = new RagSearchRequest();
             requestSearch.setQuery(ask.query);
             requestSearch.setSpaceIds("ALL".equals(mode) ? null : selected);
+            requestSearch.setFolderIds("ALL".equals(mode) ? null : selectedFolders);
             requestSearch.setTopK(6);
             result = search.search(user, requestSearch);
             StringBuilder builder = new StringBuilder();
@@ -121,7 +134,10 @@ public class AgentPreviewController {
         }
 
         List<Map<String, Object>> history = store.recentCompleted(user.getId(), conversationId);
-        String idsJson = json(ask.spaceIds == null ? Collections.emptyList() : ask.spaceIds);
+        Map<String, Object> scopeSnapshot = new LinkedHashMap<>();
+        scopeSnapshot.put("spaceIds", ask.spaceIds == null ? Collections.emptyList() : ask.spaceIds);
+        scopeSnapshot.put("folderIds", ask.folderIds == null ? Collections.emptyList() : ask.folderIds);
+        String idsJson = json(scopeSnapshot);
         long turnId = store.begin(user.getId(), conversationId, ask.query, mode, idsJson);
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("conversationId", Long.toString(conversationId));

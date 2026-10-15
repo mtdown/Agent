@@ -17,6 +17,9 @@ public interface VectorStore {
      */
     List<ChunkHit> search(float[] queryVector, Set<Long> spaceIds, int topK);
 
+    /** Limits candidates by document before top-K selection. */
+    List<ChunkHit> search(float[] queryVector, Set<Long> spaceIds, Set<Long> docIds, int topK);
+
     /**
      * Notifies the store that chunks of the given space changed (indexing,
      * invalidation, restore, delete) so it can reload its cache.
