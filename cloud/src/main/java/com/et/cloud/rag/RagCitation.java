@@ -1,6 +1,8 @@
 package com.et.cloud.rag;
 
 import lombok.Data;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 /**
  * Citation metadata sent in the SSE meta event. The index matches the [n]
@@ -12,6 +14,7 @@ public class RagCitation {
 
     private int index;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long docId;
 
     private String docTitle;

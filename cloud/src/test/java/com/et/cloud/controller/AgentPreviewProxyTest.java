@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Collections;
+import com.et.cloud.rag.RagCitation;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentPreviewProxyTest {
@@ -26,9 +28,14 @@ class AgentPreviewProxyTest {
         try {
             AgentPreviewProxy proxy = new AgentPreviewProxy("http://127.0.0.1:" + server.getAddress().getPort(), "secret");
             ByteArrayOutputStream output = new ByteArrayOutputStream();
-            proxy.stream("question").writeTo(output);
+            RagCitation citation = new RagCitation();
+            citation.setDocId(2095512793587744770L);
+            proxy.stream(Collections.singletonMap("query", "question"),
+                    Collections.singletonMap("citations", Collections.singletonList(citation)), null).writeTo(output);
             assertEquals("secret", key.get());
             assertTrue(output.toString(StandardCharsets.UTF_8.name()).contains("event: delta"));
+            assertTrue(output.toString(StandardCharsets.UTF_8.name())
+                    .contains("\"docId\":\"2095512793587744770\""));
             assertTrue(output.toString(StandardCharsets.UTF_8.name()).contains("\"firstAnswerMs\":"));
             assertTrue(output.toString(StandardCharsets.UTF_8.name()).contains("\"totalMs\":"));
         } finally { server.stop(0); }

@@ -398,6 +398,7 @@ import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController'
 import { listFolderTreeUsingGet } from '@/api/wikiFolderController'
 import { getDocumentWikiVisByIdUsingGet } from '@/api/documentWikiController'
 import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
+import { parseCitationSnapshot } from './citationIds'
 import {
   groupSpaces,
   groupSelectionState,
@@ -571,7 +572,7 @@ const openAgentConversation = async (id?: string) => {
       content: item.content,
       status: item.status === 'DONE' ? 'done' : item.status === 'FAILED' ? 'error' : 'streaming',
       error: item.status === 'FAILED' ? '上次生成未完成' : undefined,
-      citations: readJson<RagCitation[]>(item.citationsJson) ?? [],
+      citations: parseCitationSnapshot(item.citationsJson),
       stats: readJson<ChatStats>(item.statsJson),
     }))
     await scrollToBottom()
@@ -831,7 +832,7 @@ const docPanelBodyRef = ref<HTMLElement>()
 const docPreview = ref<{
   open: boolean
   loading: boolean
-  docId?: number
+  docId?: string
   title: string
   docNumber?: string
   content?: string
@@ -848,7 +849,7 @@ const openCitation = (citation: RagCitation) => {
 }
 
 const openDocPanel = async (
-  docId: number,
+  docId: string,
   title: string,
   docNumber?: string,
   chunkText?: string,

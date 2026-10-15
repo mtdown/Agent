@@ -12,7 +12,7 @@ export const apiBaseUrl = (request.defaults.baseURL || window.location.origin) a
 /** 检索命中 / 引用元数据 */
 export interface RagCitation {
   index: number
-  docId: number
+  docId: string
   docTitle: string
   docNumber?: string
   chunkIndex?: number
