@@ -13,6 +13,8 @@ import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 /** Copies private Agent SSE bytes promptly and closes upstream on browser disconnect. */
 @Component
@@ -25,13 +27,23 @@ public class AgentPreviewProxy {
         this.baseUrl = baseUrl; this.internalKey = internalKey;
     }
     public StreamingResponseBody stream(String query) {
+        return stream(java.util.Collections.singletonMap("query", query), null, null);
+    }
+    public StreamingResponseBody stream(Map<String, Object> payload, Map<String, Object> meta,
+                                        BiConsumer<Boolean, String[]> completed) {
         long startedAt = System.nanoTime();
         return out -> {
+            StringBuilder answer = new StringBuilder();
+            String[] finalStats = {null};
+            boolean success = false;
             if (internalKey == null || internalKey.isEmpty()) {
-                sendError(out, "Agent service credential is not configured"); return;
+                sendError(out, "Agent service credential is not configured");
+                if (completed != null) completed.accept(false, new String[]{"", null});
+                return;
             }
             try {
-                byte[] requestBody = JSON.writeValueAsBytes(java.util.Collections.singletonMap("query", query));
+                if (meta != null) writeFrame(out, "event: meta\ndata: " + JSON.writeValueAsString(meta) + "\n\n");
+                byte[] requestBody = JSON.writeValueAsBytes(payload);
                 HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/internal/agent/stream"))
                         .timeout(Duration.ofMinutes(3))
                         .header("X-Agent-Key", internalKey)
@@ -66,8 +78,16 @@ public class AgentPreviewProxy {
                             if (firstAnswerMs == null) done.putNull("firstAnswerMs");
                             else done.put("firstAnswerMs", firstAnswerMs);
                             done.put("totalMs", elapsedMs(startedAt));
+                            finalStats[0] = JSON.writeValueAsString(done);
+                            success = true;
                             writeFrame(out, "event: done\ndata: " + JSON.writeValueAsString(done) + "\n\n");
                         } else {
+                            if ("delta".equals(event)) {
+                                for (String part : frame.toString().split("\n")) if (part.startsWith("data:")) {
+                                    com.fasterxml.jackson.databind.JsonNode node = JSON.readTree(part.substring(5).trim());
+                                    if (node.has("content")) answer.append(node.get("content").asText());
+                                }
+                            }
                             writeFrame(out, frame.toString() + '\n');
                         }
                         frame.setLength(0);
@@ -80,6 +100,8 @@ public class AgentPreviewProxy {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
                 sendError(out, "Agent service unavailable");
+            } finally {
+                if (completed != null) completed.accept(success, new String[]{answer.toString(), finalStats[0]});
             }
         };
     }

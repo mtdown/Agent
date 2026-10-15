@@ -52,6 +52,13 @@ export interface RagAskRequest {
   deepThinking?: boolean
 }
 
+export interface AgentAskRequest {
+  query: string
+  conversationId?: string
+  ragMode: 'OFF' | 'ALL' | 'SELECTED'
+  spaceIds?: string[]
+}
+
 export interface RagAskUsage {
   promptTokens?: number
   completionTokens?: number
@@ -95,6 +102,7 @@ export interface RagAskDone {
 }
 
 export interface RagAskMeta {
+  conversationId?: string
   effectiveSpaceIds?: number[]
   authorizedDocCount?: number
   citations?: RagCitation[]
@@ -157,7 +165,15 @@ export async function ragAskUsingStream(
   body: RagAskRequest,
   handlers: RagAskHandlers,
   signal?: AbortSignal,
-  path = '/api/rag/ask',
+): Promise<void> {
+  return streamAsk(body, handlers, signal, '/api/rag/ask')
+}
+
+async function streamAsk(
+  body: RagAskRequest | AgentAskRequest,
+  handlers: RagAskHandlers,
+  signal: AbortSignal | undefined,
+  path: string,
 ): Promise<void> {
   const base = (request.defaults.baseURL || '') as string
   const resp = await fetch(base + path, {
@@ -189,11 +205,38 @@ export async function ragAskUsingStream(
 }
 
 export async function agentAskUsingStream(
-  query: string,
+  body: AgentAskRequest,
   handlers: RagAskHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  return ragAskUsingStream({ query }, handlers, signal, '/api/agent/stream')
+  return streamAsk(body, handlers, signal, '/api/agent/stream')
+}
+
+export interface AgentConversation { id: string; title: string; createTime: string; updateTime: string }
+export interface AgentStoredMessage {
+  id: string
+  turnId: string
+  role: 'user' | 'assistant'
+  content: string
+  status: 'PENDING' | 'DONE' | 'FAILED'
+  citationsJson?: string | null
+  statsJson?: string | null
+}
+export async function listAgentConversations() {
+  return request<{ data: AgentConversation[] }>('/api/agent/conversations', { method: 'GET' })
+}
+export async function getAgentConversation(id: string) {
+  return request<{ data: AgentStoredMessage[] }>(`/api/agent/conversations/${id}`, { method: 'GET' })
+}
+export async function createAgentConversation() {
+  return request<{ data: string }>('/api/agent/conversations', { method: 'POST' })
+}
+export async function deleteAgentConversation(id: string) {
+  return request<{ data: boolean }>(`/api/agent/conversations/${id}`, { method: 'DELETE' })
+}
+
+export async function renameAgentConversation(id: string, title: string) {
+  return request<{ data: boolean }>(`/api/agent/conversations/${id}`, { method: 'PATCH', data: { title } })
 }
 
 function handleFrame(frame: string, handlers: RagAskHandlers) {

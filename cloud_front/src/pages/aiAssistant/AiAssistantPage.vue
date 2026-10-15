@@ -1,6 +1,25 @@
 <template>
-  <div class="ai-assistant-page" :class="{ 'with-doc': docPreview.open }">
+  <div class="ai-assistant-page" :class="{ 'with-doc': docPreview.open, 'agent-mode': agentPreview }">
     <div class="main-row">
+      <aside v-if="agentPreview" class="conversation-sidebar">
+        <a-button class="new-chat-button" :disabled="streaming" @click="newAgentConversation"><PlusOutlined /> 新聊天</a-button>
+        <div class="conversation-heading">历史对话</div>
+        <div class="conversation-list">
+          <div v-for="conversation in agentConversations" :key="conversation.id" class="conversation-item" :class="{ active: agentConversationId === conversation.id }">
+            <button class="conversation-title" type="button" :title="conversation.title" :disabled="streaming" @click="selectAgentConversation(conversation.id)">{{ conversation.title }}</button>
+            <a-dropdown :trigger="['click']" :disabled="streaming">
+              <a-button type="text" size="small" class="conversation-more" aria-label="对话操作" @click.stop><EllipsisOutlined /></a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="startRenameConversation(conversation)"><EditOutlined /> 重命名</a-menu-item>
+                  <a-menu-item danger @click="confirmRemoveConversation(conversation)"><DeleteOutlined /> 删除</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+          </div>
+          <div v-if="agentConversations.length === 0" class="conversation-empty">暂无历史对话</div>
+        </div>
+      </aside>
       <div class="panel">
         <!-- 顶栏：范围选择 + 模式开关 -->
         <div class="scope-bar">
@@ -10,7 +29,7 @@
           </div>
           <a-checkbox
             :checked="allSpaces"
-            :disabled="agentPreview"
+            :disabled="agentPreview && !agentRagEnabled"
             :indeterminate="!allSpaces && selectedSpaceIds.length > 0"
             @change="toggleAllSpaces"
           >
@@ -18,7 +37,7 @@
           </a-checkbox>
           <a-checkbox-group
             v-model:value="selectedSpaceIds"
-            :disabled="allSpaces"
+            :disabled="allSpaces || (agentPreview && !agentRagEnabled)"
             class="space-group"
             :options="spaceOptions"
           />
@@ -26,6 +45,10 @@
             本次检索：{{ lastMeta.effectiveSpaceIds?.length ?? 0 }} 个空间 /
             {{ lastMeta.authorizedDocCount ?? 0 }} 篇授权文档
           </a-tag>
+          <div class="thinking-switch" v-if="agentPreview">
+            <a-switch v-model:checked="agentRagEnabled" size="small" />
+            <span class="thinking-label">引用知识库</span>
+          </div>
           <div class="thinking-switch" v-if="!agentPreview">
             <a-switch v-model:checked="deepThinking" size="small" />
             <span class="thinking-label">深度思考</span>
@@ -53,7 +76,7 @@
               </a-tag>
             </div>
             <p class="hint-scope">
-              {{ agentPreview ? '当前预览尚未接入知识库，回答不代表政策文档依据。' : '回答仅基于所选空间内已授权文档，引用文号可点击在右侧打开原文。' }}
+              {{ agentPreview ? '可选择是否引用已授权知识库；对话仅本人可见。' : '回答仅基于所选空间内已授权文档，引用文号可点击在右侧打开原文。' }}
             </p>
           </div>
 
@@ -212,6 +235,10 @@
       </div>
     </div>
 
+    <a-modal v-model:open="renameDialog.open" title="重命名对话" ok-text="保存" cancel-text="取消" :confirm-loading="renameDialog.saving" @ok="saveConversationName">
+      <a-input v-model:value="renameDialog.title" :maxlength="160" show-count placeholder="输入对话名称" @press-enter="saveConversationName" />
+    </a-modal>
+
     <!-- 开放 API Key 管理抽屉 -->
     <a-drawer
       v-model:open="keyDrawer.open"
@@ -301,7 +328,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import {
   ApiOutlined,
   CloseOutlined,
@@ -310,10 +337,21 @@ import {
   RobotOutlined,
   UserOutlined,
   WarningOutlined,
+  PlusOutlined,
+  EllipsisOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons-vue'
-import { message as antMessage } from 'ant-design-vue'
+import { message as antMessage, Modal } from 'ant-design-vue'
 import {
   agentAskUsingStream,
+  listAgentConversations,
+  getAgentConversation,
+  createAgentConversation,
+  deleteAgentConversation,
+  renameAgentConversation,
+  type AgentConversation,
+  type AgentStoredMessage,
   ragAskUsingStream,
   type RagAskMeta,
   type RagAskUsage,
@@ -340,6 +378,10 @@ const selectedSpaceIds = ref<number[]>([])
 const allSpaces = ref(true)
 const deepThinking = ref(false)
 const agentPreview = ref(false)
+const agentRagEnabled = ref(false)
+const agentConversationId = ref<string | undefined>()
+const agentConversations = ref<AgentConversation[]>([])
+const renameDialog = reactive({ open: false, saving: false, id: '', title: '' })
 
 const spaceOptions = computed(() => spaces.value)
 
@@ -407,12 +449,93 @@ interface ChatMessage {
   trace?: ChatTrace
 }
 
-const messages = ref<ChatMessage[]>([])
+const ragMessages = ref<ChatMessage[]>([])
+const agentMessages = ref<ChatMessage[]>([])
+const messages = computed(() => agentPreview.value ? agentMessages.value : ragMessages.value)
 const inputText = ref('')
 const streaming = ref(false)
 const lastMeta = ref<RagAskMeta | null>(null)
 const messageListRef = ref<HTMLElement>()
 const abortController = ref<AbortController | null>(null)
+
+const loadAgentConversations = async () => {
+  try {
+    const response = await listAgentConversations()
+    agentConversations.value = response.data.data ?? []
+  } catch { antMessage.error('加载历史对话失败') }
+}
+const newAgentConversation = async () => {
+  if (streaming.value) return
+  try {
+    const response = await createAgentConversation()
+    agentConversationId.value = response.data.data
+    agentMessages.value = []
+    await loadAgentConversations()
+  } catch { antMessage.error('新建对话失败') }
+}
+const readJson = <T,>(value?: string | null): T | undefined => {
+  if (!value) return undefined
+  try { return JSON.parse(value) as T } catch { return undefined }
+}
+const selectAgentConversation = async (id: string) => {
+  if (streaming.value) return
+  agentConversationId.value = id
+  await openAgentConversation(id)
+}
+const openAgentConversation = async (id?: string) => {
+  if (!id) { agentMessages.value = []; return }
+  try {
+    const response = await getAgentConversation(id)
+    agentMessages.value = (response.data.data ?? []).map((item: AgentStoredMessage) => ({
+      agentPreview: true,
+      role: item.role,
+      content: item.content,
+      status: item.status === 'DONE' ? 'done' : item.status === 'FAILED' ? 'error' : 'streaming',
+      error: item.status === 'FAILED' ? '上次生成未完成' : undefined,
+      citations: readJson<RagCitation[]>(item.citationsJson) ?? [],
+      stats: readJson<ChatStats>(item.statsJson),
+    }))
+    await scrollToBottom()
+  } catch { antMessage.error('打开对话失败或无权限') }
+}
+const startRenameConversation = (conversation: AgentConversation) => {
+  renameDialog.id = conversation.id
+  renameDialog.title = conversation.title
+  renameDialog.open = true
+}
+const saveConversationName = async () => {
+  const title = renameDialog.title.trim()
+  if (!title) { antMessage.warning('请输入对话名称'); return }
+  renameDialog.saving = true
+  try {
+    await renameAgentConversation(renameDialog.id, title)
+    renameDialog.open = false
+    await loadAgentConversations()
+  } catch { antMessage.error('重命名失败') }
+  finally { renameDialog.saving = false }
+}
+const confirmRemoveConversation = (conversation: AgentConversation) => {
+  Modal.confirm({
+    title: '删除对话？',
+    content: `删除“${conversation.title}”后无法恢复。`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => removeAgentConversation(conversation.id),
+  })
+}
+const removeAgentConversation = async (id: string) => {
+  if (streaming.value) return
+  try {
+    await deleteAgentConversation(id)
+    if (agentConversationId.value === id) {
+      agentConversationId.value = undefined
+      agentMessages.value = []
+    }
+    await loadAgentConversations()
+  } catch { antMessage.error('删除对话失败') }
+}
+watch(agentPreview, (enabled) => { if (enabled) loadAgentConversations() })
 
 const sampleQuestions = [
   '渝府办发〔2026〕24号说了什么',
@@ -469,6 +592,16 @@ const traceSteps = (msg: ChatMessage): { label: string; ms?: number | null; skip
 const send = async () => {
   const query = inputText.value.trim()
   if (!query || streaming.value) return
+  if (agentPreview.value) {
+    if (agentRagEnabled.value && !allSpaces.value && selectedSpaceIds.value.length === 0) {
+      antMessage.warning('请至少选择一个知识库空间')
+      return
+    }
+    if (!agentConversationId.value) {
+      await newAgentConversation()
+      if (!agentConversationId.value) return
+    }
+  }
   inputText.value = ''
   streaming.value = true
   abortController.value = new AbortController()
@@ -492,7 +625,16 @@ const send = async () => {
   }
 
   try {
-    await (assistantMsg.agentPreview ? agentAskUsingStream(query, {
+    await (assistantMsg.agentPreview ? agentAskUsingStream({
+      query,
+      conversationId: agentConversationId.value,
+      ragMode: !agentRagEnabled.value ? 'OFF' : allSpaces.value ? 'ALL' : 'SELECTED',
+      spaceIds: agentRagEnabled.value && !allSpaces.value ? selectedSpaceIds.value.map(String) : undefined,
+    }, {
+      onMeta: (meta) => {
+        if (meta.conversationId) agentConversationId.value = meta.conversationId
+        assistantMsg.citations = meta.citations ?? []
+      },
       onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
       onDone: (done) => {
         assistantMsg.status = 'done'
@@ -571,6 +713,7 @@ const send = async () => {
   } finally {
     streaming.value = false
     abortController.value = null
+    if (assistantMsg.agentPreview) loadAgentConversations()
     scrollToBottom()
   }
 }
@@ -694,7 +837,9 @@ const onMarkerClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement
   if (target.classList?.contains('cite-marker')) {
     const index = Number(target.dataset.index)
-    const hit = lastMeta.value?.citations?.find((c) => c.index === index)
+    const row = target.closest('.message-row')
+    const rowIndex = row ? Array.from(messageListRef.value?.querySelectorAll('.message-row') ?? []).indexOf(row) : -1
+    const hit = messages.value[rowIndex]?.citations?.find((c) => c.index === index)
     if (hit) {
       openCitation(hit)
       return
@@ -807,6 +952,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.conversation-sidebar {
+  flex: 0 0 220px;
+  min-width: 0;
+  height: calc(100vh - 190px);
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  background: #fffdf8;
+  border: 1px solid #e8dcc8;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(120, 90, 40, 0.08);
+}
+.new-chat-button { width: 100%; text-align: left; }
+.conversation-heading { padding: 18px 8px 8px; color: #8a7a5f; font-size: 12px; }
+.conversation-list { overflow-y: auto; min-height: 0; }
+.conversation-item { display: flex; align-items: center; border-radius: 8px; margin-bottom: 3px; }
+.conversation-item:hover, .conversation-item.active { background: #f7efe0; }
+.conversation-title { flex: 1; min-width: 0; border: 0; background: transparent; padding: 10px 8px; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4a3b22; }
+.conversation-title:disabled { cursor: default; }
+.conversation-more { flex: 0 0 auto; color: #8a7a5f; }
+.conversation-empty { padding: 10px 8px; color: #a89a7f; font-size: 13px; }
 .ai-assistant-page {
   max-width: 960px;
   margin: 0 auto;
@@ -817,6 +984,8 @@ onMounted(() => {
 .ai-assistant-page.with-doc {
   max-width: 1400px;
 }
+.ai-assistant-page.agent-mode { max-width: 1220px; }
+.ai-assistant-page.agent-mode.with-doc { max-width: 1580px; }
 
 .main-row {
   display: flex;
@@ -1401,6 +1570,9 @@ onMounted(() => {
 }
 
 @media (max-width: 760px) {
+  .main-row:has(.conversation-sidebar) { flex-direction: column; }
+  .conversation-sidebar { flex: 0 0 auto; height: auto; min-height: 0; max-height: 220px; }
+  .conversation-list { overflow-y: auto; }
   .bubble {
     max-width: 88%;
   }

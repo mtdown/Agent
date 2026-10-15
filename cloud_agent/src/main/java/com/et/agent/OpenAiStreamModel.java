@@ -8,12 +8,22 @@ import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /** OpenAI-compatible SSE chat adapter; accepts optional tool-call fragments. */
 public final class OpenAiStreamModel implements AgentLoop.Model {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ScheduledExecutorService DEADLINES = Executors.newSingleThreadScheduledExecutor(task -> {
+        Thread thread = new Thread(task, "agent-model-deadline");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final HttpClient client;
     private final String baseUrl, apiKey, model;
     private final long timeoutMs;
@@ -25,9 +35,14 @@ public final class OpenAiStreamModel implements AgentLoop.Model {
 
     @Override public AgentLoop.Turn stream(List<AgentLoop.Message> history, Consumer<String> delta, BooleanSupplier cancelled) {
         if (apiKey == null || apiKey.isEmpty()) throw new IllegalStateException("Agent model API key is not configured");
+        long started = System.nanoTime();
+        AtomicBoolean timedOut = new AtomicBoolean();
+        ScheduledFuture<?> deadline = null;
         try {
             ObjectNode body = JSON.createObjectNode();
             body.put("model", model); body.put("stream", true);
+            body.put("max_tokens", 2048);
+            if (model.startsWith("deepseek-")) body.putObject("thinking").put("type", "disabled");
             body.putObject("stream_options").put("include_usage", true);
             ArrayNode messages = body.putArray("messages");
             for (AgentLoop.Message entry : history) {
@@ -53,12 +68,18 @@ public final class OpenAiStreamModel implements AgentLoop.Model {
             HttpResponse<java.util.stream.Stream<String>> response = client.send(request, HttpResponse.BodyHandlers.ofLines());
             try (java.util.stream.Stream<String> lines = response.body()) {
                 if (response.statusCode() != 200) throw new IllegalStateException("Model HTTP " + response.statusCode());
+                long remaining = Math.max(1, timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+                deadline = DEADLINES.schedule(() -> {
+                    timedOut.set(true);
+                    lines.close();
+                }, remaining, TimeUnit.MILLISECONDS);
                 Parser parser = new Parser(delta);
                 Iterator<String> iterator = lines.iterator();
                 while (iterator.hasNext()) {
                     if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new AgentLoop.Cancelled();
                     parser.accept(iterator.next());
                 }
+                if (timedOut.get()) throw new IllegalStateException("Model stream timed out after " + timeoutMs + " ms");
                 return parser.finish();
             }
         } catch (InterruptedException e) {
@@ -66,7 +87,10 @@ public final class OpenAiStreamModel implements AgentLoop.Model {
         } catch (AgentLoop.Cancelled | IllegalArgumentException | IllegalStateException e) {
             throw e;
         } catch (Exception e) {
+            if (timedOut.get()) throw new IllegalStateException("Model stream timed out after " + timeoutMs + " ms", e);
             throw new IllegalStateException("Model stream failed: " + e.getMessage(), e);
+        } finally {
+            if (deadline != null) deadline.cancel(false);
         }
     }
 

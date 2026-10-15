@@ -7,6 +7,9 @@ server:
         max-age: 2592000
 
 spring:
+  mvc:
+    async:
+      request-timeout: 210s
   application:
     name: cloud
   # Session 配置 (使用 Redis 存储，与本地保持一致)
