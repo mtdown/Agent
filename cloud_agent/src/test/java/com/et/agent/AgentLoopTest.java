@@ -6,6 +6,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentLoopTest {
+    @Test void sendsOnlySuppliedHistoryAndCurrentEvidence() {
+        AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {
+            assertEquals("user", history.get(1).role);
+            assertEquals("first question", history.get(1).content);
+            assertEquals("assistant", history.get(2).role);
+            assertTrue(history.get(3).content.contains("[1] source"));
+            assertEquals("follow up", history.get(4).content);
+            return new AgentLoop.Turn(Collections.emptyList(), null);
+        }, Collections.emptyMap(), 2, 10000, 1000);
+        loop.run("follow up", Arrays.asList(
+                new AgentLoop.Message("user", "first question", null, null),
+                new AgentLoop.Message("assistant", "first answer", null, null)),
+                "[1] source", text -> {}, () -> false);
+    }
     @Test void streamsFinalAnswerAndUsage() {
         List<String> chunks = new ArrayList<>();
         AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {

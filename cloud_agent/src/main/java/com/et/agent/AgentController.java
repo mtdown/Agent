@@ -25,8 +25,14 @@ public final class AgentController {
     public AgentController(AgentLoop loop, @Value("${agent.internal-key}") String secret) { this.loop = loop; this.secret = secret; }
     public static final class Ask {
         public String query;
+        public java.util.List<History> history;
+        public String evidence;
         public Ask() { }
         public Ask(String query) { this.query = query; }
+    }
+    public static final class History {
+        public String role;
+        public String content;
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -40,7 +46,12 @@ public final class AgentController {
         return out -> {
             AtomicBoolean disconnected = new AtomicBoolean(false);
             try {
-                AgentLoop.Result result = loop.run(ask.query, chunk -> {
+                java.util.List<AgentLoop.Message> prior = new java.util.ArrayList<>();
+                if (ask.history != null) for (History item : ask.history) {
+                    if (item != null && ("user".equals(item.role) || "assistant".equals(item.role)) && item.content != null)
+                        prior.add(new AgentLoop.Message(item.role, item.content, null, null));
+                }
+                AgentLoop.Result result = loop.run(ask.query, prior, ask.evidence, chunk -> {
                     try { send(out, "delta", one("content", chunk)); }
                     catch (IOException e) { disconnected.set(true); throw new UncheckedIOException(e); }
                 }, disconnected::get);
