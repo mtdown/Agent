@@ -27,12 +27,19 @@ jobs:
         working-directory: cloud
         run: mvn -B -DskipTests package
 
+      - name: 构建 Agent jar
+        working-directory: cloud_agent
+        run: mvn -B -DskipTests package
+
       - name: 准备 Node 22
         uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: cloud_front/package-lock.json
+
+      - name: 校验 Agent 部署配置
+        run: node agentDeployment.test.mjs
 
       - name: 构建前端产物
         working-directory: cloud_front
@@ -46,8 +53,9 @@ jobs:
         run: |
           rm -rf bundle && mkdir -p bundle/dist
           cp cloud/target/cloud-0.0.1-SNAPSHOT.jar bundle/app.jar
+          cp cloud_agent/target/cloud-agent-0.0.1-SNAPSHOT.jar bundle/agent.jar
           cp -r cloud_front/dist/. bundle/dist/
-          cp deploy/Dockerfile deploy/docker-compose.yml deploy/nginx.conf \
+          cp deploy/Dockerfile deploy/AgentDockerfile deploy/docker-compose.yml deploy/nginx.conf \
              deploy/schema-init.sql deploy/deploy.sh bundle/
 
       - name: 生成服务器 .env（值只来自 Secrets，不落日志）
@@ -58,9 +66,14 @@ jobs:
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           RAG_EMBEDDING_API_KEY: ${{ secrets.RAG_EMBEDDING_API_KEY }}
           RAG_LLM_API_KEY: ${{ secrets.RAG_LLM_API_KEY }}
+          AGENT_INTERNAL_KEY: ${{ secrets.AGENT_INTERNAL_KEY }}
           DOC_USERNAME: ${{ secrets.DOC_USERNAME }}
           DOC_PASSWORD: ${{ secrets.DOC_PASSWORD }}
         run: |
+          [ -n "$RAG_LLM_API_KEY" ] || { echo "::error::Secret RAG_LLM_API_KEY is required for Agent"; exit 1; }
+          if [ -z "$AGENT_INTERNAL_KEY" ]; then
+            AGENT_INTERNAL_KEY="$(openssl rand -hex 32)"
+          fi
           # 用 printf 而不是 heredoc：避免密钥里的特殊字符被 shell 解析
           {
             printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD"
@@ -69,6 +82,7 @@ jobs:
             printf 'COS_SECRET_KEY=%s\n' "$COS_SECRET_KEY"
             printf 'RAG_EMBEDDING_API_KEY=%s\n' "$RAG_EMBEDDING_API_KEY"
             printf 'RAG_LLM_API_KEY=%s\n' "$RAG_LLM_API_KEY"
+            printf 'AGENT_INTERNAL_KEY=%s\n' "$AGENT_INTERNAL_KEY"
             printf 'DOC_USERNAME=%s\n' "${DOC_USERNAME:-admin}"
             printf 'DOC_PASSWORD=%s\n' "$DOC_PASSWORD"
             printf 'HTTP_PORT=8080\n'
@@ -120,6 +134,9 @@ jobs:
           ssh $SSH_OPTS "$USER@$HOST" '
             set -e
             cd /opt/cloudwiki
+            for file in app.jar agent.jar docker-compose.yml Dockerfile AgentDockerfile; do
+              if [ -f "$file" ]; then cp -f "$file" "$file.bak"; fi
+            done
             tar xzf bundle.tar.gz
             rm -f bundle.tar.gz
             bash deploy.sh

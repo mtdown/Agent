@@ -11,11 +11,14 @@ if [ ! -f app.jar.bak ]; then
   exit 1
 fi
 
-echo "==> 恢复到上一版 jar"
+echo "==> 恢复到上一版后端与 Agent 部署文件"
 cp -f app.jar.bak app.jar
+for file in agent.jar docker-compose.yml Dockerfile AgentDockerfile; do
+  if [ -f "$file.bak" ]; then cp -f "$file.bak" "$file"; fi
+done
 
-echo "==> 重建并启动后端（数据库与 Nginx 不受影响）"
-docker compose up -d --build backend
+echo "==> 重建并启动上一版服务（数据库卷不受影响）"
+docker compose up -d --build --remove-orphans
 
 echo "==> 容器状态"
 docker compose ps

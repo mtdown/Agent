@@ -2,7 +2,7 @@
 
 ## 一句话
 
-代码推送到 GitHub → GitHub Actions 自动构建（后端 jar + 前端 dist）→ SSH 上传到阿里云 ECS → Docker Compose 重启容器。全程无人值守，本机不再需要跑任何东西。
+代码推送到 GitHub → GitHub Actions 自动构建（后端 jar + Agent jar + 前端 dist）→ SSH 上传到阿里云 ECS → Docker Compose 重启容器。全程无人值守，本机不再需要跑任何东西。
 
 ## 架构
 
@@ -16,10 +16,11 @@ Nginx 容器（托管前端 dist，转发 /api）
 后端容器（Spring Boot 8123，context-path=/api）
     │  内网
     ├──► MySQL 9.4 容器（库名 picture，数据卷持久化）
-    └──► Redis 7 容器（session + Sa-Token，设密码）
+    ├──► Redis 7 容器（session + Sa-Token，设密码）
+    └──► Agent 容器（8124，仅容器内网；共享内部密钥）
 
 对外只暴露 8080（备案后改 80/443）。
-3306 / 6379 / 8123 一律不映射到宿主机，数据库与缓存不暴露公网。
+3306 / 6379 / 8123 / 8124 一律不映射到宿主机，数据库、缓存与 Agent 不暴露公网。
 ```
 
 ## 首次部署（一次性）
@@ -63,7 +64,10 @@ Settings → Secrets and variables → Actions：
 | `COS_SECRET_ID` / `COS_SECRET_KEY` | 可留空，compose 会兜底占位值 |
 | `RAG_EMBEDDING_API_KEY` | DashScope（embedding + rerank 共用） |
 | `RAG_LLM_API_KEY` | 回答生成模型 |
+| `AGENT_INTERNAL_KEY` | 可选；后端和 Agent 的共享内部密钥。未填时 CI 每次部署生成随机值，不会写入日志或仓库 |
 | `DOC_USERNAME` / `DOC_PASSWORD` | knife4j 接口文档口令（密码必填） |
+
+后端与 Agent 的快速模型默认使用 `deepseek-flash`；部署 Compose 也固定传入该模型名。
 
 **3. 推送代码**
 
@@ -94,6 +98,8 @@ GitHub Actions 页面也支持 `Run workflow` 手动触发（无需新提交）�
 ```
 /opt/cloudwiki/
 ├── app.jar            当前后端（app.jar.bak 是上一版，用于回滚）
+├── agent.jar          当前 Agent（后续部署保留 agent.jar.bak）
+├── AgentDockerfile    Agent 运行镜像定义
 ├── dist/              前端静态产物
 ├── Dockerfile
 ├── docker-compose.yml
@@ -112,7 +118,13 @@ MySQL 首次启动且数据卷为空时，会自动执行 `schema-init.sql` 建 
 cd /opt/cloudwiki && bash rollback.sh
 ```
 
-把 `app.jar.bak` 换回并重启后端容器，数据不受影响。
+恢复上一版后端、Agent jar 与 Compose 配置并重启服务，数据卷不受影响。首次升级到 Agent 版本时没有 `agent.jar.bak`；回滚会恢复升级前的 Compose 配置，移除 Agent 容器。
+
+## 本地 main 验收与任务分支
+
+`start-main-dev.ps1` 需要先切换到 `main`，因此必须在**干净的工作区**执行。若当前任务分支有已暂存、未暂存或未跟踪的文件，先由负责人决定保留、提交或丢弃；脚本和 Git 都不会替你覆盖这些文件。只看当前分支效果可使用脚本已有的 `-Stay` 参数，但它不是 main 效果验收。
+
+Agent 上线后，负责人需要在 `/aiAssistant` 登录并发送一条问题，确认流式回答和历史记录正常；部署脚本只能检查容器运行，无法替代这项页面验收。
 
 ## 排障
 
