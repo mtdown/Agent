@@ -82,6 +82,8 @@
 
 上传前检查（2026-10-16）：发现 `AgentConversationStore.java` 在本次页面工作期间被改回旧版 `JdbcTemplate`，内容与旧提交 `44e20f0` 完全一致，不属于本次页面改动。经负责人明确同意，仅恢复此文件至当前分支已提交的实体 + Mapper 版本，`git diff --quiet` 确认无差异；IssueLog.xlsx 第 227 行记录该问题。页面与 OpenSpec 改动继续上传。
 
+归档准备（2026-10-16）：负责人确认先同步主规格再归档。新增 `agent-conversation` 主规格并向 `ai-assistant-chat` 主规格追加本 change 的三条要求；独立逐条对照确认两份增量规格共六条要求与主规格一致，`openspec validate --specs` 29 项通过、0 失败。首次对照命令的引号错误已按 AGENTS.md 第 4 节汇报、获准修正并重测，IssueLog.xlsx 第 228 行结案。再次检查 `AgentConversationStore.java` 与当前 HEAD 哈希一致，未把旧版 `JdbcTemplate` 带入归档提交。
+
 ## Rollback
 
 回退 Cloud、Cloud Agent 与前端版本；新表暂不删除以保留会话数据。
