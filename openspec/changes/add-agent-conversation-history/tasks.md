@@ -23,12 +23,14 @@
 - [x] 3.7 修复模型 SSE 响应体阻塞时 Agent 截止时间失效的问题，并为 DeepSeek Flash 显式关闭默认思考模式；以本地假上游验证超时错误帧与正常增量。
 - [x] 3.8 将检索范围改为公共、团队、个人三组下拉复选；组可全选、子空间可单选，半选状态正确，并保证大整数空间 ID 原样发送。子空间弹层支持连续多选且右侧与展开按钮对齐。步骤：先写状态转换和 ID 精度的失败测试；实现选择逻辑与顶栏界面；执行定向测试、前端类型检查和构建；由负责人在页面手测三组、组全选、连续子项多选及弹层定位。
 - [x] 3.9 让分类弹层展示 WIKI 空间与多级文件夹；支持组、空间、文件夹混选，文件夹检索严格限定本层及后代。步骤：先补前后端失败测试（权限、空范围、混选、候选过滤在 topK 前）；实现前端树、请求传输及 Cloud 过滤；执行定向与完整自动化验证；负责人手测个人/团队/公共目录的选择和引用结果。
+- [x] 3.10 AI 助手默认展示 Agent 历史与对话，隐藏经典 RAG 模式切换及其专属控件；保持 Agent 引用知识库可用。步骤：固定页面模式；在挂载时加载历史；检查切换入口不再渲染。
 
 ## 4. 集成验收
 
 - [x] 4.1 执行 OpenSpec 严格校验、后端单元测试/构建及前端类型检查，记录测试结果与问题至本文件和 IssueLog.xlsx。
 - [x] 4.2 自动化验证通过后按 stop-dev.ps1、start-dev.ps1 启动本地服务，列出地址、账号前提和负责人页面手测清单；负责人反馈前保持手测任务未完成。
 - [x] 4.3 按负责人本轮授权进行页面自测：新建、首问命名、重命名、删除、刷新恢复、本人隔离和流式问答。（负责人确认删除与权限隔离无须重复测试）
+- [x] 4.4 对默认 Agent 页面运行前端类型检查与构建；按项目脚本启动服务，交负责人确认首次打开、历史列表和引用知识库选择。
 
 ## Verification / Result
 
@@ -73,6 +75,12 @@
 实体与 Mapper 改造（2026-10-16，负责人明确选择并允许忽略历史引用标题追问）：新增两张表对应的实体与 Mapper，将 `AgentConversationStore` 的读写移到 Mapper，保持幂等 DDL、所有者过滤和现有返回格式。新增映射测试先因实体缺失呈红灯，实施后定向测试通过。原 `AgentConversationStoreTest` 仍使用 `JdbcTemplate` 构造函数，初次 testCompile 失败；已在本轮开发中同步更新，IssueLog.xlsx 第 225 行记录为已修复。Cloud `mvn -q verify` 通过（315 项，0 失败、0 错误），OpenSpec 严格校验和 `git diff --check` 通过；按脚本启动 8123/8124/3000 成功。实际接口双向权限检查仍通过。一次命令行 SSE 冒烟脚本没有从 PowerShell 响应对象匹配到 `event: done`，但同一轮已存为两条 `DONE` 消息且助手指标存在；现有 `AgentPreviewProxy` 会输出 done 帧，初步怀疑脚本对 `Invoke-WebRequest.Content` 的类型或编码处理有误，尚未证实。IssueLog.xlsx 第 226 行保留待处理；依据 AGENTS.md 第 4 节，先汇报并等负责人确认后再修正探针及重测，1.1 暂不勾选。历史引用标题追问按负责人决定不纳入本版本，不作代码修改。
 
 负责人浏览器手测（2026-10-16）：在 `POST /api/agent/stream` 的响应中直接看到 `meta`、`delta`（内容 `2`）和 `done`；`done` 包含 promptTokens 35、completionTokens 1、totalTokens 36、firstAnswerMs 555、totalMs 605。确认流式事件正常，前述 PowerShell 探针未匹配到事件不代表产品失败，IssueLog.xlsx 第 226 行结案。结合 DDL 幂等、实体与 Mapper、Cloud 315 项测试和实际接口权限检查，完成 1.1；本次未修改模型关于历史引用标题的回答。
+
+默认 Agent 界面（2026-10-16）：负责人批准固定展示 Agent，隐藏纯 RAG 页面入口。页面初始 `agentPreview=true`，移除模式切换及纯 RAG 深度思考开关，挂载时主动加载 Agent 历史；Agent 知识库开关、授权范围与引用入口保留。`npm run build`（含 `vue-tsc --build`）通过，OpenSpec 严格校验与 `git diff --check` 通过；按 `stop-dev.ps1` → `start-dev.ps1 -NoTunnel -NoPause` 启动 8123/8124/3000 成功。负责人页面手测待反馈，4.4 保持未完成。
+
+负责人页面验收（2026-10-16）：反馈“完美，上传”，确认默认 Agent 界面、历史列表及知识库入口符合预期；4.4 完成。此次前端仅隐藏经典 RAG 页面入口，原 RAG API 未修改。
+
+上传前检查（2026-10-16）：发现 `AgentConversationStore.java` 在本次页面工作期间被改回旧版 `JdbcTemplate`，内容与旧提交 `44e20f0` 完全一致，不属于本次页面改动。经负责人明确同意，仅恢复此文件至当前分支已提交的实体 + Mapper 版本，`git diff --quiet` 确认无差异；IssueLog.xlsx 第 227 行记录该问题。页面与 OpenSpec 改动继续上传。
 
 ## Rollback
 
