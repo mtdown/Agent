@@ -118,7 +118,9 @@ MySQL 首次启动且数据卷为空时，会自动执行 `schema-init.sql` 建 
 cd /opt/cloudwiki && bash rollback.sh
 ```
 
-恢复上一版后端、Agent jar 与 Compose 配置并重启服务，数据卷不受影响。首次升级到 Agent 版本时没有 `agent.jar.bak`；回滚会恢复升级前的 Compose 配置，移除 Agent 容器。
+恢复上一版后端、Agent jar、Compose 配置**与 `nginx.conf`** 并重启服务，数据卷不受影响。首次升级到 Agent 版本时没有 `agent.jar.bak`；回滚会恢复升级前的 Compose 配置，移除 Agent 容器。
+
+`nginx.conf` 是 bind mount，只把文件换回去不会自动生效，所以 `rollback.sh` 会补一次 `nginx -t` + `nginx -s reload`（校验不过就重建 Nginx 容器）。回滚结束时同时探首页和 `/api/user/get/login`，避免重演"首页 200 但接口 502"的假成功。
 
 ## 本地 main 验收与任务分支
 
@@ -132,7 +134,7 @@ Agent 上线后，负责人需要在 `/aiAssistant` 登录并发送一条问题�
 |---|---|
 | Actions 红灯 | 看 Actions 日志的 `[ERROR]` 行；**"Node 20 弃用警告"是干扰项，不会让 job 失败** |
 | Actions 红灯但站点其实是好的 | `deploy.sh` 健康检查只等 300 秒，超时会报红但容器仍在后台启动，**以 `docker compose ps` 为准** |
-| 首页能开、接口全 502 | 后端没起来。首页是 Nginx 吐静态文件，与后端无关；看 `docker compose logs --tail=120 backend` |
+| 首页能开、接口全 502 | **先别急着看后端日志**。取 `docker compose logs --tail=100 nginx` 里 error 行的 `upstream: "http://172.x.x.x:8123/..."`，与 `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cw-backend` 的当前 IP 对比：不一致就是 Nginx 缓存了旧后端地址（见下方"已踩过的坑"第 5 条）；一致再看 `docker compose logs --tail=120 backend` |
 | 后端反复重启 + `UnsupportedEncodingException: utf8mb4` | JDBC 的 `characterEncoding` 只认 Java 字符集名，必须写 `UTF-8`（见下方"已踩过的坑"） |
 | 后端反复重启（其他原因） | 多半是 Redis/MySQL 密码不一致，或某个必填环境变量为空（如 `DOC_PASSWORD`） |
 | 编译报 `cannot find symbol: toList()` 等 | 用了 Java 16+ API，但目标是 Java 11；本机 JDK 17 编得过、CI 的 JDK 11 编不过 |
@@ -153,6 +155,19 @@ Agent 上线后，负责人需要在 `/aiAssistant` 登录并发送一条问题�
    现在 `deploy.sh` 同时探 `/` 和 `/api/user/get/login`，后者非 000/502/503 才算后端活着。
 4. **首次部署 10–20 分钟属正常**（Maven/npm 无缓存 + 65MB jar 上传 + 拉取 MySQL 镜像）；
    之后每次 5–8 分钟。
+5. **Nginx 会把后端容器 IP 缓存到"配置加载那一刻"，后端重建后接口全 502**（2026-10-16 实录）。
+   症状极具迷惑性：`cw-nginx` 已运行 4 天、`cw-backend` 刚启动且健康、首页 200、只有 `/api` 全 502。
+   根因是 `proxy_pass http://backend:8123` 只在 Nginx 加载配置时解析一次，部署重建后端容器后
+   旧 IP 无人监听，`connect() failed (111: Connection refused)`。
+   排障手法：**看 nginx 日志里的 upstream IP，和 `cw-backend` 当前 IP 比一比**，不一致即可定性
+   （本次是日志里 `172.18.0.4` vs 容器 `172.18.0.6`）。
+   - 临时恢复：`docker compose exec -T nginx nginx -s reload`（**不用重启容器、不影响首页**）。
+   - 永久修复：`nginx.conf` 用 `resolver 127.0.0.11 valid=10s ipv6=off;` + 变量 upstream
+     （`set $backend_upstream "backend:8123";` / `proxy_pass http://$backend_upstream;`），
+     让 Nginx 每次请求重新解析；`deploy.sh` 在启动容器后先 `nginx -t` 再 `nginx -s reload`，
+     因为 `nginx.conf` 是 bind mount，换文件不自动生效。
+   - 回归护栏：`deployProxy.test.mjs` 用真实容器复现"后端换 IP + Nginx 不重启"，
+     写死 upstream 的旧配置跑它会失败。
 
 ## 首次上线后：建第一个账号
 

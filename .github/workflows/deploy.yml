@@ -10,7 +10,11 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    # 固定 24.04 而不是 ubuntu-latest：2026-10-19 起浮动标签会漂到 Ubuntu 26.04，
+    # Docker Compose 由 v2 2.38 跳到 v5。agentDeployment.test.mjs 依赖
+    # `docker compose config --format json` 的输出结构（services.*.environment.*），
+    # 跨大版本可能变。要升级 runner 镜像，先单独验证该结构未变再放开。
+    runs-on: ubuntu-24.04
     steps:
       - name: 检出代码
         uses: actions/checkout@v7
@@ -41,6 +45,10 @@ jobs:
       - name: 校验 Agent 部署配置
         run: node agentDeployment.test.mjs
 
+      - name: 校验代理动态解析（容器回归）
+        # 真实起容器复现"后端换 IP、Nginx 不重启"：写死 upstream 的旧配置会在这里失败
+        run: node deployProxy.test.mjs
+
       - name: 构建前端产物
         working-directory: cloud_front
         # 用 build-only 而不是 build：后者会先跑 vue-tsc 类型检查，
@@ -55,8 +63,10 @@ jobs:
           cp cloud/target/cloud-0.0.1-SNAPSHOT.jar bundle/app.jar
           cp cloud_agent/target/cloud-agent-0.0.1-SNAPSHOT.jar bundle/agent.jar
           cp -r cloud_front/dist/. bundle/dist/
+          # rollback.sh 必须一起打包：否则服务器上根本没有它，
+          # README 里写的 `bash rollback.sh` 一直跑不了（2026-10-16 实测确认）。
           cp deploy/Dockerfile deploy/AgentDockerfile deploy/docker-compose.yml deploy/nginx.conf \
-             deploy/schema-init.sql deploy/deploy.sh bundle/
+             deploy/schema-init.sql deploy/deploy.sh deploy/rollback.sh bundle/
 
       - name: 生成服务器 .env（值只来自 Secrets，不落日志）
         env:
@@ -134,7 +144,7 @@ jobs:
           ssh $SSH_OPTS "$USER@$HOST" '
             set -e
             cd /opt/cloudwiki
-            for file in app.jar agent.jar docker-compose.yml Dockerfile AgentDockerfile; do
+            for file in app.jar agent.jar docker-compose.yml Dockerfile AgentDockerfile nginx.conf; do
               if [ -f "$file" ]; then cp -f "$file" "$file.bak"; fi
             done
             tar xzf bundle.tar.gz
