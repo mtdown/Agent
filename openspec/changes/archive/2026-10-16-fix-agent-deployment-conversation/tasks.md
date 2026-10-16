@@ -18,13 +18,17 @@
 - [x] 3.2 Perform AGENTS.md §8 assumption, contract, risk and mutation checks; results recorded below.
 - [x] 3.3 Start local services with `stop-dev.ps1` followed by `start-dev.ps1 -NoTunnel -NoPause`; the scripts reported backend 8123, Agent 8124 and frontend 3000 listening.
 - [x] 3.4 Owner manually tests Agent questions and history using the addresses below; owner reported "通过" on 2026-10-16.
-- [ ] 3.5 After the owner's manual result and approval, use `upload.ps1` to publish semantic commits to this task branch; leave merge to the owner.
+- [x] 3.5 After the owner's manual result and approval, use `upload.ps1` to publish semantic commits to this task branch; first repair commit `ef9d217` verified on `origin/fix/agent-deployment-conversation修复`. Merge remains with the owner.
 
 ## Verification / Result
 
 Automated verification on 2026-10-16: `openspec validate fix-agent-deployment-conversation --strict`, `node agentDeployment.test.mjs`, `bash -n deploy/deploy.sh deploy/rollback.sh`, cloud targeted Maven tests (15 tests, 0 failures/errors), Agent Maven tests (15 tests, 0 failures/errors), `mvn -q -DskipTests package` in each Java module, and frontend `npm run build` all passed. `git diff --check` passed. The regression test failed before deployment changes and passed afterward. Three temporary-copy mutations (wrong backend shared key, public Agent port, missing Agent backup) each made the test fail; restoring the copy made it pass. No production Agent request has been verified yet.
 
 Local services started in the required order. Frontend: `http://127.0.0.1:3000`; backend: `http://127.0.0.1:8123`; Agent: `http://127.0.0.1:8124` (internal endpoint). `start-dev.ps1` reported suggested login `admin / 12345678`. The current process has `RAG_LLM_API_KEY` set; its value was not printed. Owner reported local page acceptance passed on 2026-10-16. Production deployment remains unverified until the branch is merged and CI deploys it.
+
+The owner authorized remote upload and OpenSpec archive on 2026-10-16. `upload.ps1` created and pushed repair commit `ef9d217`; its built-in upstream check confirmed `origin/fix/agent-deployment-conversation修复` contains HEAD. Spec sync and archive follow as a separate documentation commit.
+
+Archive preparation: synchronized the two ADDED Agent deployment requirements and the MODIFIED credential requirement into `openspec/specs/deployment-pipeline/spec.md`. Exact requirement-block comparison returned true for all three; `openspec validate --specs` passed 29 specs with 0 failures, and the change passed strict validation. Existing unrelated Purpose warnings remain in other capabilities.
 
 ### AGENTS.md §8.2 implicit assumptions and failure symptoms
 
