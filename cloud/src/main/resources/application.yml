@@ -146,7 +146,7 @@ rag:
     api-key: ${RAG_LLM_API_KEY:}
     model: ${RAG_LLM_MODEL:deepseek-v4-flash-vision-exp}
     # 默认（快速）模式的非思考模型，勾选「深度思考」时才用上面的思考型模型
-    fast-model: ${RAG_LLM_FAST_MODEL:deepseek-chat}
+    fast-model: ${RAG_LLM_FAST_MODEL:deepseek-flash}
     # 生成模型是否开思考（DashScope 系模型对应请求体 enable_thinking）。
     # 留空（或未设该环境变量）= 不发送该字段，保持各厂商默认行为；仅显式配置 true/false 时才写入请求体。
     # 实测：qwen3.8-max 不传时默认开思考（有 reasoning_content），设 false 后单题 2.84s → 1.06s。

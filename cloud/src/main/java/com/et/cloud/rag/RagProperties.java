@@ -28,7 +28,7 @@ public class RagProperties {
         /** 深度思考模式使用的思考型模型 */
         private String model = "deepseek-v4-flash-vision-exp";
         /** 默认（快速）模式使用的非思考模型，秒级响应 */
-        private String fastModel = "deepseek-chat";
+        private String fastModel = "deepseek-flash";
         private int timeoutSeconds = 120;
         // 思考型模型 reasoning 与正文共用预算，需留足空间，避免 finishReason=length 截断
         private int maxTokens = 8192;
