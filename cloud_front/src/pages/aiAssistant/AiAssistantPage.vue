@@ -78,17 +78,6 @@
             <a-switch v-model:checked="agentRagEnabled" size="small" />
             <span class="thinking-label">引用知识库</span>
           </div>
-          <div class="thinking-switch" v-if="!agentPreview">
-            <a-switch v-model:checked="deepThinking" size="small" />
-            <span class="thinking-label">深度思考</span>
-            <a-tooltip title="开启后使用思考型模型，推理更深入但等待更久；默认快速模型秒级响应">
-              <QuestionCircleOutlined class="thinking-tip" />
-            </a-tooltip>
-          </div>
-          <div class="thinking-switch">
-            <a-switch v-model:checked="agentPreview" size="small" :disabled="streaming" />
-            <span class="thinking-label">Agent 技术预览</span>
-          </div>
           <a-button type="link" size="small" class="open-api-btn" @click="openKeyDrawer">
             <ApiOutlined /> 开放 API
           </a-button>
@@ -357,12 +346,11 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import {
   ApiOutlined,
   CloseOutlined,
   FileTextOutlined,
-  QuestionCircleOutlined,
   RobotOutlined,
   UserOutlined,
   WarningOutlined,
@@ -422,7 +410,7 @@ const selectedSpaceIds = ref<string[]>([])
 const selectedFolderIds = ref<string[]>([])
 const allSpaces = ref(true)
 const deepThinking = ref(false)
-const agentPreview = ref(false)
+const agentPreview = ref(true)
 const agentRagEnabled = ref(false)
 const openSpaceGroup = ref<number | null>(null)
 const agentConversationId = ref<string | undefined>()
@@ -615,7 +603,6 @@ const removeAgentConversation = async (id: string) => {
     await loadAgentConversations()
   } catch { antMessage.error('删除对话失败') }
 }
-watch(agentPreview, (enabled) => { if (enabled) loadAgentConversations() })
 
 const sampleQuestions = [
   '渝府办发〔2026〕24号说了什么',
@@ -1029,6 +1016,7 @@ const curlAskExample = `curl -N -X POST ${apiBase}/api/open/rag/ask \\
 
 onMounted(() => {
   loadSpaces()
+  loadAgentConversations()
   messageListRef.value?.addEventListener('click', onMarkerClick)
 })
 </script>
