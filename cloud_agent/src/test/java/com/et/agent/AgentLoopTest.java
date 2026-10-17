@@ -88,4 +88,47 @@ class AgentLoopTest {
         }, Collections.emptyMap(), 2, 1, 1000);
         assertThrows(IllegalStateException.class, () -> loop.run("q", text -> {}, () -> false));
     }
+
+    @Test void loadsSelectedSkillOnlyAfterToolCall() {
+        AtomicInteger turns = new AtomicInteger();
+        AgentLoop.ToolAwareModel model = new AgentLoop.ToolAwareModel() {
+            @Override public AgentLoop.Turn stream(List<AgentLoop.Message> history, java.util.Set<String> toolNames,
+                                                   java.util.function.Consumer<String> delta,
+                                                   java.util.function.BooleanSupplier cancelled) {
+                assertTrue(toolNames.contains("get_skill"));
+                if (turns.getAndIncrement() == 0) {
+                    assertTrue(history.get(0).content.contains("skill_system"));
+                    assertTrue(history.get(1).content.contains("Example"));
+                    assertFalse(history.get(1).content.contains("secret step"));
+                    return new AgentLoop.Turn(Collections.singletonList(
+                            new AgentLoop.ToolCall("call-1", "get_skill", "{\"id\":\"9007199254740993\",\"version\":1}")), null);
+                }
+                assertTrue(history.stream().anyMatch(item -> "tool".equals(item.role) && item.content.contains("secret step")));
+                return new AgentLoop.Turn(Collections.emptyList(), null);
+            }
+        };
+        AgentLoop loop = new AgentLoop(model, Collections.emptyMap(), 3, 10000, 1000);
+        loop.run("use example", Collections.emptyList(), null, "Example", Collections.singletonMap(
+                "get_skill", args -> "secret step"), chunk -> {}, () -> false);
+        assertEquals(2, turns.get());
+    }
+
+    @Test void failedLibraryWriteIsReportedToModelWithoutClaimingSuccess() {
+        AtomicInteger turns = new AtomicInteger();
+        AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {
+            if (turns.getAndIncrement() == 0)
+                return new AgentLoop.Turn(Collections.singletonList(
+                        new AgentLoop.ToolCall("write", "create_skill", "{}")), null);
+            assertTrue(history.stream().anyMatch(item -> "tool".equals(item.role)
+                    && item.content.contains("Code version or entrypoint does not exist")
+                    && item.content.contains("\"saved\":false")));
+            delta.accept("The draft was not saved");
+            return new AgentLoop.Turn(Collections.emptyList(), null);
+        }, Collections.singletonMap("create_skill", json -> {
+            throw new IllegalArgumentException("Code version or entrypoint does not exist");
+        }), 3, 10000, 1000);
+        List<String> output = new ArrayList<>();
+        loop.run("save draft", output::add, () -> false);
+        assertEquals(Collections.singletonList("The draft was not saved"), output);
+    }
 }

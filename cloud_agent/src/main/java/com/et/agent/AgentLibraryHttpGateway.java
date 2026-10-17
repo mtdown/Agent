@@ -1,0 +1,67 @@
+package com.et.agent;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+
+/** The Agent never opens host paths; Cloud owns user-scoped Skill and code records. */
+@Component
+public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final String baseUrl;
+    private final String key;
+
+    public AgentLibraryHttpGateway(@Value("${agent.cloud-base-url:http://127.0.0.1:8123}") String baseUrl,
+                                   @Value("${agent.internal-key}") String key) {
+        this.baseUrl = baseUrl.replaceAll("/+$", "");
+        this.key = key;
+    }
+
+    @Override public String getSkill(String userId, String id, int version) {
+        if (!id.matches("[1-9][0-9]{0,18}") || version < 1) throw new IllegalArgumentException("Invalid Skill reference");
+        return call("/api/internal/agent/skills/" + id + "/versions/" + version, userId, null).toString();
+    }
+
+    @Override public String createSkill(String userId, String definition) {
+        return call("/api/internal/agent/skills", userId, definition).asText();
+    }
+
+    @Override public String createCode(String userId, String definition) {
+        return call("/api/internal/agent/codes", userId, definition).asText();
+    }
+
+    private JsonNode call(String path, String userId, String body) {
+        if (key == null || key.isEmpty()) throw new IllegalStateException("Agent service credential is not configured");
+        if (userId == null || !userId.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("Invalid user context");
+        try {
+            URI uri = URI.create(baseUrl + path + "?userId=" + URLEncoder.encode(userId, StandardCharsets.UTF_8.name()));
+            HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20))
+                    .header("X-Agent-Key", key).header("Accept", "application/json");
+            HttpRequest request = (body == null ? builder.GET() : builder.header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))).build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() != 200) throw new IllegalStateException("Cloud library HTTP " + response.statusCode());
+            JsonNode envelope = JSON.readTree(response.body());
+            if (envelope.path("code").asInt(-1) != 0 || envelope.get("data") == null || envelope.get("data").isNull())
+                throw new IllegalStateException("Cloud library rejected operation: " + envelope.path("message").asText("unknown"));
+            return envelope.get("data");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AgentLoop.Cancelled();
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Cloud library request failed", e);
+        }
+    }
+}

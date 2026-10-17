@@ -103,6 +103,7 @@ services:
       TZ: Asia/Shanghai
       AGENT_BIND_ADDRESS: 0.0.0.0
       AGENT_INTERNAL_KEY: ${AGENT_INTERNAL_KEY:?AGENT_INTERNAL_KEY is required}
+      AGENT_CLOUD_BASE_URL: http://backend:8123
       RAG_LLM_API_KEY: ${RAG_LLM_API_KEY:?RAG_LLM_API_KEY is required}
       RAG_LLM_FAST_MODEL: deepseek-flash
     networks:

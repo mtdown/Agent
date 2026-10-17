@@ -26,11 +26,50 @@ class OpenAiStreamModelTest {
         try {
             OpenAiStreamModel model = new OpenAiStreamModel("http://127.0.0.1:" + server.getAddress().getPort(), "test", "deepseek-flash", 2000);
             List<String> output = new ArrayList<>();
-            model.stream(Collections.singletonList(new AgentLoop.Message("user", "1+1=?", null, null)), output::add, () -> false);
+            model.stream(Collections.singletonList(new AgentLoop.Message("user", "1+1=?", null, null)),
+                    Collections.singleton("get_skill"), output::add, () -> false);
             assertEquals(Collections.singletonList("2"), output);
             com.fasterxml.jackson.databind.JsonNode body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(requestBody.get());
             assertEquals("disabled", body.path("thinking").path("type").asText());
             assertEquals(2048, body.path("max_tokens").asInt());
+            assertEquals("get_skill", body.path("tools").get(0).path("function").path("name").asText());
+        } finally {
+            server.stop(0);
+        }
+    }
+    @Test void declaresLibraryWriteToolsWhenAvailable() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/chat/completions", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] body = "data: [DONE]\n\n".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(body); }
+        });
+        server.start();
+        try {
+            OpenAiStreamModel model = new OpenAiStreamModel("http://127.0.0.1:" + server.getAddress().getPort(),
+                    "test", "deepseek-flash", 2000);
+            model.stream(Collections.singletonList(new AgentLoop.Message("user", "save a skill", null, null)),
+                    new HashSet<>(Arrays.asList("create_code", "create_skill")), output -> {}, () -> false);
+            com.fasterxml.jackson.databind.JsonNode tools = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(requestBody.get()).path("tools");
+            assertEquals(2, tools.size());
+            assertTrue(tools.toString().contains("create_skill"));
+            assertTrue(tools.toString().contains("create_code"));
+            com.fasterxml.jackson.databind.JsonNode skill = null;
+            for (com.fasterxml.jackson.databind.JsonNode tool : tools)
+                if ("create_skill".equals(tool.path("function").path("name").asText()))
+                    skill = tool.path("function").path("parameters").path("properties").path("definition");
+            assertNotNull(skill);
+            assertEquals("object", skill.path("type").asText());
+            assertFalse(skill.path("additionalProperties").asBoolean(true));
+            assertTrue(skill.path("required").toString().contains("when_not_to_use"));
+            com.fasterxml.jackson.databind.JsonNode parameter = skill.path("properties").path("parameters")
+                    .path("items");
+            assertFalse(parameter.path("additionalProperties").asBoolean(true));
+            assertTrue(parameter.path("properties").has("required"));
+            assertFalse(parameter.path("properties").has("description"));
         } finally {
             server.stop(0);
         }

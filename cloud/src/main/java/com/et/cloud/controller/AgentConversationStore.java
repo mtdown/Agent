@@ -33,6 +33,8 @@ public class AgentConversationStore {
     public void initializeTables() {
         new ResourceDatabasePopulator(new ClassPathResource("agent-conversation.sql"))
                 .execute(Objects.requireNonNull(dataSource));
+        new ResourceDatabasePopulator(new ClassPathResource("agent-skill-library.sql"))
+                .execute(dataSource);
         // The original Windows import stored the UTF-8 default title as this exact mojibake value.
         // Only repair that placeholder, so titles explicitly chosen by users remain untouched.
         conversations.repairLegacyTitle("新对话", "E98F82E69DBFEE87AEE79287EFBFBD");

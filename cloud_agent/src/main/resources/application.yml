@@ -7,6 +7,7 @@ spring:
       request-timeout: 150s
 agent:
   internal-key: ${AGENT_INTERNAL_KEY:}
+  cloud-base-url: ${AGENT_CLOUD_BASE_URL:http://127.0.0.1:8123}
   timeout-ms: ${AGENT_TIMEOUT_MS:120000}
   max-turns: ${AGENT_MAX_TURNS:4}
   max-tool-result-chars: ${AGENT_MAX_TOOL_RESULT_CHARS:16000}
