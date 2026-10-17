@@ -26,10 +26,12 @@ public class AgentPreviewController {
     private final AgentConversationStore store;
     private final RagSearchService search;
     private final WikiSpaceService spaces;
+    private final AgentSkillCatalog skillCatalog;
 
     public AgentPreviewController(UserService users, AgentPreviewProxy proxy, AgentConversationStore store,
-                                  RagSearchService search, WikiSpaceService spaces) {
+                                  RagSearchService search, WikiSpaceService spaces, AgentSkillCatalog skillCatalog) {
         this.users = users; this.proxy = proxy; this.store = store; this.search = search; this.spaces = spaces;
+        this.skillCatalog = skillCatalog;
     }
 
     public static class Ask {
@@ -161,6 +163,8 @@ public class AgentPreviewController {
         payload.put("query", ask.query);
         payload.put("history", history);
         payload.put("evidence", evidence);
+        payload.put("userId", Long.toString(user.getId()));
+        payload.put("skillCatalog", skillCatalog.forUser(user.getId()));
         return proxy.stream(payload, meta, (success, output) -> {
             if (success) store.complete(user.getId(), conversationId, turnId, output[0], citationsJson, output[1]);
             else store.fail(user.getId(), conversationId, turnId);

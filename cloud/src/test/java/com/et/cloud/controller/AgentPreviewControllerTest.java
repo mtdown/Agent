@@ -24,7 +24,7 @@ class AgentPreviewControllerTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         when(users.getLoginUser(request)).thenThrow(new IllegalStateException("not logged in"));
         AgentPreviewController controller = new AgentPreviewController(users, proxy, store,
-                mock(RagSearchService.class), mock(WikiSpaceService.class));
+                mock(RagSearchService.class), mock(WikiSpaceService.class), emptyCatalog());
         assertThrows(IllegalStateException.class, () -> controller.stream(new AgentPreviewController.Ask("q"), request));
         verifyNoInteractions(proxy);
         verifyNoInteractions(store);
@@ -41,12 +41,29 @@ class AgentPreviewControllerTest {
         when(store.recentCompleted(1L, 2L)).thenReturn(Collections.emptyList());
         StreamingResponseBody expected = out -> {};
         when(proxy.stream(anyMap(), anyMap(), any())).thenReturn(expected);
+        AgentLibraryStore library = mock(AgentLibraryStore.class);
+        AgentLibraryStore.SkillItem item = new AgentLibraryStore.SkillItem();
+        item.id = "9007199254740993";
+        item.version = 2;
+        item.name = "Example";
+        item.summary = "Does work";
+        AgentLibraryStore.SkillVersion version = new AgentLibraryStore.SkillVersion();
+        version.definitionJson = "{\"when_to_use\":\"example request\",\"when_not_to_use\":\"other request\"}";
+        when(library.listAvailable(1L)).thenReturn(List.of(item));
+        when(library.skillVersion(1L, item.id, 2)).thenReturn(version);
+        AgentSkillCatalog catalog = new AgentSkillCatalog(library);
         AgentPreviewController.Ask ask = new AgentPreviewController.Ask("q");
         ask.conversationId = "2";
-        assertSame(expected, new AgentPreviewController(users, proxy, store, search, mock(WikiSpaceService.class))
+        assertSame(expected, new AgentPreviewController(users, proxy, store, search, mock(WikiSpaceService.class), catalog)
                 .stream(ask, request));
         verify(store).requireOwner(1L, 2L);
         verifyNoInteractions(search);
+        ArgumentCaptor<java.util.Map> payload = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(proxy).stream(payload.capture(), anyMap(), any());
+        assertEquals("1", payload.getValue().get("userId"));
+        String brief = (String) payload.getValue().get("skillCatalog");
+        assertTrue(brief.contains("9007199254740993@2 | Example"));
+        assertTrue(brief.contains("when_to_use: example request"));
     }
 
     @Test void selectedUnauthorizedSpacesNeverBecomeAllSpaces() {
@@ -64,7 +81,7 @@ class AgentPreviewControllerTest {
         ask.conversationId = "2";
         ask.ragMode = "SELECTED";
         ask.spaceIds = Arrays.asList("999");
-        new AgentPreviewController(users, proxy, store, search, spaces).stream(ask, request);
+        new AgentPreviewController(users, proxy, store, search, spaces, emptyCatalog()).stream(ask, request);
         verifyNoInteractions(search);
         verifyNoInteractions(proxy);
     }
@@ -85,11 +102,15 @@ class AgentPreviewControllerTest {
         ask.ragMode = "SELECTED";
         ask.folderIds = List.of("123");
 
-        new AgentPreviewController(users, proxy, store, search, spaces).stream(ask, request);
+        new AgentPreviewController(users, proxy, store, search, spaces, emptyCatalog()).stream(ask, request);
 
         ArgumentCaptor<RagSearchRequest> captured = ArgumentCaptor.forClass(RagSearchRequest.class);
         verify(search).search(eq(user), captured.capture());
         assertEquals(List.of(123L), captured.getValue().getFolderIds());
         assertEquals(List.of(), captured.getValue().getSpaceIds());
+    }
+
+    private static AgentSkillCatalog emptyCatalog() {
+        return new AgentSkillCatalog(mock(AgentLibraryStore.class));
     }
 }
