@@ -3,6 +3,8 @@
     <div class="main-row">
       <aside v-if="agentPreview" class="conversation-sidebar">
         <a-button class="new-chat-button" :disabled="streaming" @click="newAgentConversation"><PlusOutlined /> 新聊天</a-button>
+        <button class="library-nav" :class="{ active: libraryView === 'skill' }" type="button" :disabled="streaming" @click="libraryView = 'skill'">Skill 库</button>
+        <button class="library-nav" :class="{ active: libraryView === 'code' }" type="button" :disabled="streaming" @click="libraryView = 'code'">代码库</button>
         <div class="conversation-heading">历史对话</div>
         <div class="conversation-list">
           <div v-for="conversation in agentConversations" :key="conversation.id" class="conversation-item" :class="{ active: agentConversationId === conversation.id }">
@@ -20,7 +22,7 @@
           <div v-if="agentConversations.length === 0" class="conversation-empty">暂无历史对话</div>
         </div>
       </aside>
-      <div class="panel">
+      <div v-if="libraryView === 'chat'" class="panel">
         <!-- 顶栏：范围选择 + 模式开关 -->
         <div class="scope-bar">
           <div class="scope-title">
@@ -224,8 +226,10 @@
         </div>
       </div>
 
+      <AgentLibraryPanel v-else :mode="libraryView" @back="libraryView = 'chat'" />
+
       <!-- 右侧文档预览栏 -->
-      <div class="doc-panel" :class="{ open: docPreview.open }">
+      <div v-if="libraryView === 'chat'" class="doc-panel" :class="{ open: docPreview.open }">
         <div class="doc-panel-inner">
           <div class="doc-panel-head">
             <div class="doc-panel-title">
@@ -386,6 +390,7 @@ import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController'
 import { listFolderTreeUsingGet } from '@/api/wikiFolderController'
 import { getDocumentWikiVisByIdUsingGet } from '@/api/documentWikiController'
 import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
+import AgentLibraryPanel from './AgentLibraryPanel.vue'
 import { parseCitationSnapshot } from './citationIds'
 import {
   groupSpaces,
@@ -414,6 +419,7 @@ const agentPreview = ref(true)
 const agentRagEnabled = ref(false)
 const openSpaceGroup = ref<number | null>(null)
 const agentConversationId = ref<string | undefined>()
+const libraryView = ref<'chat' | 'skill' | 'code'>('chat')
 const agentConversations = ref<AgentConversation[]>([])
 const renameDialog = reactive({ open: false, saving: false, id: '', title: '' })
 
@@ -534,6 +540,7 @@ const loadAgentConversations = async () => {
 }
 const newAgentConversation = async () => {
   if (streaming.value) return
+  libraryView.value = 'chat'
   try {
     const response = await createAgentConversation()
     agentConversationId.value = response.data.data
@@ -547,6 +554,7 @@ const readJson = <T,>(value?: string | null): T | undefined => {
 }
 const selectAgentConversation = async (id: string) => {
   if (streaming.value) return
+  libraryView.value = 'chat'
   agentConversationId.value = id
   await openAgentConversation(id)
 }
@@ -1036,6 +1044,9 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(120, 90, 40, 0.08);
 }
 .new-chat-button { width: 100%; text-align: left; }
+.library-nav { width: 100%; margin-top: 6px; padding: 9px 12px; text-align: left; border: 0; border-radius: 8px; background: transparent; color: #4a3b22; cursor: pointer; }
+.library-nav:hover, .library-nav.active { background: #f7efe0; }
+.library-nav:disabled { opacity: .55; cursor: default; }
 .conversation-heading { padding: 18px 8px 8px; color: #8a7a5f; font-size: 12px; }
 .conversation-list { overflow-y: auto; min-height: 0; }
 .conversation-item { display: flex; align-items: center; border-radius: 8px; margin-bottom: 3px; }
