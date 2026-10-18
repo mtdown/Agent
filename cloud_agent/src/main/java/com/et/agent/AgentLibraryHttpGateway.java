@@ -2,6 +2,7 @@ package com.et.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -40,11 +41,33 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
         return call("/api/internal/agent/codes", userId, definition).asText();
     }
 
+    @Override public String writeFile(String userId, String path, String content, String mode) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("path", path); body.put("content", content); body.put("mode", mode);
+        return call("/api/internal/agent/files", userId, body.toString()).toString();
+    }
+
+    @Override public String readFile(String userId, String path) {
+        try {
+            return call("/api/internal/agent/files?path=" + URLEncoder.encode(path, StandardCharsets.UTF_8.name()),
+                    userId, null).toString();
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException("UTF-8 is unavailable", e);
+        }
+    }
+
+    @Override public String writeWikiDocument(String userId, String spaceId, String title, String content) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("spaceId", spaceId); body.put("title", title); body.put("content", content);
+        return call("/api/internal/agent/wiki-documents", userId, body.toString()).asText();
+    }
+
     private JsonNode call(String path, String userId, String body) {
         if (key == null || key.isEmpty()) throw new IllegalStateException("Agent service credential is not configured");
         if (userId == null || !userId.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("Invalid user context");
         try {
-            URI uri = URI.create(baseUrl + path + "?userId=" + URLEncoder.encode(userId, StandardCharsets.UTF_8.name()));
+            URI uri = URI.create(baseUrl + path + (path.contains("?") ? "&" : "?")
+                    + "userId=" + URLEncoder.encode(userId, StandardCharsets.UTF_8.name()));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20))
                     .header("X-Agent-Key", key).header("Accept", "application/json");
             HttpRequest request = (body == null ? builder.GET() : builder.header("Content-Type", "application/json")

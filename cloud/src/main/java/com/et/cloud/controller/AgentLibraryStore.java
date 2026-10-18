@@ -135,8 +135,8 @@ public class AgentLibraryStore {
         JsonNode definition = validateSkill(owner, definitionJson);
         return transactions.execute(status -> {
             long id = IdWorker.getId();
-            jdbc.update("INSERT INTO agent_skill_item (id, ownerUserId, name, summary, state, latestVersion) " +
-                            "VALUES (?, ?, ?, ?, 'DRAFT', 1)",
+            jdbc.update("INSERT INTO agent_skill_item (id, ownerUserId, name, summary, state, activeVersion, latestVersion) " +
+                            "VALUES (?, ?, ?, ?, 'ACTIVE', 1, 1)",
                     id, owner, definition.get("name").asText(), definition.get("summary").asText());
             jdbc.update("INSERT INTO agent_skill_version (skillId, version, definitionJson, createdBy) " +
                     "VALUES (?, 1, ?, ?)", id, definitionJson, owner);
@@ -151,9 +151,10 @@ public class AgentLibraryStore {
             int next = lockedLatest("agent_skill_item", owner, id) + 1;
             jdbc.update("INSERT INTO agent_skill_version (skillId, version, definitionJson, createdBy) " +
                     "VALUES (?, ?, ?, ?)", id, next, definitionJson, owner);
-            jdbc.update("UPDATE agent_skill_item SET name = ?, summary = ?, latestVersion = ? " +
+            jdbc.update("UPDATE agent_skill_item SET name = ?, summary = ?, latestVersion = ?, " +
+                            "activeVersion = ?, state = 'ACTIVE' " +
                             "WHERE id = ? AND ownerUserId = ? AND isDelete = 0",
-                    definition.get("name").asText(), definition.get("summary").asText(), next, id, owner);
+                    definition.get("name").asText(), definition.get("summary").asText(), next, next, id, owner);
             return next;
         });
     }
@@ -273,7 +274,7 @@ public class AgentLibraryStore {
                 jdbc.queryForObject("SELECT COUNT(*) FROM agent_code_item c " +
                                 "JOIN agent_code_version v ON v.codeId = c.id " +
                                 "WHERE c.id = ? AND c.isDelete = 0 AND v.version = ? " +
-                                "AND v.entrypoint = ? AND v.validationState = 'PASSED' " +
+                                "AND v.entrypoint = ? " +
                                 "AND (c.ownerUserId = ? OR EXISTS (SELECT 1 FROM agent_code_share x " +
                                 "WHERE x.codeId = c.id AND x.targetUserId = ?))",
                         Integer.class, Long.parseLong(codeId), version, entrypoint, user, user) > 0);

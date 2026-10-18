@@ -282,3 +282,5 @@ rag:
 #        api-rule: package
 #        api-rule-resources:
 #          - com.et.cloud.controller
+agent:
+  workspace-root: ${AGENT_WORKSPACE_ROOT:tmp/agent-user-files}
