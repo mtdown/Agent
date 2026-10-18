@@ -5,4 +5,7 @@ public interface AgentLibraryGateway {
     String getSkill(String userId, String id, int version);
     String createSkill(String userId, String definition);
     String createCode(String userId, String definition);
+    String writeFile(String userId, String path, String content, String mode);
+    String readFile(String userId, String path);
+    String writeWikiDocument(String userId, String spaceId, String title, String content);
 }

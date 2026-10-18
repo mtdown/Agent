@@ -1,8 +1,6 @@
 package com.et.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
@@ -62,7 +59,7 @@ public final class AgentController {
                     if (item != null && ("user".equals(item.role) || "assistant".equals(item.role)) && item.content != null)
                         prior.add(new AgentLoop.Message(item.role, item.content, null, null));
                 }
-                Map<String, AgentLoop.Tool> tools = libraryTools(ask.userId);
+                Map<String, AgentLoop.Tool> tools = AgentToolRegistry.bind(ask.userId, library);
                 AgentLoop.Result result = loop.run(ask.query, prior, ask.evidence, ask.skillCatalog, tools, chunk -> {
                     try { send(out, "delta", one("content", chunk)); }
                     catch (IOException e) { disconnected.set(true); throw new UncheckedIOException(e); }
@@ -78,46 +75,6 @@ public final class AgentController {
                 send(out, "error", one("message", e.getMessage() == null ? "Agent request failed" : e.getMessage()));
             }
         };
-    }
-    private Map<String, AgentLoop.Tool> libraryTools(String userId) {
-        Map<String, AgentLoop.Tool> tools = new HashMap<>();
-        tools.put("get_skill", arguments -> {
-            JsonNode args = arguments(arguments);
-            String id = requiredText(args, "id");
-            int version = args.path("version").asInt(0);
-            return library.getSkill(userId, id, version);
-        });
-        tools.put("create_skill", arguments -> {
-            String definition = SkillDraftAuthoring.assemble(arguments);
-            String id = library.createSkill(userId, definition);
-            return "{\"id\":\"" + id + "\",\"state\":\"DRAFT\"}";
-        });
-        tools.put("create_code", arguments -> {
-            JsonNode args = arguments(arguments);
-            ObjectNode body = JSON.createObjectNode();
-            for (String field : new String[]{"name", "summary", "language", "entrypoint", "sourceCode"})
-                body.put(field, requiredText(args, field));
-            JsonNode input = args.path("inputSchema");
-            JsonNode output = args.path("outputSchema");
-            if (!input.isObject() || !output.isObject()) throw new IllegalArgumentException("Code schemas must be objects");
-            body.put("inputSchemaJson", input.toString());
-            body.put("outputSchemaJson", output.toString());
-            String id = library.createCode(userId, body.toString());
-            return "{\"id\":\"" + id + "\",\"version\":1,\"validationState\":\"UNVERIFIED\"}";
-        });
-        return tools;
-    }
-
-    private static JsonNode arguments(String raw) {
-        try { return JSON.readTree(raw); }
-        catch (IOException e) { throw new IllegalArgumentException("Invalid tool arguments", e); }
-    }
-
-    private static String requiredText(JsonNode node, String key) {
-        JsonNode value = node.path(key);
-        if (!value.isTextual() || value.asText().trim().isEmpty())
-            throw new IllegalArgumentException("Missing " + key);
-        return value.asText();
     }
     private static Map<String, Object> one(String key, Object value) {
         Map<String, Object> map = new LinkedHashMap<>(); map.put(key, value); return map;

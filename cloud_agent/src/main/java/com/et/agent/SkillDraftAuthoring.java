@@ -20,7 +20,7 @@ final class SkillDraftAuthoring {
             "infer the structured fields from the conversation. Ask only for essential missing facts; do not print a blank template. " +
             "Fill name, summary, use and exclusion conditions, typed parameters, controlled steps, observable expected results, " +
             "failure policy and examples before calling create_skill. Parameter entries allow only name, type, required, min and max. " +
-            "A response step needs type=response and template. Save a draft only after create_skill returns an ID. " +
+            "A response step needs type=response and template. Report the Skill as saved and enabled only after create_skill returns an ID. " +
             "If a field error is returned, correct that field and retry; never claim an unsuccessful save succeeded.";
 
     private SkillDraftAuthoring() { }

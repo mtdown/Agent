@@ -50,41 +50,7 @@ public final class OpenAiStreamModel implements AgentLoop.ToolAwareModel {
             if (model.startsWith("deepseek-")) body.putObject("thinking").put("type", "disabled");
             body.putObject("stream_options").put("include_usage", true);
             ArrayNode declaredTools = body.putArray("tools");
-            if (toolNames.contains("get_skill")) {
-                ObjectNode function = declaredTools.addObject().put("type", "function").putObject("function");
-                function.put("name", "get_skill");
-                function.put("description", "Read the full definition of an enabled Skill selected from the current user's catalog.");
-                ObjectNode parameters = function.putObject("parameters");
-                parameters.put("type", "object");
-                ObjectNode properties = parameters.putObject("properties");
-                properties.putObject("id").put("type", "string");
-                properties.putObject("version").put("type", "integer");
-                parameters.putArray("required").add("id").add("version");
-                parameters.put("additionalProperties", false);
-            }
-            if (toolNames.contains("create_skill")) {
-                ObjectNode function = declaredTools.addObject().put("type", "function").putObject("function");
-                function.put("name", "create_skill");
-                function.put("description", "Save a structured Skill in the current user's library as a disabled draft. Include name, summary, when_to_use, when_not_to_use, parameters, steps, expected_results, failure_policy and examples.");
-                ObjectNode parameters = function.putObject("parameters");
-                parameters.setAll(SkillDraftAuthoring.toolParameters());
-            }
-            if (toolNames.contains("create_code")) {
-                ObjectNode function = declaredTools.addObject().put("type", "function").putObject("function");
-                function.put("name", "create_code");
-                function.put("description", "Save Python or Java source as version 1 in the current user's code library. Returns UNVERIFIED; do not claim it has run or passed samples.");
-                ObjectNode parameters = function.putObject("parameters");
-                parameters.put("type", "object");
-                ObjectNode properties = parameters.putObject("properties");
-                for (String field : new String[]{"name", "summary", "language", "entrypoint", "sourceCode"})
-                    properties.putObject(field).put("type", "string");
-                properties.putObject("inputSchema").put("type", "object");
-                properties.putObject("outputSchema").put("type", "object");
-                ArrayNode required = parameters.putArray("required");
-                for (String field : new String[]{"name", "summary", "language", "entrypoint", "sourceCode", "inputSchema", "outputSchema"})
-                    required.add(field);
-                parameters.put("additionalProperties", false);
-            }
+            for (String name : toolNames) declaredTools.add(AgentToolRegistry.declaration(name));
             if (declaredTools.isEmpty()) body.remove("tools");
             ArrayNode messages = body.putArray("messages");
             for (AgentLoop.Message entry : history) {

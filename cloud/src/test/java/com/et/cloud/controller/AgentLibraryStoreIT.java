@@ -25,7 +25,7 @@ class AgentLibraryStoreIT {
     private static final String OUTPUT_SCHEMA = "{\"type\":\"object\",\"properties\":{}}";
 
     @Test
-    void createsResponseOnlySkillAsPrivateDraftWithoutCodeValidation() throws Exception {
+    void createsResponseOnlySkillAsPrivateActiveVersionWithoutCodeValidation() throws Exception {
         DataSource database = localDatabase();
         DataSourceTransactionManager transactions = new DataSourceTransactionManager(database);
         new TransactionTemplate(transactions).execute(status -> {
@@ -38,15 +38,17 @@ class AgentLibraryStoreIT {
                     + "\"expected_results\":[\"Hello\"],\"failure_policy\":\"stop\","
                     + "\"examples\":[{\"input\":{},\"expected\":\"Hello\"}]}";
             String id = store.createSkill(OWNER, definition);
-            assertTrue(store.listSkills(OWNER).stream().anyMatch(item -> item.id.equals(id) && "DRAFT".equals(item.state)));
-            assertFalse(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(id)));
+            assertTrue(store.listSkills(OWNER).stream().anyMatch(item -> item.id.equals(id)
+                    && "ACTIVE".equals(item.state) && item.version == 1 && item.latestVersion == 1));
+            assertTrue(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(id) && item.version == 1));
+            assertEquals(1, store.enabledSkillVersion(OWNER, id, 1).version);
             assertThrows(IllegalArgumentException.class, () -> store.skillVersion(OTHER, id, 1));
             return null;
         });
     }
 
     @Test
-    void privateDraftAndFixedVersionsRemainOwnerScoped() throws Exception {
+    void privateActiveSkillAndFixedVersionsRemainOwnerScoped() throws Exception {
         DataSource database = localDatabase();
         DataSourceTransactionManager transactions = new DataSourceTransactionManager(database);
         TransactionTemplate outer = new TransactionTemplate(transactions);
@@ -57,20 +59,25 @@ class AgentLibraryStoreIT {
             String codeId = store.createCode(OWNER, "Example", "Returns a value", "PYTHON", "run",
                     "def run(inputs, resources):\n    return {}", INPUT_SCHEMA, OUTPUT_SCHEMA);
             assertEquals(1, store.codeVersion(OWNER, codeId, 1).version);
+            assertEquals("UNVERIFIED", store.codeVersion(OWNER, codeId, 1).validationState);
             assertThrows(IllegalArgumentException.class, () -> store.codeVersion(OTHER, codeId, 1));
-            assertThrows(IllegalArgumentException.class, () -> store.createSkill(OWNER, skill(codeId, 1)));
-            store.markCodeValidated(codeId, 1, true);
+            assertThrows(IllegalArgumentException.class, () -> store.createSkill(OTHER, skill(codeId, 1)));
+            assertThrows(IllegalArgumentException.class, () -> store.createSkill(OWNER, skill(codeId, 2)));
+            assertThrows(IllegalArgumentException.class, () -> store.createSkill(OWNER,
+                    skill(codeId, 1).replace("\"entrypoint\":\"run\"", "\"entrypoint\":\"missing\"")));
 
             String skillId = store.createSkill(OWNER, skill(codeId, 1));
-            assertFalse(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(skillId)));
-            assertThrows(IllegalArgumentException.class, () -> store.enabledSkillVersion(OWNER, skillId, 1));
+            assertEquals("UNVERIFIED", store.codeVersion(OWNER, codeId, 1).validationState);
+            assertTrue(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(skillId) && item.version == 1));
+            assertEquals(1, store.enabledSkillVersion(OWNER, skillId, 1).version);
             assertThrows(IllegalArgumentException.class, () -> store.skillVersion(OTHER, skillId, 1));
             assertThrows(IllegalArgumentException.class, () -> store.enableSkill(OTHER, skillId, 1));
-            store.enableSkill(OWNER, skillId, 1);
-            assertTrue(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(skillId)));
 
             store.shareCode(OWNER, codeId, OTHER);
             store.shareSkill(OWNER, skillId, OTHER);
+            String sharedSkillId = store.createSkill(OTHER, skill(codeId, 1));
+            assertTrue(store.listSkills(OTHER).stream()
+                    .anyMatch(item -> item.id.equals(sharedSkillId) && "ACTIVE".equals(item.state) && item.version == 1));
             assertEquals(1, store.skillVersion(OTHER, skillId, 1).version);
             assertEquals(1, store.enabledSkillVersion(OTHER, skillId, 1).version);
             assertThrows(IllegalArgumentException.class, () -> store.enabledSkillVersion(OTHER, skillId, 2));
@@ -81,6 +88,35 @@ class AgentLibraryStoreIT {
             assertEquals(2, next);
             assertTrue(store.skillVersion(OWNER, skillId, 1).definitionJson.contains("\"code_version\":1"));
             assertEquals("def run(inputs, resources):\n    return {}", store.codeVersion(OWNER, codeId, 1).sourceCode);
+            return null;
+        });
+    }
+
+    @Test
+    void revisingSkillImmediatelyActivatesLatestAndFailedRevisionKeepsPreviousVersion() throws Exception {
+        DataSource database = localDatabase();
+        DataSourceTransactionManager transactions = new DataSourceTransactionManager(database);
+        new TransactionTemplate(transactions).execute(status -> {
+            status.setRollbackOnly();
+            AgentLibraryStore store = new AgentLibraryStore(database, transactions,
+                    new AgentSkillDefinitionValidator(), new AgentCodeVersionValidator());
+            String original = "{\"name\":\"Greeting\",\"summary\":\"Replies politely\","
+                    + "\"when_to_use\":\"Asked to greet\",\"when_not_to_use\":\"Otherwise\","
+                    + "\"parameters\":[],\"steps\":[{\"type\":\"response\",\"template\":\"Hello\"}],"
+                    + "\"expected_results\":[\"Hello\"],\"failure_policy\":\"stop\","
+                    + "\"examples\":[{\"input\":{},\"expected\":\"Hello\"}]}";
+            String id = store.createSkill(OWNER, original);
+            store.disableSkill(OWNER, id);
+            assertFalse(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(id)));
+            String revised = original.replace("Greeting", "Greeting again");
+            assertEquals(2, store.reviseSkill(OWNER, id, revised));
+            assertTrue(store.listAvailable(OWNER).stream().anyMatch(item -> item.id.equals(id) && item.version == 2));
+            assertEquals(2, store.enabledSkillVersion(OWNER, id, 2).version);
+            assertEquals(original, store.skillVersion(OWNER, id, 1).definitionJson);
+            assertThrows(IllegalArgumentException.class, () -> store.enabledSkillVersion(OWNER, id, 1));
+            assertThrows(IllegalArgumentException.class, () -> store.reviseSkill(OWNER, id, "{}"));
+            assertTrue(store.listSkills(OWNER).stream().anyMatch(item -> item.id.equals(id)
+                    && "ACTIVE".equals(item.state) && item.version == 2 && item.latestVersion == 2));
             return null;
         });
     }

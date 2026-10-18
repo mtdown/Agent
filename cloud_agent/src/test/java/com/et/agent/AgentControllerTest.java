@@ -15,6 +15,9 @@ class AgentControllerTest {
                     public String getSkill(String userId, String id, int version) { return "{}"; }
                     public String createSkill(String userId, String definition) { return "1"; }
                     public String createCode(String userId, String definition) { return "2"; }
+                    public String writeFile(String userId, String path, String content, String mode) { return "{}"; }
+                    public String readFile(String userId, String path) { return "{}"; }
+                    public String writeWikiDocument(String userId, String spaceId, String title, String content) { return "3"; }
                 });
     }
 
@@ -64,6 +67,9 @@ class AgentControllerTest {
                 assertTrue(definition.contains("sourceCode"));
                 return "9007199254740994";
             }
+            @Override public String writeFile(String userId, String path, String content, String mode) { return "{}"; }
+            @Override public String readFile(String userId, String path) { return "{}"; }
+            @Override public String writeWikiDocument(String userId, String spaceId, String title, String content) { return "3"; }
         };
         AgentLoop.ToolAwareModel model = new AgentLoop.ToolAwareModel() {
             int turn;

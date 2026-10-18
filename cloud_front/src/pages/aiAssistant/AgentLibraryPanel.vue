@@ -4,11 +4,11 @@
       <div>
         <div class="library-eyebrow">Agent 资源</div>
         <h2>{{ mode === 'skill' ? 'Skill 库' : '代码库' }}</h2>
-        <p>{{ mode === 'skill' ? '查看可复用的技能流程与版本。' : '编辑、发布并追溯 Python 或 Java 代码。' }}</p>
+        <p>{{ mode === 'skill' ? '查看可复用的技能流程与版本。' : '保存即发布，并追溯 Python 或 Java 代码版本。' }}</p>
       </div>
       <div class="library-actions">
         <a-button @click="$emit('back')">返回聊天</a-button>
-        <a-button type="primary" @click="createNew">{{ mode === 'skill' ? '新建 Skill 草稿' : '新建代码' }}</a-button>
+        <a-button type="primary" @click="createNew">{{ mode === 'skill' ? '新建 Skill' : '新建代码' }}</a-button>
       </div>
     </header>
 
@@ -19,14 +19,14 @@
           <span class="card-summary">{{ card.summary }}</span>
           <span class="card-meta">
             <a-tag v-if="mode === 'skill'" :color="card.state === 'ACTIVE' ? 'green' : 'default'">{{ stateText(card.state) }}</a-tag>
-            <a-tag v-else color="blue">代码</a-tag>
+            <a-tag v-else color="blue">已发布</a-tag>
             <span>v{{ card.latestVersion }}</span>
             <span>{{ card.owner ? '我的' : '已共享' }}</span>
           </span>
         </button>
       </div>
       <div v-else-if="!loading" class="library-empty">
-        {{ mode === 'skill' ? '还没有 Skill。完成任务后，Agent 可以为你生成草稿。' : '还没有代码。可以在线创建并发布第一个版本。' }}
+        {{ mode === 'skill' ? '还没有 Skill。完成任务后，Agent 可以为你创建并启用。' : '还没有代码。保存后即发布第一个版本。' }}
       </div>
     </a-spin>
 
@@ -45,9 +45,9 @@
         <a-alert v-if="selected?.state === 'DRAFT'" type="info" show-icon message="草稿不会被 Agent 自动选择或执行。" class="editor-alert" />
         <div class="field-label">Skill 定义（JSON）</div>
         <a-textarea v-model:value="skillJson" class="source-editor" :rows="22" :disabled="!!selected && !selected.owner" spellcheck="false" />
-        <div class="editor-help">包含名称、能力描述、适用条件、参数、步骤、预期结果、失败策略和样例。代码步骤需引用已验证的固定代码版本。</div>
+        <div class="editor-help">包含名称、能力描述、适用条件、参数、步骤、预期结果、失败策略和样例。代码步骤可引用有权限的已发布固定版本；样例状态另行显示。</div>
         <div v-if="!selected || selected.owner" class="editor-buttons">
-          <a-button type="primary" :loading="saving" @click="saveSkill">{{ selected ? '发布新版本' : '保存草稿' }}</a-button>
+          <a-button type="primary" :loading="saving" @click="saveSkill">{{ selected ? '保存并启用新版本' : '保存并启用' }}</a-button>
           <a-button v-if="selected" :loading="saving" @click="toggleSkill">{{ selected.state === 'ACTIVE' && selected.version === shownVersion ? '停用' : `启用 v${shownVersion}` }}</a-button>
         </div>
       </template>
@@ -65,9 +65,9 @@
         <a-textarea v-model:value="codeDraft.inputSchemaJson" :rows="4" :disabled="!!selected && !selected.owner" spellcheck="false" />
         <div class="field-label">输出结构（JSON Schema）</div>
         <a-textarea v-model:value="codeDraft.outputSchemaJson" :rows="4" :disabled="!!selected && !selected.owner" spellcheck="false" />
-        <a-alert v-if="selected" class="editor-alert" type="info" show-icon :message="`当前版本样例状态：${validationText}`" />
+        <a-alert v-if="selected" class="editor-alert" type="info" show-icon :message="`已发布 v${shownVersion}；样例状态：${validationText}`" />
         <div v-if="!selected || selected.owner" class="editor-buttons">
-          <a-button type="primary" :loading="saving" @click="saveCode">{{ selected ? '发布新版本' : '创建并发布' }}</a-button>
+          <a-button type="primary" :loading="saving" :disabled="!!selected && !hasCodeChanges" @click="saveCode">{{ selected ? '保存修改' : '保存代码' }}</a-button>
         </div>
       </template>
 
@@ -101,6 +101,7 @@ const shownVersion = ref(1)
 const requestedVersion = ref<number | null>(1)
 const skillJson = ref('')
 const validationState = ref('UNVERIFIED')
+const codeOriginal = ref('')
 const shareTarget = ref('')
 const codeDraft = reactive<CodeDraft>({
   name: '', summary: '', language: 'PYTHON', entrypoint: 'run', sourceCode: '',
@@ -110,6 +111,7 @@ const codeDraft = reactive<CodeDraft>({
 
 const drawerTitle = computed(() => `${props.mode === 'skill' ? 'Skill' : '代码'} · ${selected.value?.name ?? '新建'}`)
 const validationText = computed(() => ({ PASSED: '已通过', FAILED: '失败', UNVERIFIED: '待验证' })[validationState.value as 'PASSED' | 'FAILED' | 'UNVERIFIED'] ?? '待验证')
+const hasCodeChanges = computed(() => JSON.stringify(codeDraft) !== codeOriginal.value)
 const stateText = (state?: string) => ({ ACTIVE: '已启用', DRAFT: '草稿', DISABLED: '已停用' })[state as 'ACTIVE' | 'DRAFT' | 'DISABLED'] ?? '草稿'
 
 function unwrap<T>(response: { data: { code: number; message?: string; data: T } }): T {
@@ -137,6 +139,7 @@ function createNew() {
   }, null, 2)
   Object.assign(codeDraft, { name: '', summary: '', language: 'PYTHON', entrypoint: 'run', sourceCode: '',
     inputSchemaJson: '{"type":"object","properties":{}}', outputSchemaJson: '{"type":"object","properties":{}}' })
+  codeOriginal.value = JSON.stringify(codeDraft)
   drawerOpen.value = true
 }
 
@@ -165,6 +168,7 @@ async function loadVersion() {
       })
       validationState.value = version.validationState
       shownVersion.value = version.version
+      codeOriginal.value = JSON.stringify(codeDraft)
     }
   } catch (error) { message.error(error instanceof Error ? error.message : '读取版本失败') }
   finally { detailLoading.value = false }
@@ -184,11 +188,16 @@ async function saveSkill() {
       shownVersion.value = version
       requestedVersion.value = version
       selected.value.latestVersion = version
-      message.success(`已发布 Skill v${version}`)
+      selected.value.version = version
+      selected.value.state = 'ACTIVE'
+      message.success(`Skill v${version} 已保存并启用`)
     } else {
-      unwrap(await createSkill(definition))
-      message.success('Skill 草稿已保存，请审阅后启用')
-      drawerOpen.value = false
+      const id = unwrap(await createSkill(definition))
+      await refresh()
+      const created = cards.value.find(card => card.id === id)
+      if (created) await openCard(created)
+      else drawerOpen.value = false
+      message.success('Skill 已创建并启用 v1')
     }
     await refresh()
   } catch (error) { message.error(error instanceof Error ? error.message : '保存 Skill 失败') }
@@ -219,14 +228,18 @@ async function saveCode() {
       requestedVersion.value = version
       selected.value.latestVersion = version
       validationState.value = 'UNVERIFIED'
-      message.success(`已发布代码 v${version}`)
+      codeOriginal.value = JSON.stringify(codeDraft)
+      await refresh()
+      message.success(`修改已保存并发布为 v${version}，样例待验证`)
     } else {
-      unwrap(await createCode(codeDraft))
-      message.success('代码已创建并发布，样例验证后可绑定 Skill')
-      drawerOpen.value = false
+      const id = unwrap(await createCode(codeDraft))
+      await refresh()
+      const created = cards.value.find(card => card.id === id)
+      if (created) await openCard(created)
+      else drawerOpen.value = false
+      message.success('代码已创建并发布 v1，可绑定 Skill；样例待验证')
     }
-    await refresh()
-  } catch (error) { message.error(error instanceof Error ? error.message : '发布代码失败') }
+  } catch (error) { message.error(error instanceof Error ? error.message : '保存代码失败') }
   finally { saving.value = false }
 }
 

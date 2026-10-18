@@ -79,10 +79,13 @@ services:
       RAG_LLM_API_KEY: ${RAG_LLM_API_KEY:-}
       AGENT_BASE_URL: http://agent:8124
       AGENT_INTERNAL_KEY: ${AGENT_INTERNAL_KEY:?AGENT_INTERNAL_KEY is required}
+      AGENT_WORKSPACE_ROOT: /data/agent-user-files
       # 不传 RAG_RERANK_API_KEY：让 application.yml 自己回退到 embedding key
       DOC_USERNAME: ${DOC_USERNAME:-admin}
       DOC_PASSWORD: ${DOC_PASSWORD}
       JAVA_OPTS: -Xmx512m -Xms256m -XX:MaxMetaspaceSize=160m -Djava.awt.headless=true
+    volumes:
+      - agent-user-files:/data/agent-user-files
     depends_on:
       mysql:
         condition: service_healthy
@@ -92,6 +95,7 @@ services:
         condition: service_started
     networks:
       - cw
+
 
   agent:
     build:
@@ -127,6 +131,7 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  agent-user-files:
 
 networks:
   cw:

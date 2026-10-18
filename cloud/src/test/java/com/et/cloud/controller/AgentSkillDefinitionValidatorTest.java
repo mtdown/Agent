@@ -49,6 +49,14 @@ class AgentSkillDefinitionValidatorTest {
         assertTrue(error.getMessage().contains("parameters[0].description"), error.getMessage());
     }
 
+    @Test
+    void rejectsSkillStepReferencingUnregisteredTool() {
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(
+                validDefinition().replace("\"type\":\"code\",\"code_item_id\":\"9007199254740993\",\"code_version\":2,\"entrypoint\":\"run\",\"args\":{\"count\":\"$count\"}",
+                        "\"type\":\"tool\",\"tool\":\"shell\",\"args\":{}"),
+                (id, version, entrypoint) -> true));
+    }
+
     private static String validDefinition() {
         return "{\"name\":\"Example\",\"summary\":\"Runs a versioned code sample\","
                 + "\"when_to_use\":\"User asks for the sample\",\"when_not_to_use\":\"Input unavailable\","

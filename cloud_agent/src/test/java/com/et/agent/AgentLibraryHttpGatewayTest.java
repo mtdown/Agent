@@ -10,6 +10,30 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentLibraryHttpGatewayTest {
+    @Test void writesAndReadsPersonalFilesThroughApiPrefix() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> request = new AtomicReference<>();
+        server.createContext("/api/internal/agent/files", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            request.set(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " "
+                    + exchange.getRequestHeaders().getFirst("X-Agent-Key") + " " + body);
+            byte[] response = "{\"code\":0,\"data\":{\"path\":\"notes/a.txt\",\"content\":\"saved\",\"verified\":true},\"message\":\"ok\"}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway(
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            assertTrue(gateway.writeFile("7", "notes/a.txt", "saved", "create").contains("\"verified\":true"));
+            assertTrue(request.get().contains("POST /api/internal/agent/files?userId=7 secret"));
+            assertTrue(request.get().contains("\"mode\":\"create\""));
+            assertTrue(gateway.readFile("7", "notes/a.txt").contains("\"content\":\"saved\""));
+            assertTrue(request.get().contains("GET /api/internal/agent/files?path=notes%2Fa.txt&userId=7 secret"));
+        } finally { server.stop(0); }
+    }
+
     @Test void sendsCurrentUserAndInternalKeyToCloudLibrary() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> request = new AtomicReference<>();
