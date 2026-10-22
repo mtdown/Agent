@@ -62,6 +62,18 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
         return call("/api/internal/agent/wiki-documents", userId, body.toString()).asText();
     }
 
+    @Override public String listWritableWikiLocations(String userId, String spaceId, String cursor, Integer limit) {
+        if (spaceId != null && !spaceId.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("Invalid spaceId");
+        if (cursor != null && !cursor.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("Invalid cursor");
+        if (cursor != null && spaceId == null) throw new IllegalArgumentException("cursor requires spaceId");
+        if (limit != null && (limit < 1 || limit > 100)) throw new IllegalArgumentException("Invalid limit");
+        StringBuilder path = new StringBuilder("/api/internal/agent/wiki-locations");
+        if (spaceId != null) path.append("?spaceId=").append(spaceId);
+        if (cursor != null) path.append(spaceId == null ? '?' : '&').append("cursor=").append(cursor);
+        if (limit != null) path.append(path.indexOf("?") < 0 ? '?' : '&').append("limit=").append(limit);
+        return call(path.toString(), userId, null).toString();
+    }
+
     private JsonNode call(String path, String userId, String body) {
         if (key == null || key.isEmpty()) throw new IllegalStateException("Agent service credential is not configured");
         if (userId == null || !userId.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("Invalid user context");

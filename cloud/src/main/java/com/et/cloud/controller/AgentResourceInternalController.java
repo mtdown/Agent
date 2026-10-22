@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Map;
+import javax.annotation.Resource;
 
 /** User-scoped file and knowledge operations reachable only through the Agent key. */
 @RestController
@@ -20,6 +21,9 @@ public final class AgentResourceInternalController {
     private final AgentPersonalFileStore files;
     private final AgentWikiDocumentWriter wiki;
     private final String secret;
+
+    @Resource
+    private AgentWritableWikiLocations writableWikiLocations;
 
     public static final class WriteFileRequest {
         public String path;
@@ -65,6 +69,17 @@ public final class AgentResourceInternalController {
         if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "Missing knowledge document");
         try { return ResultUtils.success(wiki.create(user, body.spaceId, body.title, body.content)); }
         catch (IllegalArgumentException e) { throw new BusinessException(ErrorCode.PARAMS_ERROR, e.getMessage()); }
+    }
+
+    @GetMapping("/wiki-locations")
+    public BaseResponse<Map<String, Object>> listWritableWikiLocations(
+            @RequestHeader(value = "X-Agent-Key", required = false) String key,
+            @RequestParam String userId,
+            @RequestParam(required = false) String spaceId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        long user = requireUser(key, userId);
+        return ResultUtils.success(writableWikiLocations.list(user, spaceId, cursor, limit));
     }
 
     private long requireUser(String key, String userId) {

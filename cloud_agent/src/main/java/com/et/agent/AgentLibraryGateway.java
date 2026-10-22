@@ -8,4 +8,8 @@ public interface AgentLibraryGateway {
     String writeFile(String userId, String path, String content, String mode);
     String readFile(String userId, String path);
     String writeWikiDocument(String userId, String spaceId, String title, String content);
+
+    default String listWritableWikiLocations(String userId, String spaceId, String cursor, Integer limit) {
+        throw new UnsupportedOperationException("Writable Wiki directory is unavailable");
+    }
 }

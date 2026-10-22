@@ -10,6 +10,34 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentLibraryHttpGatewayTest {
+    @Test void readsWritableWikiLocationsWithBoundUserAndCursor() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> request = new AtomicReference<>();
+        server.createContext("/api/internal/agent/wiki-locations", exchange -> {
+            request.set(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " "
+                    + exchange.getRequestHeaders().getFirst("X-Agent-Key"));
+            byte[] response = "{\"code\":0,\"data\":{\"spaces\":[],\"folders\":[],\"nextCursor\":null}}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway(
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            assertTrue(gateway.listWritableWikiLocations("7", "11", "9007199254740993", 25)
+                    .contains("\"folders\":[]"));
+            assertTrue(request.get().contains("GET /api/internal/agent/wiki-locations?spaceId=11&cursor=9007199254740993&limit=25&userId=7 secret"));
+            AgentLoop.Tool tool = AgentToolRegistry.bind("7", gateway).get("list_writable_wiki_locations");
+            assertNotNull(tool);
+            assertTrue(tool.execute("{\"spaceId\":\"11\",\"cursor\":\"9007199254740993\",\"limit\":25}")
+                    .contains("\"spaces\":[]"));
+            assertFalse(AgentToolRegistry.declaration("list_writable_wiki_locations")
+                    .path("function").path("parameters").path("properties").has("userId"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> gateway.listWritableWikiLocations("7", "11", null, 101));
+        } finally { server.stop(0); }
+    }
     @Test void writesAndReadsPersonalFilesThroughApiPrefix() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> request = new AtomicReference<>();
