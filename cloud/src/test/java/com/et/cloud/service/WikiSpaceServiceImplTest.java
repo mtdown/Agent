@@ -114,10 +114,14 @@ class WikiSpaceServiceImplTest {
         assertFalse(wikiSpaceService.checkSpaceEditable(teamSpace, member));
     }
 
+
     @Test
-    void publicSpaceIsNotEditableByOrdinaryUser() {
+    void publicSpaceIsEditableByOrdinaryUser() {
         WikiSpace publicSpace = space(WikiSpaceService.TYPE_PUBLIC, null);
 
+        assertTrue(wikiSpaceService.checkSpaceEditable(publicSpace, user(100L, UserConstant.DEFAULT_ROLE)));
+        assertFalse(wikiSpaceService.checkSpaceEditable(publicSpace, null));
+        publicSpace.setIsDelete(1);
         assertFalse(wikiSpaceService.checkSpaceEditable(publicSpace, user(100L, UserConstant.DEFAULT_ROLE)));
     }
 

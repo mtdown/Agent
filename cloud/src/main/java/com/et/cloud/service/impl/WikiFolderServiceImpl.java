@@ -55,21 +55,25 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
 
     @Override
     public WikiFolder requireVisibleFolder(Long folderId, Long expectedSpaceId, User loginUser) {
+        return requireFolderAccess(folderId, expectedSpaceId, loginUser, false);
+    }
+
+    @Override
+    public WikiFolder requireFolderAccess(Long folderId, Long expectedSpaceId, User loginUser, boolean isWrite) {
         ThrowUtils.throwIf(folderId == null || folderId <= 0, ErrorCode.PARAMS_ERROR);
         WikiFolder wikiFolder = this.getById(folderId);
         ThrowUtils.throwIf(wikiFolder == null || Objects.equals(wikiFolder.getIsDelete(), 1), ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(expectedSpaceId != null && !Objects.equals(expectedSpaceId, wikiFolder.getSpaceId()), ErrorCode.PARAMS_ERROR);
-        WikiSpace wikiSpace = wikiSpaceService.requireVisibleSpace(wikiFolder.getSpaceId(), loginUser);
-        ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NO_AUTH_ERROR);
+        wikiSpaceService.requireSpaceAccess(wikiFolder.getSpaceId(), loginUser, isWrite);
         return wikiFolder;
     }
 
     @Override
     public Long createFolder(Long spaceId, Long parentId, String name, User loginUser) {
-        wikiSpaceService.requireVisibleSpace(spaceId, loginUser);
+        wikiSpaceService.requireSpaceAccess(spaceId, loginUser, true);
         ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "文件夹名称不能为空");
         if (parentId != null) {
-            requireVisibleFolder(parentId, spaceId, loginUser);
+            requireFolderAccess(parentId, spaceId, loginUser, true);
         }
         WikiFolder wikiFolder = new WikiFolder();
         wikiFolder.setSpaceId(spaceId);
@@ -84,7 +88,7 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
 
     @Override
     public Boolean renameFolder(Long folderId, String name, User loginUser) {
-        WikiFolder oldFolder = requireVisibleFolder(folderId, null, loginUser);
+        WikiFolder oldFolder = requireFolderAccess(folderId, null, loginUser, true);
         ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "文件夹名称不能为空");
         oldFolder.setName(name);
         oldFolder.setEditTime(new Date());
@@ -95,10 +99,10 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
 
     @Override
     public Boolean moveFolder(Long folderId, Long parentId, User loginUser) {
-        WikiFolder oldFolder = requireVisibleFolder(folderId, null, loginUser);
+        WikiFolder oldFolder = requireFolderAccess(folderId, null, loginUser, true);
         ThrowUtils.throwIf(Objects.equals(folderId, parentId), ErrorCode.PARAMS_ERROR, "不能移动到自身");
         if (parentId != null) {
-            WikiFolder parent = requireVisibleFolder(parentId, oldFolder.getSpaceId(), loginUser);
+            WikiFolder parent = requireFolderAccess(parentId, oldFolder.getSpaceId(), loginUser, true);
             List<Long> subtreeIds = collectFolderSubtreeIds(oldFolder.getSpaceId(), oldFolder.getId());
             ThrowUtils.throwIf(subtreeIds.contains(parent.getId()), ErrorCode.PARAMS_ERROR, "不能移动到子文件夹");
         }
@@ -117,7 +121,7 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteFolderTree(Long folderId, User loginUser) {
-        WikiFolder oldFolder = requireVisibleFolder(folderId, null, loginUser);
+        WikiFolder oldFolder = requireFolderAccess(folderId, null, loginUser, true);
         List<Long> subtreeIds = collectFolderSubtreeIds(oldFolder.getSpaceId(), folderId);
         String ids = joinIds(subtreeIds);
         Date now = new Date();
@@ -134,7 +138,7 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
         ThrowUtils.throwIf(folder == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(folder.getIsDelete(), 1), ErrorCode.PARAMS_ERROR, "该文件夹不在回收站中");
         WikiSpace space = wikiSpaceMapper.selectByIdIncludeDeleted(folder.getSpaceId());
-        ThrowUtils.throwIf(!wikiSpaceService.checkSpaceVisible(space, loginUser), ErrorCode.NO_AUTH_ERROR);
+        ThrowUtils.throwIf(!wikiSpaceService.checkSpaceAccess(space, loginUser, true), ErrorCode.NO_AUTH_ERROR);
         if (folder.getParentId() != null && baseMapper.selectByIdIncludeDeleted(folder.getParentId()) == null) {
             baseMapper.moveToRoot(folder.getId());
         }
@@ -152,7 +156,7 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
         ThrowUtils.throwIf(folder == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(folder.getIsDelete(), 1), ErrorCode.PARAMS_ERROR, "该文件夹不在回收站中");
         WikiSpace space = wikiSpaceMapper.selectByIdIncludeDeleted(folder.getSpaceId());
-        ThrowUtils.throwIf(!wikiSpaceService.checkSpaceVisible(space, loginUser), ErrorCode.NO_AUTH_ERROR);
+        ThrowUtils.throwIf(!wikiSpaceService.checkSpaceAccess(space, loginUser, true), ErrorCode.NO_AUTH_ERROR);
         List<Long> subtreeIds = collectFolderSubtreeIds(folder.getSpaceId(), folderId);
         String ids = joinIds(subtreeIds);
         documentWikiMapper.physicallyDeleteByFolderIds(ids);

@@ -7,6 +7,7 @@ import com.et.cloud.model.entity.User;
 import com.et.cloud.service.DocumentWikiService;
 import com.et.cloud.service.UserService;
 import com.et.cloud.service.WikiCacheManager;
+import com.et.cloud.service.WikiSpaceService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -30,6 +31,7 @@ class DocumentWikiControllerEditFormatTest {
         ReflectionTestUtils.setField(controller, "documentWikiService", documentWikiService);
         ReflectionTestUtils.setField(controller, "userService", userService);
         ReflectionTestUtils.setField(controller, "wikiCacheManager", wikiCacheManager);
+        ReflectionTestUtils.setField(controller, "wikiSpaceService", mock(WikiSpaceService.class));
         User loginUser = user(7L);
         DocumentWiki oldDocument = storedDocument(99L, null);
         DocumentWikiEditRequest request = new DocumentWikiEditRequest();
@@ -41,7 +43,6 @@ class DocumentWikiControllerEditFormatTest {
 
         when(userService.getLoginUser(any())).thenReturn(loginUser);
         when(documentWikiService.getById(99L)).thenReturn(oldDocument);
-        doNothing().when(documentWikiService).checkDocumentWikiVisible(loginUser, oldDocument);
 
         assertThrows(BusinessException.class,
                 () -> controller.editDocumentWiki(request, new MockHttpServletRequest()));
@@ -58,6 +59,7 @@ class DocumentWikiControllerEditFormatTest {
         ReflectionTestUtils.setField(controller, "documentWikiService", documentWikiService);
         ReflectionTestUtils.setField(controller, "userService", userService);
         ReflectionTestUtils.setField(controller, "wikiCacheManager", wikiCacheManager);
+        ReflectionTestUtils.setField(controller, "wikiSpaceService", mock(WikiSpaceService.class));
         User loginUser = user(7L);
         DocumentWiki oldDocument = storedDocument(100L, "html");
         DocumentWikiEditRequest request = new DocumentWikiEditRequest();
@@ -68,7 +70,6 @@ class DocumentWikiControllerEditFormatTest {
 
         when(userService.getLoginUser(any())).thenReturn(loginUser);
         when(documentWikiService.getById(100L)).thenReturn(oldDocument);
-        doNothing().when(documentWikiService).checkDocumentWikiVisible(loginUser, oldDocument);
 
         assertThrows(BusinessException.class,
                 () -> controller.editDocumentWiki(request, new MockHttpServletRequest()));
@@ -84,6 +85,7 @@ class DocumentWikiControllerEditFormatTest {
         ReflectionTestUtils.setField(controller, "documentWikiService", documentWikiService);
         ReflectionTestUtils.setField(controller, "userService", userService);
         ReflectionTestUtils.setField(controller, "wikiCacheManager", wikiCacheManager);
+        ReflectionTestUtils.setField(controller, "wikiSpaceService", mock(WikiSpaceService.class));
         User loginUser = user(7L);
         DocumentWiki oldDocument = storedDocument(101L, "markdown");
         DocumentWikiEditRequest request = new DocumentWikiEditRequest();
@@ -95,7 +97,6 @@ class DocumentWikiControllerEditFormatTest {
 
         when(userService.getLoginUser(any())).thenReturn(loginUser);
         when(documentWikiService.getById(101L)).thenReturn(oldDocument);
-        doNothing().when(documentWikiService).checkDocumentWikiVisible(loginUser, oldDocument);
         when(documentWikiService.buildSummary("# Title\n\nBody")).thenReturn("Title Body");
         when(documentWikiService.updateById(any())).thenReturn(true);
 

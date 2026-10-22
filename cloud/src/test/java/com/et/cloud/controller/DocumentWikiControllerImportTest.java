@@ -53,7 +53,7 @@ class DocumentWikiControllerImportTest {
 
         when(userService.getLoginUser(any())).thenReturn(loginUser);
         when(wikiSpaceService.requireEditableSpace(11L, loginUser)).thenReturn(wikiSpace);
-        when(wikiFolderService.requireVisibleFolder(22L, 11L, loginUser)).thenReturn(folder);
+        when(wikiFolderService.requireFolderAccess(22L, 11L, loginUser, true)).thenReturn(folder);
         when(importService.parse(file, "Custom title")).thenReturn(imported);
         when(documentWikiService.save(any())).thenAnswer(invocation -> {
             DocumentWiki documentWiki = invocation.getArgument(0);
@@ -96,7 +96,7 @@ class DocumentWikiControllerImportTest {
 
         when(userService.getLoginUser(any())).thenReturn(loginUser);
         when(wikiSpaceService.requireEditableSpace(11L, loginUser)).thenReturn(wikiSpace);
-        when(wikiFolderService.requireVisibleFolder(22L, 11L, loginUser))
+        when(wikiFolderService.requireFolderAccess(22L, 11L, loginUser, true))
                 .thenThrow(new BusinessException(ErrorCode.PARAMS_ERROR, "文件夹不属于目标空间"));
 
         assertThrows(BusinessException.class,

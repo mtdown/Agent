@@ -11,6 +11,8 @@ public interface WikiFolderService extends IService<WikiFolder> {
 
     WikiFolder requireVisibleFolder(Long folderId, Long expectedSpaceId, User loginUser);
 
+    WikiFolder requireFolderAccess(Long folderId, Long expectedSpaceId, User loginUser, boolean isWrite);
+
     Long createFolder(Long spaceId, Long parentId, String name, User loginUser);
 
     Boolean renameFolder(Long folderId, String name, User loginUser);

@@ -77,6 +77,25 @@ public final class AgentToolRegistry {
                     return result("id", gateway.writeWikiDocument(user, requiredText(args, "spaceId"),
                             requiredText(args, "title"), requiredText(args, "content")), "space", "knowledge");
                 });
+        ObjectNode locations = JSON.createObjectNode().put("type", "object").put("additionalProperties", false);
+        ObjectNode locationFields = locations.putObject("properties");
+        locationFields.putObject("spaceId").put("type", "string");
+        locationFields.putObject("cursor").put("type", "string");
+        locationFields.putObject("limit").put("type", "integer");
+        locations.putArray("required");
+        register("list_writable_wiki_locations", "List the current user's writable public, personal and team spaces. " +
+                        "With spaceId, list up to limit active folders; pass nextCursor as cursor for the next page. " +
+                        "Use defaultPersonalSpaceId when the user did not name a destination. IDs are strings.",
+                locations, (user, gateway) -> raw -> {
+                    JsonNode args = arguments(raw);
+                    String spaceId = optionalText(args, "spaceId");
+                    String cursor = optionalText(args, "cursor");
+                    JsonNode limitNode = args.path("limit");
+                    if (!limitNode.isMissingNode() && (!limitNode.isIntegralNumber() || !limitNode.canConvertToInt()))
+                        throw new IllegalArgumentException("Invalid limit");
+                    Integer limit = limitNode.isMissingNode() ? null : limitNode.asInt();
+                    return gateway.listWritableWikiLocations(user, spaceId, cursor, limit);
+                });
     }
 
     private AgentToolRegistry() { }
@@ -125,6 +144,14 @@ public final class AgentToolRegistry {
         JsonNode value = args.path(name);
         if (!value.isTextual() || value.asText().trim().isEmpty())
             throw new IllegalArgumentException("Missing " + name);
+        return value.asText();
+    }
+
+    private static String optionalText(JsonNode args, String name) {
+        JsonNode value = args.path(name);
+        if (value.isMissingNode()) return null;
+        if (!value.isTextual() || value.asText().trim().isEmpty())
+            throw new IllegalArgumentException("Invalid " + name);
         return value.asText();
     }
 

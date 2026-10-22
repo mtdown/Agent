@@ -28,6 +28,10 @@ public interface WikiSpaceService extends IService<WikiSpace> {
 
     boolean checkSpaceVisible(WikiSpace wikiSpace, User loginUser);
 
+    boolean checkSpaceAccess(WikiSpace wikiSpace, User loginUser, boolean isWrite);
+
+    WikiSpace requireSpaceAccess(Long spaceId, User loginUser, boolean isWrite);
+
     WikiSpace requireVisibleSpace(Long spaceId, User loginUser);
 
     boolean checkSpaceEditable(WikiSpace wikiSpace, User loginUser);
