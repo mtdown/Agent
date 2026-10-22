@@ -93,6 +93,11 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
 
     @Override
     public boolean checkSpaceVisible(WikiSpace wikiSpace, User loginUser) {
+        return checkSpaceAccess(wikiSpace, loginUser, false);
+    }
+
+    @Override
+    public boolean checkSpaceAccess(WikiSpace wikiSpace, User loginUser, boolean isWrite) {
         if (wikiSpace == null || loginUser == null || Objects.equals(wikiSpace.getIsDelete(), 1)) {
             return false;
         }
@@ -106,51 +111,40 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
             return Objects.equals(wikiSpace.getOwnerUserId(), loginUser.getId());
         }
         if (Objects.equals(wikiSpace.getType(), TYPE_TEAM)) {
-            return wikiSpaceUserMapper.selectCount(new QueryWrapper<WikiSpaceUser>()
+            QueryWrapper<WikiSpaceUser> membership = new QueryWrapper<WikiSpaceUser>()
                     .eq("spaceId", wikiSpace.getId())
                     .eq("userId", loginUser.getId())
-                    .eq("isDelete", 0)) > 0;
+                    .eq("isDelete", 0);
+            if (isWrite) {
+                membership.in("spaceRole", SpaceRoleEnum.ADMIN.getValue(), SpaceRoleEnum.EDITOR.getValue());
+            }
+            return wikiSpaceUserMapper.selectCount(membership) > 0;
         }
         return false;
     }
 
     @Override
     public WikiSpace requireVisibleSpace(Long spaceId, User loginUser) {
+        return requireSpaceAccess(spaceId, loginUser, false);
+    }
+
+    @Override
+    public WikiSpace requireSpaceAccess(Long spaceId, User loginUser, boolean isWrite) {
         ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
         WikiSpace wikiSpace = this.getById(spaceId);
         ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
-        ThrowUtils.throwIf(!checkSpaceVisible(wikiSpace, loginUser), ErrorCode.NO_AUTH_ERROR);
+        ThrowUtils.throwIf(!checkSpaceAccess(wikiSpace, loginUser, isWrite), ErrorCode.NO_AUTH_ERROR);
         return wikiSpace;
     }
 
     @Override
     public boolean checkSpaceEditable(WikiSpace wikiSpace, User loginUser) {
-        if (wikiSpace == null || loginUser == null || Objects.equals(wikiSpace.getIsDelete(), 1)) {
-            return false;
-        }
-        if (isAdmin(loginUser)) {
-            return true;
-        }
-        if (Objects.equals(wikiSpace.getType(), TYPE_PERSONAL)) {
-            return Objects.equals(wikiSpace.getOwnerUserId(), loginUser.getId());
-        }
-        if (Objects.equals(wikiSpace.getType(), TYPE_TEAM)) {
-            return wikiSpaceUserMapper.selectCount(new QueryWrapper<WikiSpaceUser>()
-                    .eq("spaceId", wikiSpace.getId())
-                    .eq("userId", loginUser.getId())
-                    .eq("isDelete", 0)
-                    .in("spaceRole", SpaceRoleEnum.ADMIN.getValue(), SpaceRoleEnum.EDITOR.getValue())) > 0;
-        }
-        return false;
+        return checkSpaceAccess(wikiSpace, loginUser, true);
     }
 
     @Override
     public WikiSpace requireEditableSpace(Long spaceId, User loginUser) {
-        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
-        WikiSpace wikiSpace = this.getById(spaceId);
-        ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
-        ThrowUtils.throwIf(!checkSpaceEditable(wikiSpace, loginUser), ErrorCode.NO_AUTH_ERROR);
-        return wikiSpace;
+        return requireSpaceAccess(spaceId, loginUser, true);
     }
 
     @Override

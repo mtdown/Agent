@@ -203,7 +203,7 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         if (folderId == null) {
             return null;
         }
-        WikiFolder folder = wikiFolderService.requireVisibleFolder(folderId, wikiSpace.getId(), loginUser);
+        WikiFolder folder = wikiFolderService.requireFolderAccess(folderId, wikiSpace.getId(), loginUser, true);
         return folder.getId();
     }
 

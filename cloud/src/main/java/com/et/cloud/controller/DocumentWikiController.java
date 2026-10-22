@@ -85,9 +85,9 @@ public class DocumentWikiController {
         DocumentWiki documentWiki = new DocumentWiki();
         BeanUtils.copyProperties(documentWikiAddRequest, documentWiki);
         documentWiki.setTags(JSONUtil.toJsonStr(documentWikiAddRequest.getTags()));
-        WikiSpace wikiSpace = requireVisibleSpace(documentWikiAddRequest.getSpaceId(), request);
+        WikiSpace wikiSpace = wikiSpaceService.requireSpaceAccess(documentWikiAddRequest.getSpaceId(), loginUser, true);
         if (documentWikiAddRequest.getFolderId() != null) {
-            WikiFolder folder = wikiFolderService.requireVisibleFolder(documentWikiAddRequest.getFolderId(), wikiSpace.getId(), loginUser);
+            WikiFolder folder = wikiFolderService.requireFolderAccess(documentWikiAddRequest.getFolderId(), wikiSpace.getId(), loginUser, true);
             documentWiki.setFolderId(folder.getId());
         }
         documentWiki.setSpaceId(wikiSpace.getId());
@@ -119,7 +119,7 @@ public class DocumentWikiController {
         WikiSpace wikiSpace = wikiSpaceService.requireEditableSpace(spaceId, loginUser);
         Long targetFolderId = null;
         if (folderId != null) {
-            WikiFolder folder = wikiFolderService.requireVisibleFolder(folderId, wikiSpace.getId(), loginUser);
+            WikiFolder folder = wikiFolderService.requireFolderAccess(folderId, wikiSpace.getId(), loginUser, true);
             targetFolderId = folder.getId();
         }
         ImportedWikiDocument imported = wikiDocumentImportService.parse(multipartFile, title);
@@ -165,7 +165,7 @@ public class DocumentWikiController {
         long id = deleteRequest.getId();
         DocumentWiki oldDocumentWiki = documentWikiService.getById(id);
         ThrowUtils.throwIf(oldDocumentWiki == null, ErrorCode.NOT_FOUND_ERROR);
-        documentWikiService.checkDocumentWikiVisible(loginUser, oldDocumentWiki);
+        wikiSpaceService.requireSpaceAccess(oldDocumentWiki.getSpaceId(), loginUser, true);
         boolean result = documentWikiService.logicalDelete(id, loginUser.getId());
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         wikiCacheManager.clearDocument(oldDocumentWiki.getSpaceId(), id);
@@ -242,7 +242,7 @@ public class DocumentWikiController {
         long id = documentWikiEditRequest.getId();
         DocumentWiki oldDocumentWiki = documentWikiService.getById(id);
         ThrowUtils.throwIf(oldDocumentWiki == null, ErrorCode.NOT_FOUND_ERROR);
-        documentWikiService.checkDocumentWikiVisible(loginUser, oldDocumentWiki);
+        wikiSpaceService.requireSpaceAccess(oldDocumentWiki.getSpaceId(), loginUser, true);
         DocumentWiki documentWiki = new DocumentWiki();
         BeanUtils.copyProperties(documentWikiEditRequest, documentWiki);
         documentWiki.setSpaceId(oldDocumentWiki.getSpaceId());
@@ -271,10 +271,10 @@ public class DocumentWikiController {
         User loginUser = userService.getLoginUser(request);
         DocumentWiki documentWiki = documentWikiService.getById(moveRequest.getId());
         ThrowUtils.throwIf(documentWiki == null, ErrorCode.NOT_FOUND_ERROR);
-        documentWikiService.checkDocumentWikiVisible(loginUser, documentWiki);
-        WikiSpace targetSpace = wikiSpaceService.requireVisibleSpace(moveRequest.getTargetSpaceId(), loginUser);
+        wikiSpaceService.requireSpaceAccess(documentWiki.getSpaceId(), loginUser, true);
+        WikiSpace targetSpace = wikiSpaceService.requireSpaceAccess(moveRequest.getTargetSpaceId(), loginUser, true);
         if (moveRequest.getTargetFolderId() != null) {
-            wikiFolderService.requireVisibleFolder(moveRequest.getTargetFolderId(), targetSpace.getId(), loginUser);
+            wikiFolderService.requireFolderAccess(moveRequest.getTargetFolderId(), targetSpace.getId(), loginUser, true);
         }
         Long oldSpaceId = documentWiki.getSpaceId();
         // moveDocument 用显式 SET wrapper（null folderId = 移到空间根）并发布 RAG 索引事件
@@ -300,11 +300,6 @@ public class DocumentWikiController {
                 .map(documentWiki -> documentWikiService.getDocumentWikiVis(documentWiki, request))
                 .collect(java.util.stream.Collectors.toList());
         return ResultUtils.success(visList);
-    }
-
-    private WikiSpace requireVisibleSpace(Long spaceId, HttpServletRequest request) {
-        User loginUser = userService.getLoginUser(request);
-        return wikiSpaceService.requireVisibleSpace(spaceId, loginUser);
     }
 
     private void prepareVisibleDocumentWikiQuery(DocumentWikiQueryRequest documentWikiQueryRequest, HttpServletRequest request) {

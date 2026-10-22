@@ -94,14 +94,17 @@ public class WikiRecycleController {
                                          HttpServletRequest request) {
         ThrowUtils.throwIf(restoreRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
-        wikiSpaceService.requireVisibleSpace(restoreRequest.getSpaceId(), loginUser);
         if ("folder".equals(restoreRequest.getItemType())) {
+            WikiFolder folder = wikiFolderMapper.selectByIdIncludeDeleted(restoreRequest.getItemId());
+            ThrowUtils.throwIf(folder == null, ErrorCode.NOT_FOUND_ERROR);
+            ThrowUtils.throwIf(!Objects.equals(folder.getSpaceId(), restoreRequest.getSpaceId()), ErrorCode.PARAMS_ERROR);
             return ResultUtils.success(wikiFolderService.restoreFolderTree(restoreRequest.getItemId(), loginUser));
         }
         DocumentWiki document = documentWikiService.getByIdIncludeDeleted(restoreRequest.getItemId());
         ThrowUtils.throwIf(document == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(document.getIsDelete(), 1), ErrorCode.PARAMS_ERROR, "该文档不在回收站中");
-        wikiSpaceService.requireVisibleSpace(document.getSpaceId(), loginUser);
+        ThrowUtils.throwIf(!Objects.equals(document.getSpaceId(), restoreRequest.getSpaceId()), ErrorCode.PARAMS_ERROR);
+        wikiSpaceService.requireSpaceAccess(document.getSpaceId(), loginUser, true);
         Boolean result = documentWikiService.restore(document.getId());
         wikiCacheManager.clearDocument(document.getSpaceId(), document.getId());
         return ResultUtils.success(result);
@@ -112,14 +115,17 @@ public class WikiRecycleController {
                                                  HttpServletRequest request) {
         ThrowUtils.throwIf(deleteRequest == null || !Boolean.TRUE.equals(deleteRequest.getConfirm()), ErrorCode.PARAMS_ERROR, "请确认永久删除");
         User loginUser = userService.getLoginUser(request);
-        wikiSpaceService.requireVisibleSpace(deleteRequest.getSpaceId(), loginUser);
         if ("folder".equals(deleteRequest.getItemType())) {
+            WikiFolder folder = wikiFolderMapper.selectByIdIncludeDeleted(deleteRequest.getItemId());
+            ThrowUtils.throwIf(folder == null, ErrorCode.NOT_FOUND_ERROR);
+            ThrowUtils.throwIf(!Objects.equals(folder.getSpaceId(), deleteRequest.getSpaceId()), ErrorCode.PARAMS_ERROR);
             return ResultUtils.success(wikiFolderService.permanentDeleteFolderTree(deleteRequest.getItemId(), loginUser));
         }
         DocumentWiki document = documentWikiService.getByIdIncludeDeleted(deleteRequest.getItemId());
         ThrowUtils.throwIf(document == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(document.getIsDelete(), 1), ErrorCode.PARAMS_ERROR, "该文档不在回收站中");
-        wikiSpaceService.requireVisibleSpace(document.getSpaceId(), loginUser);
+        ThrowUtils.throwIf(!Objects.equals(document.getSpaceId(), deleteRequest.getSpaceId()), ErrorCode.PARAMS_ERROR);
+        wikiSpaceService.requireSpaceAccess(document.getSpaceId(), loginUser, true);
         Boolean result = documentWikiService.permanentDelete(document.getId());
         wikiCacheManager.clearSpace(document.getSpaceId());
         return ResultUtils.success(result);
