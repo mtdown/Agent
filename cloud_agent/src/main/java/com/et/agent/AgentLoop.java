@@ -52,9 +52,18 @@ public final class AgentLoop {
         public final Usage usage;
         public final Long firstAnswerMs;
         public final long totalMs;
-        public Result(Usage usage, Long firstAnswerMs, long totalMs) {
+        public final String choiceRequest;
+        public final List<ToolEvent> wikiEvents;
+        public Result(Usage usage, Long firstAnswerMs, long totalMs,
+                      String choiceRequest, List<ToolEvent> wikiEvents) {
             this.usage = usage; this.firstAnswerMs = firstAnswerMs; this.totalMs = totalMs;
+            this.choiceRequest = choiceRequest;
+            this.wikiEvents = Collections.unmodifiableList(new ArrayList<>(wikiEvents));
         }
+    }
+    public static final class ToolEvent {
+        public final String name, result;
+        public ToolEvent(String name, String result) { this.name = name; this.result = result; }
     }
     public static final class Cancelled extends RuntimeException { }
 
@@ -89,7 +98,10 @@ public final class AgentLoop {
                 SkillDraftAuthoring.INSTRUCTIONS + " " +
                 "The user also has persistent personal files and may edit authorized knowledge spaces. " +
                 "For personal files call write_file with a relative path and explicit mode; use read_file to check contents. " +
-                "For knowledge documents call write_wiki_document only with a specific editable space ID. " +
+                "For a Wiki document save, prefer the built-in Skill builtin:wiki-write@1: call get_skill first, then list_writable_wiki_locations. " +
+                "Never ask the user for a space ID and never show a space, folder, document or user ID in an answer. " +
+                "If content is missing, ask for it before creating a folder. Call plan_wiki_destination after listing writable spaces. If the user did not specify a destination, use destinationType=unspecified and wait for a structured choice rather than selecting personal space automatically. " +
+                "A unique named writable team may be used directly. Once a destination is selected, call create_wiki_folder and create_wiki_document in order; report success only after the document tool succeeds. " +
                 "Skill and code libraries are separate destinations reached through create_skill and create_code. " +
                 "Do not reinterpret 'personal space' as the Skill or code library, and do not claim a file was saved without a successful tool result. " +
                 "Use create_skill to save and enable a structured Skill and create_code to save Python or Java source when the user asks you to create or install them; never merely provide a copy script and claim installation. " +
@@ -118,15 +130,19 @@ public final class AgentLoop {
         int toolResultChars = 0;
         Map<String, Tool> availableTools = new HashMap<>(tools);
         if (requestTools != null) availableTools.putAll(requestTools);
+        boolean guardWikiText = availableTools.containsKey("plan_wiki_destination");
+        List<ToolEvent> wikiEvents = new ArrayList<>();
         for (int turnNumber = 1; turnNumber <= maxTurns; turnNumber++) {
             check(started, cancelled);
             StringBuilder answer = new StringBuilder();
+            List<String> bufferedChunks = new ArrayList<>();
             Consumer<String> answerDelta = chunk -> {
                 check(started, cancelled);
                 if (chunk != null && !chunk.isEmpty()) {
                     if (firstAnswerMs[0] == null) firstAnswerMs[0] = elapsed(started);
                     answer.append(chunk);
-                    delta.accept(chunk);
+                    if (guardWikiText) bufferedChunks.add(chunk);
+                    else delta.accept(chunk);
                 }
             };
             Turn turn = model instanceof ToolAwareModel
@@ -136,8 +152,12 @@ public final class AgentLoop {
             check(started, cancelled);
             if (turn.usage == null) usageAvailable = false;
             else { input += turn.usage.promptTokens; output += turn.usage.completionTokens; }
-            if (turn.toolCalls == null || turn.toolCalls.isEmpty())
-                return new Result(usageAvailable ? new Usage(input, output) : null, firstAnswerMs[0], elapsed(started));
+            if (turn.toolCalls == null || turn.toolCalls.isEmpty()) {
+                if (guardWikiText && wikiEvents.isEmpty())
+                    for (String bufferedChunk : bufferedChunks) delta.accept(bufferedChunk);
+                return new Result(usageAvailable ? new Usage(input, output) : null, firstAnswerMs[0],
+                        elapsed(started), null, wikiEvents);
+            }
             if (turnNumber == maxTurns) throw new IllegalStateException("Agent turn limit reached");
             history.add(new Message("assistant", answer.toString(), null, null, turn.toolCalls));
             for (ToolCall call : turn.toolCalls) {
@@ -160,6 +180,19 @@ public final class AgentLoop {
                 if (result == null) throw new IllegalStateException("Tool returned no result");
                 toolResultChars += result.length();
                 if (toolResultChars > maxToolResultChars) throw new IllegalStateException("Tool result limit reached");
+                if (call.name.equals("plan_wiki_destination") || call.name.equals("list_writable_wiki_locations")
+                        || call.name.equals("create_wiki_folder") || call.name.equals("create_wiki_document")
+                        || call.name.equals("write_wiki_document"))
+                    wikiEvents.add(new ToolEvent(call.name, result));
+                if (call.name.equals("plan_wiki_destination")) {
+                    try {
+                        if (JSON.readTree(result).path("choiceRequired").asBoolean(false))
+                            return new Result(usageAvailable ? new Usage(input, output) : null,
+                                    firstAnswerMs[0], elapsed(started), result, wikiEvents);
+                    } catch (java.io.IOException e) {
+                        throw new IllegalStateException("Invalid destination planning result", e);
+                    }
+                }
                 history.add(new Message("tool", result, call.id, call.name));
             }
         }

@@ -29,7 +29,8 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
     }
 
     @Override public String getSkill(String userId, String id, int version) {
-        if (!id.matches("[1-9][0-9]{0,18}") || version < 1) throw new IllegalArgumentException("Invalid Skill reference");
+        if (!(id.matches("[1-9][0-9]{0,18}") || "builtin:wiki-write".equals(id)) || version < 1)
+            throw new IllegalArgumentException("Invalid Skill reference");
         return call("/api/internal/agent/skills/" + id + "/versions/" + version, userId, null).toString();
     }
 
@@ -59,7 +60,22 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
     @Override public String writeWikiDocument(String userId, String spaceId, String title, String content) {
         ObjectNode body = JSON.createObjectNode();
         body.put("spaceId", spaceId); body.put("title", title); body.put("content", content);
-        return call("/api/internal/agent/wiki-documents", userId, body.toString()).asText();
+        return call("/api/internal/agent/wiki-documents", userId, body.toString()).toString();
+    }
+
+    @Override public String createWikiFolder(String userId, String spaceId, String taskName) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("spaceId", spaceId); body.put("taskName", taskName);
+        return call("/api/internal/agent/wiki-folders", userId, body.toString()).toString();
+    }
+
+    @Override public String createWikiDocument(String userId, String spaceId, String folderId,
+                                               String title, String content) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("spaceId", spaceId); body.put("folderId", folderId);
+        if (title != null) body.put("title", title);
+        body.put("content", content);
+        return call("/api/internal/agent/wiki-documents/create", userId, body.toString()).toString();
     }
 
     @Override public String listWritableWikiLocations(String userId, String spaceId, String cursor, Integer limit) {
@@ -82,7 +98,7 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
                     + "userId=" + URLEncoder.encode(userId, StandardCharsets.UTF_8.name()));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20))
                     .header("X-Agent-Key", key).header("Accept", "application/json");
-            HttpRequest request = (body == null ? builder.GET() : builder.header("Content-Type", "application/json")
+            HttpRequest request = (body == null ? builder.GET() : builder.header("Content-Type", "application/json; charset=UTF-8")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))).build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() != 200) throw new IllegalStateException("Cloud library HTTP " + response.statusCode());

@@ -33,6 +33,7 @@ public final class AgentController {
         public String evidence;
         public String userId;
         public String skillCatalog;
+        public String selectedSpaceId;
         public Ask() { }
         public Ask(String query) { this.query = query; }
     }
@@ -51,6 +52,8 @@ public final class AgentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         if (ask.userId == null || !ask.userId.matches("[1-9][0-9]{0,18}"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        if (ask.selectedSpaceId != null && !ask.selectedSpaceId.matches("[1-9][0-9]{0,18}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         return out -> {
             AtomicBoolean disconnected = new AtomicBoolean(false);
             try {
@@ -59,11 +62,24 @@ public final class AgentController {
                     if (item != null && ("user".equals(item.role) || "assistant".equals(item.role)) && item.content != null)
                         prior.add(new AgentLoop.Message(item.role, item.content, null, null));
                 }
-                Map<String, AgentLoop.Tool> tools = AgentToolRegistry.bind(ask.userId, library);
-                AgentLoop.Result result = loop.run(ask.query, prior, ask.evidence, ask.skillCatalog, tools, chunk -> {
+                Map<String, AgentLoop.Tool> tools = AgentToolRegistry.bind(ask.userId, library,
+                        ask.selectedSpaceId);
+                String query = ask.selectedSpaceId == null ? ask.query : ask.query +
+                        "\n\n[用户已点击确认本次 Wiki 写入空间。目标 spaceId=" + ask.selectedSpaceId +
+                        "。仅使用这个 ID 创建文件夹和文档，无须再次请求选择；创建工具会拒绝其他空间。]";
+                AgentLoop.Result result = loop.run(query, prior, ask.evidence, ask.skillCatalog, tools, chunk -> {
                     try { send(out, "delta", one("content", chunk)); }
                     catch (IOException e) { disconnected.set(true); throw new UncheckedIOException(e); }
                 }, disconnected::get);
+                if (result.choiceRequest != null)
+                    send(out, "wiki_choice_request", JSON.readTree(result.choiceRequest));
+                for (AgentLoop.ToolEvent item : result.wikiEvents) {
+                    if ("plan_wiki_destination".equals(item.name)) continue;
+                    Map<String, Object> event = new LinkedHashMap<>();
+                    event.put("name", item.name);
+                    event.put("result", JSON.readTree(item.result));
+                    send(out, "wiki_tool_event", event);
+                }
                 Map<String, Object> done = new LinkedHashMap<>();
                 done.put("usage", result.usage);
                 done.put("firstAnswerMs", result.firstAnswerMs);
@@ -72,7 +88,7 @@ public final class AgentController {
             } catch (UncheckedIOException | AgentLoop.Cancelled e) {
                 // Downstream closed: stop work without attempting another frame.
             } catch (Exception e) {
-                send(out, "error", one("message", e.getMessage() == null ? "Agent request failed" : e.getMessage()));
+                send(out, "error", one("message", "Agent request failed"));
             }
         };
     }

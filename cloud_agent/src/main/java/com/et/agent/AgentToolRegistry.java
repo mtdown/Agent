@@ -69,13 +69,36 @@ public final class AgentToolRegistry {
         register("read_file", "Read a UTF-8 file from the current user's personal files.",
                 fields(new String[]{"path"}, new String[]{"string"}),
                 (user, gateway) -> raw -> gateway.readFile(user, requiredText(arguments(raw), "path")));
-        register("write_wiki_document", "Create a Markdown document in a knowledge space the current user may edit. " +
-                        "Requires an exact space ID, title and content.",
+        register("write_wiki_document", "Compatibility write: create a new task-and-date folder, then a Markdown document in it. " +
+                        "Requires an exact writable space ID, title and content. Returns real folderId and documentId.",
                 fields(new String[]{"spaceId", "title", "content"}, new String[]{"string", "string", "string"}),
                 (user, gateway) -> raw -> {
                     JsonNode args = arguments(raw);
-                    return result("id", gateway.writeWikiDocument(user, requiredText(args, "spaceId"),
-                            requiredText(args, "title"), requiredText(args, "content")), "space", "knowledge");
+                    return gateway.writeWikiDocument(user, requiredText(args, "spaceId"),
+                            requiredText(args, "title"), requiredText(args, "content"));
+                });
+        register("create_wiki_folder", "Create one new task-and-date root folder in a writable Wiki space. " +
+                        "Use the real spaceId returned by list_writable_wiki_locations; returns folderId as a string.",
+                fields(new String[]{"spaceId", "taskName"}, new String[]{"string", "string"}),
+                (user, gateway) -> raw -> {
+                    JsonNode args = arguments(raw);
+                    return gateway.createWikiFolder(user, requiredText(args, "spaceId"),
+                            requiredText(args, "taskName"));
+                });
+        ObjectNode createDocument = fields(new String[]{"spaceId", "folderId", "content"},
+                new String[]{"string", "string", "string"});
+        createDocument.with("properties").putObject("title").put("type", "string");
+        register("create_wiki_document", "Create a Markdown document inside an active folder of a writable Wiki space. " +
+                        "Use the folderId from create_wiki_folder. An omitted or blank title is derived from content. " +
+                        "Returns documentId, folderId and spaceId as strings; report success only with a documentId.",
+                createDocument, (user, gateway) -> raw -> {
+                    JsonNode args = arguments(raw);
+                    JsonNode title = args.path("title");
+                    if (!title.isMissingNode() && !title.isTextual())
+                        throw new IllegalArgumentException("Invalid title");
+                    return gateway.createWikiDocument(user, requiredText(args, "spaceId"),
+                            requiredText(args, "folderId"), title.isMissingNode() ? null : title.asText(),
+                            requiredText(args, "content"));
                 });
         ObjectNode locations = JSON.createObjectNode().put("type", "object").put("additionalProperties", false);
         ObjectNode locationFields = locations.putObject("properties");
@@ -85,7 +108,7 @@ public final class AgentToolRegistry {
         locations.putArray("required");
         register("list_writable_wiki_locations", "List the current user's writable public, personal and team spaces. " +
                         "With spaceId, list up to limit active folders; pass nextCursor as cursor for the next page. " +
-                        "Use defaultPersonalSpaceId when the user did not name a destination. IDs are strings.",
+                        "IDs are for internal tool use only and must never appear in user-facing text.",
                 locations, (user, gateway) -> raw -> {
                     JsonNode args = arguments(raw);
                     String spaceId = optionalText(args, "spaceId");
@@ -96,6 +119,14 @@ public final class AgentToolRegistry {
                     Integer limit = limitNode.isMissingNode() ? null : limitNode.asInt();
                     return gateway.listWritableWikiLocations(user, spaceId, cursor, limit);
                 });
+        ObjectNode planDestination = fields(new String[]{"destinationType"}, new String[]{"string"});
+        ((ObjectNode) planDestination.path("properties").path("destinationType")).putArray("enum")
+                .add("unspecified").add("personal").add("public").add("team");
+        planDestination.with("properties").putObject("teamName").put("type", "string");
+        register("plan_wiki_destination", "Resolve a Wiki save destination after listing writable spaces. " +
+                        "Use destinationType=unspecified when the user gave no location; this requests clickable choices " +
+                        "and stops before any write. Use teamName for a named team. Never show returned IDs to the user.",
+                planDestination, (user, gateway) -> raw -> AgentWikiDestinationPlanner.plan(user, gateway, raw));
     }
 
     private AgentToolRegistry() { }
@@ -110,6 +141,26 @@ public final class AgentToolRegistry {
     public static Map<String, AgentLoop.Tool> bind(String userId, AgentLibraryGateway gateway) {
         Map<String, AgentLoop.Tool> tools = new LinkedHashMap<>();
         for (Spec spec : SPECS.values()) tools.put(spec.name, spec.binder.bind(userId, gateway));
+        return tools;
+    }
+
+    /** Keep a user-selected destination authoritative even if the model supplies another ID. */
+    public static Map<String, AgentLoop.Tool> bind(String userId, AgentLibraryGateway gateway,
+                                                    String selectedSpaceId) {
+        Map<String, AgentLoop.Tool> tools = bind(userId, gateway);
+        if (selectedSpaceId == null) return tools;
+        if (!selectedSpaceId.matches("[1-9][0-9]{0,18}"))
+            throw new IllegalArgumentException("Invalid selected Wiki space");
+        for (String name : new String[]{"create_wiki_folder", "create_wiki_document", "write_wiki_document"}) {
+            AgentLoop.Tool delegate = tools.get(name);
+            tools.put(name, raw -> {
+                if (!selectedSpaceId.equals(requiredText(arguments(raw), "spaceId")))
+                    throw new IllegalArgumentException("Selected Wiki destination differs from tool target");
+                return delegate.execute(raw);
+            });
+        }
+        tools.put("plan_wiki_destination", raw -> result("choiceRequired", false,
+                "spaceId", selectedSpaceId));
         return tools;
     }
 

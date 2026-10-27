@@ -9,6 +9,15 @@ public interface AgentLibraryGateway {
     String readFile(String userId, String path);
     String writeWikiDocument(String userId, String spaceId, String title, String content);
 
+    default String createWikiFolder(String userId, String spaceId, String taskName) {
+        throw new UnsupportedOperationException("Wiki folder creation is unavailable");
+    }
+
+    default String createWikiDocument(String userId, String spaceId, String folderId,
+                                      String title, String content) {
+        throw new UnsupportedOperationException("Wiki document creation is unavailable");
+    }
+
     default String listWritableWikiLocations(String userId, String spaceId, String cursor, Integer limit) {
         throw new UnsupportedOperationException("Writable Wiki directory is unavailable");
     }
