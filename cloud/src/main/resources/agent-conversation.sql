@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS agent_message (
     spaceIdsJson text NULL,
     citationsJson mediumtext NULL,
     statsJson text NULL,
+    interactionJson mediumtext NULL,
+    choiceConsumed tinyint NOT NULL DEFAULT 0,
     createTime datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_conversation_order (conversationId, id),

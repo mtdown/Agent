@@ -7,6 +7,7 @@ import com.et.cloud.rag.*;
 import com.et.cloud.service.UserService;
 import com.et.cloud.service.WikiSpaceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -27,11 +28,20 @@ public class AgentPreviewController {
     private final RagSearchService search;
     private final WikiSpaceService spaces;
     private final AgentSkillCatalog skillCatalog;
+    private final AgentWikiChoiceService choices;
 
+    @Autowired
     public AgentPreviewController(UserService users, AgentPreviewProxy proxy, AgentConversationStore store,
-                                  RagSearchService search, WikiSpaceService spaces, AgentSkillCatalog skillCatalog) {
+                                  RagSearchService search, WikiSpaceService spaces, AgentSkillCatalog skillCatalog,
+                                  AgentWikiChoiceService choices) {
         this.users = users; this.proxy = proxy; this.store = store; this.search = search; this.spaces = spaces;
-        this.skillCatalog = skillCatalog;
+        this.skillCatalog = skillCatalog; this.choices = choices;
+    }
+
+    /** Kept for the existing direct controller tests. Spring uses the injected constructor above. */
+    AgentPreviewController(UserService users, AgentPreviewProxy proxy, AgentConversationStore store,
+                           RagSearchService search, WikiSpaceService spaces, AgentSkillCatalog skillCatalog) {
+        this(users, proxy, store, search, spaces, skillCatalog, null);
     }
 
     public static class Ask {
@@ -59,6 +69,15 @@ public class AgentPreviewController {
         return ResultUtils.success(store.messages(users.getLoginUser(request).getId(), Long.parseLong(id)));
     }
 
+    @GetMapping("/conversations/{id}/wiki-documents/{turnId}/preview")
+    public BaseResponse<Map<String, String>> previewWikiResult(@PathVariable String id, @PathVariable String turnId,
+                                                                @RequestParam String token, HttpServletRequest request) {
+        if (!id.matches("[1-9][0-9]{0,18}") || !turnId.matches("[1-9][0-9]{0,18}"))
+            throw new IllegalArgumentException("Invalid document action");
+        return ResultUtils.success(choices.preview(users.getLoginUser(request), Long.parseLong(id),
+                Long.parseLong(turnId), token));
+    }
+
     @DeleteMapping("/conversations/{id}")
     public BaseResponse<Boolean> delete(@PathVariable String id, HttpServletRequest request) {
         store.delete(users.getLoginUser(request).getId(), Long.parseLong(id));
@@ -77,6 +96,29 @@ public class AgentPreviewController {
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public StreamingResponseBody stream(@RequestBody Ask ask, HttpServletRequest request) {
+        return streamInternal(ask, request, null);
+    }
+
+    public static class WikiChoice {
+        public String turnId;
+        public String token;
+    }
+
+    @PostMapping(value = "/conversations/{id}/wiki-choice/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public StreamingResponseBody selectWikiChoice(@PathVariable String id, @RequestBody WikiChoice choice,
+                                                  HttpServletRequest request) {
+        if (choice == null || choice.turnId == null || !choice.turnId.matches("[1-9][0-9]{0,18}") ||
+                id == null || !id.matches("[1-9][0-9]{0,18}"))
+            throw new IllegalArgumentException("Invalid Wiki choice");
+        User user = users.getLoginUser(request);
+        AgentWikiChoiceService.Selection selected = choices.claim(user, Long.parseLong(id),
+                Long.parseLong(choice.turnId), choice.token);
+        Ask resumed = new Ask(selected.originalQuery);
+        resumed.conversationId = id;
+        return streamInternal(resumed, request, selected.spaceId);
+    }
+
+    private StreamingResponseBody streamInternal(Ask ask, HttpServletRequest request, String selectedSpaceId) {
         User user = users.getLoginUser(request);
         if (ask == null || ask.query == null || ask.query.trim().isEmpty() || ask.query.length() > 4000)
             throw new IllegalArgumentException("Invalid question");
@@ -165,10 +207,18 @@ public class AgentPreviewController {
         payload.put("evidence", evidence);
         payload.put("userId", Long.toString(user.getId()));
         payload.put("skillCatalog", skillCatalog.forUser(user.getId()));
-        return proxy.stream(payload, meta, (success, output) -> {
-            if (success) store.complete(user.getId(), conversationId, turnId, output[0], citationsJson, output[1]);
-            else store.fail(user.getId(), conversationId, turnId);
-        });
+        if (selectedSpaceId != null) payload.put("selectedSpaceId", selectedSpaceId);
+        AgentWikiChoiceProjection projection = choices == null ? null :
+                new AgentWikiChoiceProjection(choices, user, conversationId, turnId);
+        java.util.function.BiConsumer<Boolean, String[]> completed = (success, output) -> {
+            if (success) {
+                String interaction = output.length > 2 ? output[2] : null;
+                String answer = interaction == null ? output[0] : "请选择写入空间";
+                store.complete(user.getId(), conversationId, turnId, answer, citationsJson, output[1], interaction);
+            } else store.fail(user.getId(), conversationId, turnId);
+        };
+        return projection == null ? proxy.stream(payload, meta, completed) :
+                proxy.stream(payload, meta, completed, projection);
     }
 
     private static String json(Object value) {

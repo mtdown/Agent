@@ -87,7 +87,8 @@ public final class AgentSkillDefinitionValidator {
                 case "tool":
                     fields(step, "step", "type", "tool", "args");
                     if (!Set.of("get_skill", "create_skill", "create_code", "write_file", "read_file",
-                            "write_wiki_document").contains(text(step, "tool", 1, 80)))
+                            "write_wiki_document", "list_writable_wiki_locations", "create_wiki_folder",
+                            "create_wiki_document", "plan_wiki_destination").contains(text(step, "tool", 1, 80)))
                         throw invalid("Invalid tool name");
                     object(step.get("args"), "tool arguments");
                     break;

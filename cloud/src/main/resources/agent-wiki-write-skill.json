@@ -1,0 +1,21 @@
+{
+  "name": "文档写入流程",
+  "summary": "将用户提供的内容写入有权限的 Wiki 空间",
+  "when_to_use": "用户要求将内容保存为知识库文档时优先使用。先检查内容是否完整，再查询可写空间。",
+  "when_not_to_use": "用户只是提问、要求保存个人文件或没有提供待写入内容时不要创建文件夹。",
+  "parameters": [
+    {"name": "taskName", "type": "string", "required": true},
+    {"name": "content", "type": "string", "required": true}
+  ],
+  "steps": [
+    {"type": "tool", "tool": "list_writable_wiki_locations", "args": {}},
+    {"type": "tool", "tool": "plan_wiki_destination", "args": {"destinationType": "$destinationType", "teamName": "$teamName"}},
+    {"type": "response", "template": "未指定空间时展示可点击的空间选项，推荐个人空间；团队名称不唯一时等待用户选择。不得展示内部 ID。"},
+    {"type": "tool", "tool": "create_wiki_folder", "args": {"spaceId": "$selectedSpaceId", "taskName": "$taskName"}},
+    {"type": "tool", "tool": "create_wiki_document", "args": {"spaceId": "$selectedSpaceId", "folderId": "$createdFolderId", "content": "$content"}},
+    {"type": "response", "template": "仅当文档工具确认成功后报告已保存；部分失败时说明已创建的文件夹。"}
+  ],
+  "expected_results": ["目标已确认且文档工具返回真实文档 ID", "对话界面只显示名称与路径"],
+  "failure_policy": "stop",
+  "examples": [{"input": {"taskName": "整理发布说明", "content": "# 发布说明\n正文"}, "expected": "先选择可写空间，再创建任务文件夹和文档"}]
+}

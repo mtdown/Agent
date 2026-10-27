@@ -4,6 +4,7 @@ import com.et.cloud.commen.BaseResponse;
 import com.et.cloud.commen.ResultUtils;
 import com.et.cloud.exception.BusinessException;
 import com.et.cloud.exception.ErrorCode;
+import com.et.cloud.service.impl.AgentWikiCreationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -19,8 +20,10 @@ import javax.annotation.Resource;
 @RequestMapping("/internal/agent")
 public final class AgentResourceInternalController {
     private final AgentPersonalFileStore files;
-    private final AgentWikiDocumentWriter wiki;
     private final String secret;
+
+    @Resource
+    private AgentWikiCreationService creation;
 
     @Resource
     private AgentWritableWikiLocations writableWikiLocations;
@@ -37,9 +40,21 @@ public final class AgentResourceInternalController {
         public String content;
     }
 
-    public AgentResourceInternalController(AgentPersonalFileStore files, AgentWikiDocumentWriter wiki,
+    public static final class WikiFolderRequest {
+        public String spaceId;
+        public String taskName;
+    }
+
+    public static final class WikiCreateDocumentRequest {
+        public String spaceId;
+        public String folderId;
+        public String title;
+        public String content;
+    }
+
+    public AgentResourceInternalController(AgentPersonalFileStore files,
                                            @Value("${agent.internal-key:}") String secret) {
-        this.files = files; this.wiki = wiki; this.secret = secret;
+        this.files = files; this.secret = secret;
     }
 
     @PostMapping("/files")
@@ -62,12 +77,12 @@ public final class AgentResourceInternalController {
     }
 
     @PostMapping("/wiki-documents")
-    public BaseResponse<String> writeWikiDocument(
+    public BaseResponse<AgentWikiCreationService.DocumentResult> writeWikiDocument(
             @RequestHeader(value = "X-Agent-Key", required = false) String key,
             @RequestParam String userId, @RequestBody WikiDocumentRequest body) {
         long user = requireUser(key, userId);
         if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "Missing knowledge document");
-        try { return ResultUtils.success(wiki.create(user, body.spaceId, body.title, body.content)); }
+        try { return ResultUtils.success(creation.createLegacyDocument(user, body.spaceId, body.title, body.content)); }
         catch (IllegalArgumentException e) { throw new BusinessException(ErrorCode.PARAMS_ERROR, e.getMessage()); }
     }
 
@@ -80,6 +95,25 @@ public final class AgentResourceInternalController {
             @RequestParam(required = false) Integer limit) {
         long user = requireUser(key, userId);
         return ResultUtils.success(writableWikiLocations.list(user, spaceId, cursor, limit));
+    }
+
+    @PostMapping("/wiki-folders")
+    public BaseResponse<AgentWikiCreationService.FolderResult> createWikiFolder(
+            @RequestHeader(value = "X-Agent-Key", required = false) String key,
+            @RequestParam String userId, @RequestBody WikiFolderRequest body) {
+        long user = requireUser(key, userId);
+        if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "缺少任务文件夹请求");
+        return ResultUtils.success(creation.createFolder(user, body.spaceId, body.taskName));
+    }
+
+    @PostMapping("/wiki-documents/create")
+    public BaseResponse<AgentWikiCreationService.DocumentResult> createWikiDocument(
+            @RequestHeader(value = "X-Agent-Key", required = false) String key,
+            @RequestParam String userId, @RequestBody WikiCreateDocumentRequest body) {
+        long user = requireUser(key, userId);
+        if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "缺少文档请求");
+        return ResultUtils.success(creation.createDocument(user, body.spaceId, body.folderId,
+                body.title, body.content));
     }
 
     private long requireUser(String key, String userId) {
