@@ -132,6 +132,24 @@
                   <a-spin size="small" />
                   <span>{{ msg.reasoning ? '正在生成回答…' : '正在检索并思考…' }}</span>
                 </div>
+                <div v-if="msg.interaction?.kind === 'destination_choice'" class="wiki-choice-options">
+                  <a-button
+                    v-for="option in msg.interaction.options"
+                    :key="option.token"
+                    :type="option.recommended ? 'primary' : 'default'"
+                    :disabled="streaming || msg.interaction.consumed || Date.now() >= msg.interaction.expiresAt"
+                    @click="selectWikiDestination(msg, option)"
+                  >{{ option.label }}<span v-if="option.recommended">（推荐）</span></a-button>
+                  <span v-if="msg.interaction.consumed">已选择</span>
+                  <span v-else-if="Date.now() >= msg.interaction.expiresAt">选项已过期，请重新提出写入请求</span>
+                </div>
+                <div v-if="msg.interaction?.kind === 'wiki_write_result'" class="wiki-choice-options">
+                  <a-button @click="openWikiResult(msg.interaction)">查看文档：{{ msg.interaction.documentTitle }}</a-button>
+                </div>
+                <div v-if="msg.interaction?.kind === 'wiki_partial_result'" class="wiki-choice-options">
+                  <a-tag color="warning">文档未保存</a-tag>
+                  <span>已创建：{{ msg.interaction.spaceLabel }} / {{ msg.interaction.folderName }}</span>
+                </div>
                 <!-- 引用区 -->
                 <div v-if="msg.citations?.length" class="citations">
                   <div class="citations-title">引用依据</div>
@@ -367,6 +385,7 @@ import {
 import { message as antMessage, Modal } from 'ant-design-vue'
 import {
   agentAskUsingStream,
+  agentSelectWikiChoiceUsingStream,
   listAgentConversations,
   getAgentConversation,
   createAgentConversation,
@@ -374,6 +393,10 @@ import {
   renameAgentConversation,
   type AgentConversation,
   type AgentStoredMessage,
+  type AgentWikiChoice,
+  type AgentWikiPartialResult,
+  type AgentWikiResult,
+  getAgentWikiResultPreview,
   ragAskUsingStream,
   type RagAskMeta,
   type RagAskUsage,
@@ -521,6 +544,7 @@ interface ChatMessage {
   stopped?: boolean
   stats?: ChatStats
   trace?: ChatTrace
+  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult
 }
 
 const ragMessages = ref<ChatMessage[]>([])
@@ -570,6 +594,7 @@ const openAgentConversation = async (id?: string) => {
       error: item.status === 'FAILED' ? '上次生成未完成' : undefined,
       citations: parseCitationSnapshot(item.citationsJson),
       stats: readJson<ChatStats>(item.statsJson),
+      interaction: item.interaction ?? undefined,
     }))
     await scrollToBottom()
   } catch { antMessage.error('打开对话失败或无权限') }
@@ -664,6 +689,47 @@ const traceSteps = (msg: ChatMessage): { label: string; ms?: number | null; skip
 }
 
 // ---- 发送与流式接收 ----
+const selectWikiDestination = async (
+  message: ChatMessage,
+  option: AgentWikiChoice['options'][number],
+) => {
+  const conversationId = agentConversationId.value
+  const choice = message.interaction
+  if (!conversationId || choice?.kind !== 'destination_choice') return
+  if (choice.consumed || streaming.value || Date.now() >= choice.expiresAt) return
+  streaming.value = true
+  abortController.value = new AbortController()
+  const assistantMsg: ChatMessage = reactive({ role: 'assistant', content: '', status: 'streaming', agentPreview: true })
+  agentMessages.value.push(assistantMsg)
+  await scrollToBottom()
+  try {
+    await agentSelectWikiChoiceUsingStream(conversationId, choice.turnId, option.token, {
+      onMeta: (meta) => { assistantMsg.citations = meta.citations ?? [] },
+      onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
+      onWikiChoice: (next) => { assistantMsg.interaction = next },
+      onWikiResult: (result) => { assistantMsg.interaction = result },
+      onDone: (done) => {
+        choice.consumed = true
+        assistantMsg.status = 'done'
+        assistantMsg.stats = {
+          usage: done.usage ?? null,
+          firstAnswerMs: done.firstAnswerMs == null ? null : Number(done.firstAnswerMs),
+          totalMs: done.totalMs == null ? undefined : Number(done.totalMs),
+        }
+      },
+      onError: (error) => { assistantMsg.status = 'error'; assistantMsg.error = error },
+    }, abortController.value.signal)
+  } catch (error: any) {
+    assistantMsg.status = 'error'
+    assistantMsg.error = error?.message ?? '写入请求失败'
+  } finally {
+    streaming.value = false
+    abortController.value = null
+    if (assistantMsg.status === 'done') await openAgentConversation(conversationId)
+    scrollToBottom()
+  }
+}
+
 const send = async () => {
   const query = inputText.value.trim()
   if (!query || streaming.value) return
@@ -713,6 +779,8 @@ const send = async () => {
         assistantMsg.citations = meta.citations ?? []
       },
       onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
+      onWikiChoice: (choice) => { assistantMsg.interaction = choice; scrollToBottom() },
+      onWikiResult: (result) => { assistantMsg.interaction = result; scrollToBottom() },
       onDone: (done) => {
         assistantMsg.status = 'done'
         assistantMsg.stats = {
@@ -841,6 +909,23 @@ const docPreview = ref<{
 /** 点击引用/角标：右侧打开文档并高亮引用切片 */
 const openCitation = (citation: RagCitation) => {
   openDocPanel(citation.docId, citation.docTitle, citation.docNumber, citation.chunkText)
+}
+
+const openWikiResult = async (result: AgentWikiResult) => {
+  const conversationId = agentConversationId.value
+  if (!conversationId) return
+  docPreview.value = { open: true, loading: true, title: result.documentTitle }
+  try {
+    const response = await getAgentWikiResultPreview(conversationId, result.turnId, result.openToken)
+    docPreview.value.title = response.data.data.title
+    docPreview.value.content = response.data.data.content
+    docPreview.value.contentFormat = response.data.data.contentFormat || 'plain'
+  } catch {
+    docPreview.value.content = ''
+    antMessage.error('文档加载失败或无权限查看')
+  } finally {
+    docPreview.value.loading = false
+  }
 }
 
 const openDocPanel = async (
@@ -1055,6 +1140,7 @@ onMounted(() => {
 .conversation-title:disabled { cursor: default; }
 .conversation-more { flex: 0 0 auto; color: #8a7a5f; }
 .conversation-empty { padding: 10px 8px; color: #a89a7f; font-size: 13px; }
+.wiki-choice-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
 .ai-assistant-page {
   max-width: 960px;
   margin: 0 auto;
