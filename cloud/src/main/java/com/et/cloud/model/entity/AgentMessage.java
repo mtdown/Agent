@@ -21,5 +21,7 @@ public class AgentMessage {
     private String spaceIdsJson;
     private String citationsJson;
     private String statsJson;
+    private String interactionJson;
+    private Integer choiceConsumed;
     private Date createTime;
 }

@@ -9,6 +9,9 @@ import org.apache.ibatis.annotations.Update;
 
 public interface WikiSpaceMapper extends BaseMapper<WikiSpace> {
 
+    @Select("SELECT id FROM wiki_space WHERE id = #{id} AND isDelete = 0 FOR UPDATE")
+    Long lockActiveById(@Param("id") Long id);
+
     @Select("SELECT * FROM wiki_space WHERE id = #{id}")
     WikiSpace selectByIdIncludeDeleted(@Param("id") Long id);
 

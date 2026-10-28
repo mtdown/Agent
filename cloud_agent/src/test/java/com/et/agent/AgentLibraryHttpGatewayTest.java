@@ -6,10 +6,62 @@ import org.junit.jupiter.api.Test;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentLibraryHttpGatewayTest {
+    @Test void readsReservedBuiltInWikiSkillThroughCloud() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> request = new AtomicReference<>();
+        server.createContext("/api/internal/agent/skills/", exchange -> {
+            request.set(exchange.getRequestMethod() + " " + exchange.getRequestURI());
+            byte[] response = "{\"code\":0,\"data\":{\"id\":\"builtin:wiki-write\",\"version\":1}}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway(
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            assertTrue(gateway.getSkill("7", "builtin:wiki-write", 1).contains("builtin:wiki-write"));
+            assertTrue(request.get().contains("GET /api/internal/agent/skills/builtin:wiki-write/versions/1?userId=7"));
+            assertThrows(IllegalArgumentException.class, () -> gateway.getSkill("7", "builtin:unknown", 1));
+        } finally { server.stop(0); }
+    }
+    @Test void createsWikiItemsThroughUserBoundCloudEndpoints() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        CopyOnWriteArrayList<String> requests = new CopyOnWriteArrayList<>();
+        server.createContext("/api/internal/agent/", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " "
+                    + exchange.getRequestHeaders().getFirst("X-Agent-Key") + " "
+                    + exchange.getRequestHeaders().getFirst("Content-Type") + " " + body);
+            byte[] response = ("{\"code\":0,\"data\":{\"spaceId\":\"88\","
+                    + "\"folderId\":\"9007199254740995\",\"documentId\":\"9007199254740997\"}}")
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway(
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            assertTrue(gateway.createWikiFolder("7", "88", "中文任务").contains("\"folderId\":\"9007199254740995\""));
+            assertTrue(gateway.createWikiDocument("7", "88", "9007199254740995", "中文标题", "正文")
+                    .contains("\"documentId\":\"9007199254740997\""));
+            assertTrue(gateway.writeWikiDocument("7", "88", "旧标题", "正文")
+                    .contains("\"folderId\":\"9007199254740995\""));
+            assertEquals(3, requests.size());
+            assertTrue(requests.get(0).contains("POST /api/internal/agent/wiki-folders?userId=7 secret application/json; charset=UTF-8"));
+            assertTrue(requests.get(0).contains("\"taskName\":\"中文任务\""));
+            assertTrue(requests.get(1).contains("POST /api/internal/agent/wiki-documents/create?userId=7 secret"));
+            assertTrue(requests.get(1).contains("\"folderId\":\"9007199254740995\""));
+            assertTrue(requests.get(2).contains("POST /api/internal/agent/wiki-documents?userId=7 secret"));
+        } finally { server.stop(0); }
+    }
+
     @Test void readsWritableWikiLocationsWithBoundUserAndCursor() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> request = new AtomicReference<>();

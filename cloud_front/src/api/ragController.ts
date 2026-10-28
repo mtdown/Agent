@@ -62,6 +62,28 @@ export interface AgentAskRequest {
   folderIds?: string[]
 }
 
+export interface AgentWikiChoice {
+  kind: 'destination_choice'
+  turnId: string
+  expiresAt: number
+  consumed?: boolean
+  options: Array<{ token: string; label: string; recommended: boolean }>
+}
+export interface AgentWikiResult {
+  kind: 'wiki_write_result'
+  turnId: string
+  spaceLabel: string
+  folderName: string
+  documentTitle: string
+  openToken: string
+}
+export interface AgentWikiPartialResult {
+  kind: 'wiki_partial_result'
+  turnId: string
+  spaceLabel: string
+  folderName: string
+}
+
 export interface RagAskUsage {
   promptTokens?: number
   completionTokens?: number
@@ -117,6 +139,8 @@ export interface RagAskHandlers {
   onDelta?: (text: string) => void
   onDone?: (done: RagAskDone) => void
   onError?: (message: string) => void
+  onWikiChoice?: (choice: AgentWikiChoice) => void
+  onWikiResult?: (result: AgentWikiResult | AgentWikiPartialResult) => void
 }
 
 /** 与后端 BaseResponse 对齐的本地类型（typings.d.ts 未覆盖 RAG 接口） */
@@ -173,7 +197,7 @@ export async function ragAskUsingStream(
 }
 
 async function streamAsk(
-  body: RagAskRequest | AgentAskRequest,
+  body: RagAskRequest | AgentAskRequest | { turnId: string; token: string },
   handlers: RagAskHandlers,
   signal: AbortSignal | undefined,
   path: string,
@@ -215,6 +239,17 @@ export async function agentAskUsingStream(
   return streamAsk(body, handlers, signal, '/api/agent/stream')
 }
 
+export async function agentSelectWikiChoiceUsingStream(
+  conversationId: string,
+  turnId: string,
+  token: string,
+  handlers: RagAskHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  return streamAsk({ turnId, token }, handlers, signal,
+    `/api/agent/conversations/${encodeURIComponent(conversationId)}/wiki-choice/stream`)
+}
+
 export interface AgentConversation { id: string; title: string; createTime: string; updateTime: string }
 export interface AgentStoredMessage {
   id: string
@@ -224,12 +259,20 @@ export interface AgentStoredMessage {
   status: 'PENDING' | 'DONE' | 'FAILED'
   citationsJson?: string | null
   statsJson?: string | null
+  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | null
 }
 export async function listAgentConversations() {
   return request<{ data: AgentConversation[] }>('/api/agent/conversations', { method: 'GET' })
 }
 export async function getAgentConversation(id: string) {
   return request<{ data: AgentStoredMessage[] }>(`/api/agent/conversations/${id}`, { method: 'GET' })
+}
+export async function getAgentWikiResultPreview(conversationId: string, turnId: string, token: string) {
+  return request<{ data: { title: string; content: string; contentFormat: string } }>(
+    `/api/agent/conversations/${encodeURIComponent(conversationId)}/wiki-documents/`
+      + `${encodeURIComponent(turnId)}/preview?token=${encodeURIComponent(token)}`,
+    { method: 'GET' },
+  )
 }
 export async function createAgentConversation() {
   return request<{ data: string }>('/api/agent/conversations', { method: 'POST' })
@@ -275,6 +318,12 @@ function handleFrame(frame: string, handlers: RagAskHandlers) {
       break
     case 'error':
       handlers.onError?.(String(payload.message ?? '问答服务异常'))
+      break
+    case 'wiki_choice':
+      handlers.onWikiChoice?.(payload as AgentWikiChoice)
+      break
+    case 'wiki_result':
+      handlers.onWikiResult?.(payload as AgentWikiResult | AgentWikiPartialResult)
       break
     default:
       break

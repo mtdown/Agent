@@ -178,6 +178,7 @@ public class AgentLibraryStore {
     }
 
     public SkillVersion skillVersion(long user, String rawId, int version) {
+        if (AgentBuiltInWikiWriteSkill.ID.equals(rawId)) return AgentBuiltInWikiWriteSkill.version(version);
         long id = id(rawId);
         requireSkillAccess(user, id);
         List<SkillVersion> versions = jdbc.query("SELECT version, definitionJson FROM agent_skill_version " +
@@ -193,6 +194,7 @@ public class AgentLibraryStore {
     }
 
     public SkillVersion enabledSkillVersion(long user, String rawId, int version) {
+        if (AgentBuiltInWikiWriteSkill.ID.equals(rawId)) return AgentBuiltInWikiWriteSkill.version(version);
         long id = id(rawId);
         List<SkillVersion> versions = jdbc.query("SELECT v.version, v.definitionJson FROM agent_skill_item s " +
                         "JOIN agent_skill_version v ON v.skillId = s.id AND v.version = s.activeVersion " +
@@ -218,7 +220,7 @@ public class AgentLibraryStore {
     }
 
     public List<SkillItem> listAvailable(long user) {
-        return jdbc.query("SELECT CAST(s.id AS CHAR) id, s.name, s.summary, s.state, s.activeVersion " +
+        List<SkillItem> available = jdbc.query("SELECT CAST(s.id AS CHAR) id, s.name, s.summary, s.state, s.activeVersion " +
                         "FROM agent_skill_item s WHERE s.isDelete = 0 AND s.state = 'ACTIVE' " +
                         "AND (s.ownerUserId = ? OR EXISTS (SELECT 1 FROM agent_skill_share x " +
                         "WHERE x.skillId = s.id AND x.targetUserId = ?)) " +
@@ -232,10 +234,12 @@ public class AgentLibraryStore {
                     result.version = rs.getInt("activeVersion");
                     return result;
                 }, user, user);
+        available.add(0, AgentBuiltInWikiWriteSkill.item());
+        return available;
     }
 
     public List<SkillItem> listSkills(long user) {
-        return jdbc.query("SELECT CAST(s.id AS CHAR) id, s.name, s.summary, s.state, " +
+        List<SkillItem> available = jdbc.query("SELECT CAST(s.id AS CHAR) id, s.name, s.summary, s.state, " +
                         "s.activeVersion, s.latestVersion, s.ownerUserId FROM agent_skill_item s " +
                         "WHERE s.isDelete = 0 AND (s.ownerUserId = ? OR (s.state = 'ACTIVE' AND EXISTS " +
                         "(SELECT 1 FROM agent_skill_share x WHERE x.skillId = s.id AND x.targetUserId = ?))) " +
@@ -251,6 +255,8 @@ public class AgentLibraryStore {
                     result.owner = rs.getLong("ownerUserId") == user;
                     return result;
                 }, user, user);
+        available.add(0, AgentBuiltInWikiWriteSkill.item());
+        return available;
     }
 
     public List<CodeItem> listCodes(long user) {

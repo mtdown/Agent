@@ -6,9 +6,13 @@ import com.et.cloud.mapper.AgentMessageMapper;
 import com.et.cloud.model.entity.AgentConversation;
 import com.et.cloud.model.entity.AgentMessage;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.core.io.ClassPathResource;
 import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,25 +23,42 @@ import java.util.Objects;
 @Service
 public class AgentConversationStore {
     private final DataSource dataSource;
+    private final JdbcTemplate jdbc;
     private final AgentConversationMapper conversations;
     private final AgentMessageMapper messages;
 
     public AgentConversationStore(DataSource dataSource, AgentConversationMapper conversations,
                                   AgentMessageMapper messages) {
         this.dataSource = dataSource;
+        this.jdbc = new JdbcTemplate(dataSource);
         this.conversations = conversations;
         this.messages = messages;
     }
 
     @PostConstruct
     public void initializeTables() {
-        new ResourceDatabasePopulator(new ClassPathResource("agent-conversation.sql"))
-                .execute(Objects.requireNonNull(dataSource));
-        new ResourceDatabasePopulator(new ClassPathResource("agent-skill-library.sql"))
-                .execute(dataSource);
+        ResourceDatabasePopulator conversationsScript = new ResourceDatabasePopulator(
+                new ClassPathResource("agent-conversation.sql"));
+        conversationsScript.setSqlScriptEncoding("UTF-8");
+        conversationsScript.execute(Objects.requireNonNull(dataSource));
+        ensureChoiceColumn("interactionJson", "mediumtext NULL");
+        ensureChoiceColumn("choiceConsumed", "tinyint NOT NULL DEFAULT 0");
+        ResourceDatabasePopulator libraryScript = new ResourceDatabasePopulator(
+                new ClassPathResource("agent-skill-library.sql"));
+        libraryScript.setSqlScriptEncoding("UTF-8");
+        libraryScript.execute(dataSource);
         // The original Windows import stored the UTF-8 default title as this exact mojibake value.
         // Only repair that placeholder, so titles explicitly chosen by users remain untouched.
         conversations.repairLegacyTitle("新对话", "E98F82E69DBFEE87AEE79287EFBFBD");
+    }
+
+    private void ensureChoiceColumn(String column, String definition) {
+        try (Connection connection = dataSource.getConnection();
+             ResultSet fields = connection.getMetaData().getColumns(null, null, "agent_message", column)) {
+            if (!fields.next()) jdbc.execute("ALTER TABLE agent_message ADD COLUMN " + column + " " + definition);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Could not prepare Agent choice storage", e);
+        }
     }
 
     public long create(long ownerId) {
@@ -58,7 +79,16 @@ public class AgentConversationStore {
 
     public List<Map<String, Object>> messages(long ownerId, long conversationId) {
         requireOwner(ownerId, conversationId);
-        return messages.listByConversation(conversationId);
+        List<Map<String, Object>> result = messages.listByConversation(conversationId);
+        for (Map<String, Object> row : result) {
+            Object internal = row.remove("interactionJson");
+            Object consumed = row.remove("choiceConsumed");
+            if (internal != null) {
+                boolean wasConsumed = consumed instanceof Number && ((Number) consumed).intValue() != 0;
+                row.put("interaction", AgentWikiChoiceService.safeDisplay(String.valueOf(internal), wasConsumed));
+            }
+        }
+        return result;
     }
 
     public void requireOwner(long ownerId, long conversationId) {
@@ -107,6 +137,11 @@ public class AgentConversationStore {
     }
 
     public void complete(long ownerId, long conversationId, long turnId, String answer, String citationsJson, String statsJson) {
+        complete(ownerId, conversationId, turnId, answer, citationsJson, statsJson, null);
+    }
+
+    public void complete(long ownerId, long conversationId, long turnId, String answer, String citationsJson,
+                         String statsJson, String interactionJson) {
         requireOwner(ownerId, conversationId);
         try {
             AgentMessage message = new AgentMessage();
@@ -118,6 +153,7 @@ public class AgentConversationStore {
             message.setStatus("DONE");
             message.setCitationsJson(citationsJson);
             message.setStatsJson(statsJson);
+            message.setInteractionJson(interactionJson);
             if (messages.insert(message) != 1) throw new IllegalStateException("Could not save answer");
             messages.markDone(conversationId, turnId);
         } finally { release(ownerId, conversationId); }

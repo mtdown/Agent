@@ -57,6 +57,16 @@ class AgentSkillDefinitionValidatorTest {
                 (id, version, entrypoint) -> true));
     }
 
+    @Test
+    void acceptsTheWikiWriteWorkflowTools() {
+        for (String tool : new String[]{"list_writable_wiki_locations", "create_wiki_folder", "create_wiki_document"}) {
+            String definition = validDefinition().replace(
+                    "\"type\":\"code\",\"code_item_id\":\"9007199254740993\",\"code_version\":2,\"entrypoint\":\"run\",\"args\":{\"count\":\"$count\"}",
+                    "\"type\":\"tool\",\"tool\":\"" + tool + "\",\"args\":{}");
+            assertDoesNotThrow(() -> validator.validate(definition, (id, version, entrypoint) -> false));
+        }
+    }
+
     private static String validDefinition() {
         return "{\"name\":\"Example\",\"summary\":\"Runs a versioned code sample\","
                 + "\"when_to_use\":\"User asks for the sample\",\"when_not_to_use\":\"Input unavailable\","

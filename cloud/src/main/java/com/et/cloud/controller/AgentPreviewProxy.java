@@ -1,6 +1,7 @@
 package com.et.cloud.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,17 @@ import java.util.function.BiConsumer;
 /** Copies private Agent SSE bytes promptly and closes upstream on browser disconnect. */
 @Component
 public class AgentPreviewProxy {
+    /** The browser only receives the result of projecting internal Wiki events. */
+    public interface WikiEvents {
+        PublicEvent project(String event, JsonNode data);
+        String interactionJson();
+        default String displayAnswer() { return null; }
+    }
+    public static final class PublicEvent {
+        public final String name;
+        public final Object data;
+        public PublicEvent(String name, Object data) { this.name = name; this.data = data; }
+    }
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final String baseUrl, internalKey;
@@ -31,6 +43,10 @@ public class AgentPreviewProxy {
     }
     public StreamingResponseBody stream(Map<String, Object> payload, Map<String, Object> meta,
                                         BiConsumer<Boolean, String[]> completed) {
+        return stream(payload, meta, completed, null);
+    }
+    public StreamingResponseBody stream(Map<String, Object> payload, Map<String, Object> meta,
+                                        BiConsumer<Boolean, String[]> completed, WikiEvents wikiEvents) {
         long startedAt = System.nanoTime();
         return out -> {
             StringBuilder answer = new StringBuilder();
@@ -70,6 +86,20 @@ public class AgentPreviewProxy {
                             firstAnswerMs = elapsedMs(startedAt);
                         }
                         if ("done".equals(event)) {
+                            String safeAnswer = wikiEvents == null ? null : wikiEvents.displayAnswer();
+                            if (safeAnswer != null) {
+                                answer.setLength(0);
+                                answer.append(safeAnswer);
+                                writeFrame(out, "event: delta\ndata: " + JSON.writeValueAsString(
+                                        java.util.Collections.singletonMap("content", safeAnswer)) + "\n\n");
+                            }
+                            String internalInteraction = wikiEvents == null ? null : wikiEvents.interactionJson();
+                            if (internalInteraction != null) {
+                                Map<String, Object> display = AgentWikiChoiceService.safeDisplay(internalInteraction, false);
+                                if ("wiki_write_result".equals(display.get("kind"))
+                                        || "wiki_partial_result".equals(display.get("kind")))
+                                    writeFrame(out, "event: wiki_result\ndata: " + JSON.writeValueAsString(display) + "\n\n");
+                            }
                             String data = null;
                             for (String part : frame.toString().split("\n")) {
                                 if (part.startsWith("data:")) data = part.substring(5).trim();
@@ -81,6 +111,18 @@ public class AgentPreviewProxy {
                             finalStats[0] = JSON.writeValueAsString(done);
                             success = true;
                             writeFrame(out, "event: done\ndata: " + JSON.writeValueAsString(done) + "\n\n");
+                        } else if (event != null && event.startsWith("wiki_")) {
+                            // Internal Agent tool data contains real IDs. Never forward that frame.
+                            if (wikiEvents != null) {
+                                String data = null;
+                                for (String part : frame.toString().split("\n"))
+                                    if (part.startsWith("data:")) data = part.substring(5).trim();
+                                if (data == null) throw new IllegalStateException("Wiki event has no data");
+                                PublicEvent projected = wikiEvents.project(event, JSON.readTree(data));
+                                if (projected != null)
+                                    writeFrame(out, "event: " + projected.name + "\ndata: "
+                                            + JSON.writeValueAsString(projected.data) + "\n\n");
+                            }
                         } else {
                             if ("delta".equals(event)) {
                                 for (String part : frame.toString().split("\n")) if (part.startsWith("data:")) {
@@ -101,7 +143,8 @@ public class AgentPreviewProxy {
             } catch (Exception e) {
                 sendError(out, "Agent service unavailable");
             } finally {
-                if (completed != null) completed.accept(success, new String[]{answer.toString(), finalStats[0]});
+                if (completed != null) completed.accept(success, new String[]{answer.toString(), finalStats[0],
+                        wikiEvents == null ? null : wikiEvents.interactionJson()});
             }
         };
     }

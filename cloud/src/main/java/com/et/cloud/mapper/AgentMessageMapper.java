@@ -11,7 +11,7 @@ import java.util.Map;
 
 public interface AgentMessageMapper extends BaseMapper<AgentMessage> {
     @Select("SELECT CAST(id AS CHAR) id, CAST(turnId AS CHAR) turnId, role, content, status, ragMode, " +
-            "spaceIdsJson, citationsJson, statsJson, createTime FROM agent_message " +
+            "spaceIdsJson, citationsJson, statsJson, interactionJson, choiceConsumed, createTime FROM agent_message " +
             "WHERE conversationId = #{conversationId} ORDER BY id")
     List<Map<String, Object>> listByConversation(@Param("conversationId") long conversationId);
 
