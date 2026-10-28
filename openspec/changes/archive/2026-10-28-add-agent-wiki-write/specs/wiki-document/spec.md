@@ -73,3 +73,13 @@ The system SHALL let a user with write access to both the source and destination
 - **WHEN** the user moves it to the destination space's root without choosing a folder
 - **THEN** the document's space is updated and its previous folder reference is cleared
 - **AND** it appears in the destination space's root document list
+
+### Requirement: Document ownership follows the space
+
+The system SHALL treat documents as belonging to their containing space, so that the author leaving the space (removed or voluntary exit) does not change the document's location or availability. Remaining members SHALL retain visibility according to their membership and SHALL mutate the document only with space write access.
+
+#### Scenario: Document stays after its author exits the space
+- **GIVEN** a team space containing a document authored by a member
+- **WHEN** the author is removed from the team space or exits voluntarily
+- **THEN** the document remains in the team space and visible to the remaining members
+- **AND** only remaining members with space write access may operate on it

@@ -1,14 +1,14 @@
-# Spec Delta
+# agent-wiki-write Specification
 
 ## Purpose
 
 定义登录用户通过 Agent 查询可写 Wiki 目录并创建任务文件夹与文档的可观察行为，使用户无需提供数据库 ID，同时保证目标匹配、权限复核、命名与结果反馈可验证。
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Agent lists writable destinations for the current user
 
-The system SHALL provide the Agent with only the current logged-in user's writable public, personal, and team spaces and a bounded, pageable listing of active folders in a selected writable space. Each returned space and folder SHALL include its real ID as a decimal string, name, type or parent relationship as applicable. The caller SHALL NOT choose a different user identity in tool arguments.
+For an ordinary logged-in user, the system SHALL provide the Agent with only that user's writable public, personal, and team spaces and a bounded, pageable listing of active folders in a selected writable space. Each returned space and folder SHALL include its real ID as a decimal string, name, type or parent relationship as applicable. The caller SHALL NOT choose a different user identity in tool arguments. Platform-admin directory enumeration is deferred; it does not change the separate by-ID write permission rule.
 
 #### Scenario: Public and personal destinations
 - **GIVEN** a logged-in ordinary user
