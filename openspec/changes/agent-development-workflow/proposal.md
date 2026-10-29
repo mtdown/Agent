@@ -6,7 +6,7 @@
 
 ## What Changes
 
-- 根 `AGENTS.md` 区分共同规则与总管职责，明确派发角色文件和任务卡。
+- 根 `AGENTS.md` 只保留共同规则和角色入口；总管职责单独放在 `AGENTS_manager.md`，并明确总管必须读取该文件。
 - 开发规则规定实现、自检、问题分级记录及修复交接；测试规则规定每轮新建独立上下文、被测快照、证据和结论。
 - 固定验收与清单外重大风险分别处理；证据不足或阻塞不视为通过；保留三轮上限。
 - 测试报告由总管核对，独立记录复核按风险触发；一般试错不强制生成 HTML。
@@ -24,5 +24,5 @@
 
 ## Impact
 
-- 规则文件：`AGENTS.md`、`AGENTS_rules.md`、`AGENTS_test.md`；OpenSpec 规划工件。
+- 规则文件：`AGENTS.md`、`AGENTS_manager.md`、`AGENTS_rules.md`、`AGENTS_test.md`；OpenSpec 规划工件。
 - 沿用现有任务分支、IssueLog、报告和上传脚本，不更改业务代码、API、数据库或脚本。
