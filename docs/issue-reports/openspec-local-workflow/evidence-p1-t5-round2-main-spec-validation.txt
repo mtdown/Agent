@@ -1,0 +1,58 @@
+=== exits.txt ===
+Get-Content exit: 0
+git diff exit: 0
+quick_validate exit: 0
+change validate exit: 0
+all specs exit: 0
+status exit: 0
+strict spec exit: 0
+
+=== safety-all.txt ===
+- Validating...
+✓ spec/agent-conversation
+✓ spec/agent-development-workflow
+✓ spec/agent-wiki-write
+  ℹ [INFO] requirements[0]: Requirement text is very long (>500 characters). Consider breaking it down.
+  ℹ [INFO] requirements[1]: Requirement text is very long (>500 characters). Consider breaking it down.
+✓ spec/ai-assistant-chat
+✓ spec/batch-document-import
+  ℹ [INFO] requirements[2]: Requirement text is very long (>500 characters). Consider breaking it down.
+  ℹ [INFO] requirements[4]: Requirement text is very long (>500 characters). Consider breaking it down.
+✓ spec/deployment-pipeline
+✓ spec/dev-public-tunnel
+  ⚠ [WARNING] overview: Purpose section is still a placeholder rather than a Purpose anyone wrote (the sentence `openspec archive` writes for a new capability, or a `TBD`/`TODO` marker left in its place). Replace it with what this capability is for, editing the main spec directly: a `## Purpose` in a delta is read only when the capability is created, so it cannot replace this one.
+✓ spec/dev-script-reliability
+✓ spec/git-upload-workflow
+✓ spec/json-document-import
+✓ spec/open-rag-api
+✓ spec/project-hygiene
+✓ spec/rag-eval-flow
+✓ spec/rag-llm-generation
+✓ spec/wiki-attachment
+✓ spec/wiki-document
+✓ spec/wiki-document-actions
+  ⚠ [WARNING] overview: Purpose section is still a placeholder rather than a Purpose anyone wrote (the sentence `openspec archive` writes for a new capability, or a `TBD`/`TODO` marker left in its place). Replace it with what this capability is for, editing the main spec directly: a `## Purpose` in a delta is read only when the capability is created, so it cannot replace this one.
+✓ spec/wiki-document-list
+  ℹ [INFO] requirements[4]: Requirement text is very long (>500 characters). Consider breaking it down.
+✓ spec/wiki-document-model
+  ⚠ [WARNING] overview: Purpose section is still a placeholder rather than a Purpose anyone wrote (the sentence `openspec archive` writes for a new capability, or a `TBD`/`TODO` marker left in its place). Replace it with what this capability is for, editing the main spec directly: a `## Purpose` in a delta is read only when the capability is created, so it cannot replace this one.
+✓ spec/wiki-folder
+✓ spec/wiki-layout
+✓ spec/wiki-multiformat-document-import
+  ℹ [INFO] requirements[8]: Requirement text is very long (>500 characters). Consider breaking it down.
+✓ spec/wiki-navigation-flow
+✓ spec/wiki-navigation-tree
+  ℹ [INFO] requirements[0]: Requirement text is very long (>500 characters). Consider breaking it down.
+  ℹ [INFO] requirements[9]: Requirement text is very long (>500 characters). Consider breaking it down.
+✓ spec/wiki-rag-admin
+✓ spec/wiki-rag-pipeline
+✓ spec/wiki-rag-retrieval
+✓ spec/wiki-recycle-bin
+✓ spec/wiki-search
+✓ spec/wiki-space
+✓ spec/wiki-workspace-theme
+Totals: 31 passed, 0 failed (31 items)
+
+=== safety-strict.txt ===
+Specification 'agent-development-workflow' is valid
+

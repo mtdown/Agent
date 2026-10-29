@@ -1,0 +1,102 @@
+
+--- after-hashes.txt ---
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    B7BDD60BDBD2365C8F69BE734DD107F314AD8793C3F616F09A368FD1E6B8DF2C C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t3\acceptance.txt
+SHA256    77E8D60293B1813676166AED5B25EE5CF6F92AC23205D052D4332EE044FB5F8E C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t3\diff.patch
+SHA256    048C04C283ACE1ABC5FE08F17E3B945A3566D2D1CA74B569C4C81283A1BF2269 C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-explore-local\SKILL.md
+SHA256    95ED31936B538CBF44B5E3F7F81DA50DEFD256D96048EE370D82B36E8FF5C486 C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-explore\SKILL.md
+SHA256    C7A41D21DB105AF3F363B76E8697A42FFCE4A725BAE952362E3B3DBF32D9141C C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\proposal.md
+SHA256    E8446EDDACDDE5430D3051DCCFD7BC45600E4FC8081CE37182BCE00DA0B1C3F9 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\design.md
+SHA256    F42AB5164612391D6D078D64A4B265C2EE26B21158BC6147EEC1C75715EF0089 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\specs\agent-development-workflow\spec.md
+SHA256    FCA26AE6AABB814FC07AA468E9391E20B9D1A33725CD9EAEE04D10FF71D4B6C0 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\tasks.md
+
+
+
+
+--- before-hashes.txt ---
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    B7BDD60BDBD2365C8F69BE734DD107F314AD8793C3F616F09A368FD1E6B8DF2C C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t3\acceptance.txt
+SHA256    77E8D60293B1813676166AED5B25EE5CF6F92AC23205D052D4332EE044FB5F8E C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t3\diff.patch
+SHA256    048C04C283ACE1ABC5FE08F17E3B945A3566D2D1CA74B569C4C81283A1BF2269 C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-explore-local\SKILL.md
+SHA256    95ED31936B538CBF44B5E3F7F81DA50DEFD256D96048EE370D82B36E8FF5C486 C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-explore\SKILL.md
+SHA256    C7A41D21DB105AF3F363B76E8697A42FFCE4A725BAE952362E3B3DBF32D9141C C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\proposal.md
+SHA256    E8446EDDACDDE5430D3051DCCFD7BC45600E4FC8081CE37182BCE00DA0B1C3F9 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\design.md
+SHA256    F42AB5164612391D6D078D64A4B265C2EE26B21158BC6147EEC1C75715EF0089 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\specs\agent-development-workflow\spec.md
+SHA256    FCA26AE6AABB814FC07AA468E9391E20B9D1A33725CD9EAEE04D10FF71D4B6C0 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\tasks.md
+
+
+
+
+--- c3-git.txt ---
+
+
+--- c3-openspec.txt ---
+Change 'openspec-local-workflow' is valid
+
+
+--- c3-skill.txt ---
+Skill is valid!
+
+
+--- report.md ---
+# 测试报告
+Change ID／阶段 ID／原子任务 ID／轮次／时间：openspec-local-workflow／P1／P1-T3／第1轮／2026-10-29（Asia/Shanghai）
+测试实例标识：local_explore_tester
+总体结论：PASS
+环境与基线：Windows PowerShell；分支 feature/agent-development-workflow开发；HEAD 1ffd9f08982a600719ea484eb7052fe3f3a85a3c。未切换或运行基线：任务卡未指定安全基线运行方法，本次固定验收不需要基线运行。
+被测范围与快照：新增 .agents/skills/openspec-explore-local/SKILL.md；完整新增补丁 tmp/openspec-local-p1t3/diff.patch SHA256 77e8d60293b1813676166aed5b25ee5cf6f92ac23205d052d4332ee044fb5f8e，去除两个补丁文件头并规范化换行后与文件全文相同。验收文件 SHA256 b7bdd60bdbd2365c8f69be734dd107f314ad8793c3f616f09a368fd1e6b8df2c。使用 Get-FileHash -Algorithm SHA256 对任务卡列出的两项技能、四项 change 文档及验收和补丁执行前后核对，均与任务卡值一致；完整结果见 before-hashes.txt 和 after-hashes.txt。
+验收项结果：
+- C1：PASS
+  操作及命令：Get-Content -Raw -Encoding UTF8 .agents/skills/openspec-explore-local/SKILL.md。
+  退出码与关键断言：PowerShell 命令成功（$? 为 True）；第2–3行名称匹配目录，第8行探索任务和已有 change、由总管创建 change、禁止自身创建和实施业务代码。
+  预期／实际：成功且包含上述条款／成功且条款存在。
+  证据：skill-output.txt，以及 .agents/skills/openspec-explore-local/SKILL.md:2、:3、:8。
+- C2：PASS
+  操作及命令：同 C1，逐项核查全文。
+  退出码与关键断言：PowerShell 命令成功（$? 为 True）；第12行完整授权后不重复确认；第13行仅探索和停点；第14行超出授权或需求、外部行为、设计歧义时停止；第19–23行 store、list、status、instructions、项目配置和代码上下文。
+  预期／实际：分别包含上述授权边界及 CLI 上下文路径／条款均存在。
+  证据：skill-output.txt；被测文件第12–14、19–23行。
+- C3：PASS
+  操作及命令与退出码：git diff --exit-code -- .agents/skills/openspec-explore/SKILL.md，0；python -X utf8 C:/Users/origin/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/openspec-explore-local，0；openspec validate openspec-local-workflow --strict，0。
+  预期／实际：三条均退出 0，原技能不变、技能有效、change valid／git 无差异；Skill is valid!；Change 'openspec-local-workflow' is valid。原技能测试前后 SHA256 均为 95ed31936b538cbf44b5e3f7f81da50defd256d96048ee370d82b36e8ff5c486。
+  证据：c3-git.txt、c3-skill.txt、c3-openspec.txt、前后哈希文件。
+固定验收缺陷：无。
+清单外交付阻断问题：无。
+未验证项与原因：无。
+变异检验：未做；任务卡未授权。
+问题记录：无。
+临时文件、数据及服务清理状态：按任务卡保留 tmp/openspec-local-p1t3-evidence/ 证据；未启停服务、未修改被测文件。
+风格意见（不计 FAIL）：无。
+
+
+--- skill-output.txt ---
+---
+name: openspec-explore-local
+description: Use when exploring a task or existing OpenSpec change in this project's coordinated workflow before planning or implementation.
+---
+
+# Explore a task
+
+Explore the user's problem, requirements, existing behavior and relevant code or change artifacts. Compare viable options, identify assumptions and risks, and report unresolved decisions to the manager. Read files and use read-only tools as needed; avoid inventing product rules. This skill does not implement business code, create a change, or modify workflow configuration. The manager creates the change under the project's workspace rules.
+
+## Authorization and handoff
+
+- If the user explicitly authorized the complete workflow, hand the exploration and resolved scope to the manager for planning without requesting the same authorization again. Proceed only within that authorization and the project's escalation rules.
+- If the user authorized exploration only, stop at exploration; do not automatically write artifacts or move to planning or implementation. Honor any explicit user stop point.
+- If the next action exceeds authorization, or requirements, external behavior or design remain ambiguous in a way that requires a decision, stop that action and report the issue to the manager or user as appropriate. A discussion answer alone does not authorize additional work.
+- When planning or updating artifacts is authorized, hand off to the manager and the appropriate local planning skill. Do not create the change or implement the task as part of exploration.
+
+## OpenSpec context
+
+If a named standalone store is relevant, discover it with `openspec store list --json`. Use the selected `--store <id>` consistently for applicable OpenSpec commands, including `list`, `status`, and `instructions`; otherwise use the nearest local OpenSpec root. Do not guess a store or change identity.
+
+Run `openspec list --json` to discover active changes and the resolved root. Read `<root.path>/openspec/config.yaml` or `config.yml` when present, applying project `context` and artifact-specific `rules` as constraints without copying them into outputs. Investigate relevant project code and existing specifications.
+
+For a relevant existing change, confirm its identity and branch ownership with the manager, then run `openspec status --change "<name>" --json`; inspect `changeRoot`, `artifactPaths`, `actionContext`, and existing artifact paths. Use `openspec instructions "<artifact-id>" --change "<name>" --json` when interpreting an artifact's schema, dependencies, template, or instructions. Preserve the selected store flag. If the change is missing or its ownership is unclear, report it instead of creating or assuming one.
+
+Summarize the problem, relevant evidence, decisions, remaining questions and recommended planning handoff. Keep exploration read-only; the manager coordinates subsequent authorized changes.
+

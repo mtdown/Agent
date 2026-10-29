@@ -1,0 +1,188 @@
+
+--- F1-exit.txt ---
+exit=0
+
+
+--- F1.txt ---
+---
+name: openspec-archive-change-local
+description: Archive a manager-confirmed completed OpenSpec change after independent acceptance and spec synchronization in this project's coordinated workflow.
+---
+
+# Archive a completed change
+
+Use the change and task branch confirmed by the manager. Do not select another change or store independently. Follow the project role rules; archiving is performed only after all stages and independent acceptance are complete. If identity, ownership, store, authorization, or results are unclear, stop and report to the manager.
+
+If a store is selected, discover its ID with `openspec store list --json` and keep `--store "<id>"` on every applicable OpenSpec command throughout. Otherwise use the nearest local OpenSpec root. Resolve paths from the selected store's status, not from a hardcoded repository path.
+
+## Check prerequisites
+
+1. Confirm the change, selected store, task branch, and authority to sync and archive. An explicitly authorized complete workflow needs no repeated confirmation for ordinary operations. Stop at a user-specified pause, when the action exceeds authorization, or when a decision is required; do not infer consent.
+2. Run `openspec status --change "<name>" --json` with the selected store flag. Read `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, and artifact statuses. All required artifacts must be `done` or explicitly `skipped`; otherwise stop. Read the actual tasks file and confirm every task is complete. A missing or incomplete tasks file, incomplete stage, or missing independent PASS evidence blocks archive.
+3. Validate the change with `openspec validate "<name>" --strict` using the same store. Stop on failure. If available, `openspec instructions archive --change "<name>" --json` may provide advisory context; a failed or unsupported advisory lookup does not override the required checks. Apply relevant context only when consistent with confirmed paths, authorization and checks.
+
+## Sync and verify before moving
+
+Use only `artifactPaths.specs.existingOutputPaths` from status as the source of delta specs. If there are no entries, record that no delta specs exist. If entries exist, compare every delta with the corresponding main spec under the store-aware `<planningHome.root>/openspec/specs/<capability-path>/spec.md`, preserving the full capability path. Run `openspec-sync-specs-local` for **all** entries with the same confirmed change and store, and wait synchronously until it finishes; never move the source while sync is in flight. The local sync obtains valid specs instructions before writes and validates its output.
+
+After sync, independently compare every delta against its main spec: added requirements must be present; modified descriptions and scenarios must be reflected while unrelated scenarios remain; removed requirements must be absent (including an empty retired capability, subject to any explicitly reported retained spec); renamed requirements must exist under the new name and not the old. Validate the resulting main specs and change. If sync fails, validation fails, any comparison is inconsistent, or any delta remains unapplied, report the evidence and stop without archiving. Do not treat partial sync as success.
+
+## Archive and verify
+
+Use `<planningHome.changesDir>/archive` as the destination. The target is the change name if it already begins with `YYYY-MM-DD-`; otherwise prefix the current date once. Check the exact destination before moving. If it exists, stop without overwriting or renaming it. Create the archive directory if necessary and move the entire `changeRoot` to the target, preserving all files including `.openspec.yaml` metadata.
+
+Verify the original change path is absent, the target exists with its metadata and expected artifacts, and OpenSpec status/list reflects the archived state at the selected root. Report the change, schema, store, destination, validation and sync results, plus any verification failure. If the move or post-move verification fails, report the actual state and stop; do not claim success or silently overwrite anything. The manager handles subsequent stage upload under the project rules.
+
+
+
+--- F2-exit.txt ---
+exit=0
+
+
+--- F2.txt ---
+---
+name: openspec-archive-change-local
+description: Archive a manager-confirmed completed OpenSpec change after independent acceptance and spec synchronization in this project's coordinated workflow.
+---
+
+# Archive a completed change
+
+Use the change and task branch confirmed by the manager. Do not select another change or store independently. Follow the project role rules; archiving is performed only after all stages and independent acceptance are complete. If identity, ownership, store, authorization, or results are unclear, stop and report to the manager.
+
+If a store is selected, discover its ID with `openspec store list --json` and keep `--store "<id>"` on every applicable OpenSpec command throughout. Otherwise use the nearest local OpenSpec root. Resolve paths from the selected store's status, not from a hardcoded repository path.
+
+## Check prerequisites
+
+1. Confirm the change, selected store, task branch, and authority to sync and archive. An explicitly authorized complete workflow needs no repeated confirmation for ordinary operations. Stop at a user-specified pause, when the action exceeds authorization, or when a decision is required; do not infer consent.
+2. Run `openspec status --change "<name>" --json` with the selected store flag. Read `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, and artifact statuses. All required artifacts must be `done` or explicitly `skipped`; otherwise stop. Read the actual tasks file and confirm every task is complete. A missing or incomplete tasks file, incomplete stage, or missing independent PASS evidence blocks archive.
+3. Validate the change with `openspec validate "<name>" --strict` using the same store. Stop on failure. If available, `openspec instructions archive --change "<name>" --json` may provide advisory context; a failed or unsupported advisory lookup does not override the required checks. Apply relevant context only when consistent with confirmed paths, authorization and checks.
+
+## Sync and verify before moving
+
+Use only `artifactPaths.specs.existingOutputPaths` from status as the source of delta specs. If there are no entries, record that no delta specs exist. If entries exist, compare every delta with the corresponding main spec under the store-aware `<planningHome.root>/openspec/specs/<capability-path>/spec.md`, preserving the full capability path. Run `openspec-sync-specs-local` for **all** entries with the same confirmed change and store, and wait synchronously until it finishes; never move the source while sync is in flight. The local sync obtains valid specs instructions before writes and validates its output.
+
+After sync, independently compare every delta against its main spec: added requirements must be present; modified descriptions and scenarios must be reflected while unrelated scenarios remain; removed requirements must be absent (including an empty retired capability, subject to any explicitly reported retained spec); renamed requirements must exist under the new name and not the old. Validate the resulting main specs and change. If sync fails, validation fails, any comparison is inconsistent, or any delta remains unapplied, report the evidence and stop without archiving. Do not treat partial sync as success.
+
+## Archive and verify
+
+Use `<planningHome.changesDir>/archive` as the destination. The target is the change name if it already begins with `YYYY-MM-DD-`; otherwise prefix the current date once. Check the exact destination before moving. If it exists, stop without overwriting or renaming it. Create the archive directory if necessary and move the entire `changeRoot` to the target, preserving all files including `.openspec.yaml` metadata.
+
+Verify the original change path is absent, the target exists with its metadata and expected artifacts, and OpenSpec status/list reflects the archived state at the selected root. Report the change, schema, store, destination, validation and sync results, plus any verification failure. If the move or post-move verification fails, report the actual state and stop; do not claim success or silently overwrite anything. The manager handles subsequent stage upload under the project rules.
+
+
+
+--- F3-git-exit.txt ---
+exit=0
+
+
+--- F3-git.txt ---
+
+
+--- F3-openspec-exit.txt ---
+exit=0
+
+
+--- F3-openspec.txt ---
+Change 'openspec-local-workflow' is valid
+
+
+--- F3-skill-exit.txt ---
+exit=0
+
+
+--- F3-skill.txt ---
+Skill is valid!
+
+
+--- hashes-after.txt ---
+5C9E5A2A9D8E8F6D860BE8DA77F5B41DA7D8020576280CBF31A8BAD85832DB15 C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t6\acceptance.txt
+2ED4EC9674F83E8691213EF94E83A8BB7C5BBF777153BEF96041AA6BE8F333CD C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t6\diff.patch
+B4DD8876861987AE11681B064CDFA6560A3210FEA0E2BC692A2DE7BA7CA27682 C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-archive-change-local\SKILL.md
+E0FFAACDB982E7440E97979422A91178CC93220A5805BD07CBDAEF82C33284AC C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-archive-change\SKILL.md
+C7A41D21DB105AF3F363B76E8697A42FFCE4A725BAE952362E3B3DBF32D9141C C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\proposal.md
+E8446EDDACDDE5430D3051DCCFD7BC45600E4FC8081CE37182BCE00DA0B1C3F9 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\design.md
+F42AB5164612391D6D078D64A4B265C2EE26B21158BC6147EEC1C75715EF0089 C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\specs\agent-development-workflow\spec.md
+9EB6E4A0C5491137E789905A67B5A3549027E6243C97729AED33D6B00CE77E2F C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\tasks.md
+
+
+--- hashes-before.txt ---
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    5C9E5A2A9D8E8F6D860BE8DA77F5B41DA7D8020576280CBF31A8BAD85832DB15 C:\Users\origin\IdeaProjects\Agent\tmp\opens…
+SHA256    2ED4EC9674F83E8691213EF94E83A8BB7C5BBF777153BEF96041AA6BE8F333CD C:\Users\origin\IdeaProjects\Agent\tmp\opens…
+SHA256    B4DD8876861987AE11681B064CDFA6560A3210FEA0E2BC692A2DE7BA7CA27682 C:\Users\origin\IdeaProjects\Agent\.agents\s…
+SHA256    E0FFAACDB982E7440E97979422A91178CC93220A5805BD07CBDAEF82C33284AC C:\Users\origin\IdeaProjects\Agent\.agents\s…
+SHA256    C7A41D21DB105AF3F363B76E8697A42FFCE4A725BAE952362E3B3DBF32D9141C C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    E8446EDDACDDE5430D3051DCCFD7BC45600E4FC8081CE37182BCE00DA0B1C3F9 C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    F42AB5164612391D6D078D64A4B265C2EE26B21158BC6147EEC1C75715EF0089 C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    9EB6E4A0C5491137E789905A67B5A3549027E6243C97729AED33D6B00CE77E2F C:\Users\origin\IdeaProjects\Agent\openspec\…
+
+
+
+--- patch-match.txt ---
+patch body matches skill: True
+
+
+--- report.md ---
+# 测试报告
+Change ID／阶段 ID／原子任务 ID／轮次／时间：openspec-local-workflow／P1／P1-T6／第 1 轮／2026-10-29 15:22 +08:00
+测试实例标识：/root/local_archive_tester（本轮新建独立实例）
+总体结论：PASS
+环境与基线：Windows PowerShell，分支 feature/agent-development-workflow开发，HEAD 1ffd9f08982a600719ea484eb7052fe3f3a85a3c；共享工作区已有任务相关未提交、未跟踪文件。未运行基线，任务卡未指定安全的基线运行方式，本次为固定条款和结构验收。
+被测范围与快照：新增 .agents/skills/openspec-archive-change-local/SKILL.md；对照 .agents/skills/openspec-archive-change/SKILL.md，以及 change 下 proposal.md、design.md、specs/agent-development-workflow/spec.md、tasks.md。任务卡完整补丁 diff.patch SHA256 2ed4ec9674f83e8691213ef94e83a8bb7c5bbf777153bef96041aa6be8f333cd，正文与新增文件一致；acceptance.txt SHA256 5c9e5a2a9d8e8f6d860be8da77f5b41da7d8020576280cbf31a8bad85832db15。测试前后 Get-FileHash -Algorithm SHA256 对以上六文件和两输入文件逐项核对，均与任务卡一致；结果见 hashes-before.txt、hashes-after.txt（前者表格路径因 PowerShell 格式显示截断，顺序同任务卡；后者完整）。未修改被测文件。
+验收项结果：
+- F1：PASS
+  操作及命令：Get-Content -Raw -Encoding UTF8 .agents/skills/openspec-archive-change-local/SKILL.md
+  退出码与关键断言：0；第 2 行名称与目录匹配；第 8、10、14–15 行约束总管确认的 change、store、工件、tasks、阶段和独立验收。
+  预期／实际：命令成功且具备规定前提／命令成功，规定前提均存在。
+  证据：F1.txt、F1-exit.txt、skill-lines.txt。
+- F2：PASS
+  操作及命令：Get-Content -Raw -Encoding UTF8 .agents/skills/openspec-archive-change-local/SKILL.md
+  退出码与关键断言：0；第 20–22 行规定 delta 全量 local sync、主规格核对和失败停止；第 15–16、26 行规定未完成、校验失败和目标冲突停止；第 26–28 行规定保留元数据、验证位置和状态；第 14 行规定明确授权不重复询问、超范围及用户停点停止。
+  预期／实际：逐项具备同步、失败、冲突、归档验证及授权分支／各条款均存在。
+  证据：F2.txt、F2-exit.txt、skill-lines.txt。
+- F3：PASS
+  操作及命令：分别执行 git diff --exit-code -- .agents/skills/openspec-archive-change/SKILL.md；python -X utf8 C:/Users/origin/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/openspec-archive-change-local；openspec validate openspec-local-workflow --strict。
+  退出码与关键断言：依次 0、0、0；原版无 diff，技能输出 Skill is valid!，OpenSpec 输出 Change 'openspec-local-workflow' is valid。
+  预期／实际：三命令分别成功、技能有效且 change valid／均符合。
+  证据：F3-git.txt、F3-git-exit.txt、F3-skill.txt、F3-skill-exit.txt、F3-openspec.txt、F3-openspec-exit.txt。
+固定验收缺陷：无。
+清单外交付阻断问题：无。
+未验证项与原因：无固定验收遗漏；本次依据任务卡核查技能文本及校验命令，未实际归档或同步。
+变异检验：未做，任务卡未授权。
+问题记录：无；无需空 IssueLog 记录或 HTML。
+临时文件、数据及服务清理状态：证据保留在 tmp/openspec-local-p1t6-evidence/，未启动服务或修改数据。首次尝试生成行号证据的辅助 PowerShell 命令因空管道语法解析失败（退出码 1），随后修正命令成功；不影响固定命令结果。
+风格意见（不计 FAIL）：无。
+
+
+--- skill-lines.txt ---
+  1: ---
+  2: name: openspec-archive-change-local
+  3: description: Archive a manager-confirmed completed OpenSpec change after independent acceptance and spec synchronization in this project's coordinated workflow.
+  4: ---
+  5: 
+  6: # Archive a completed change
+  7: 
+  8: Use the change and task branch confirmed by the manager. Do not select another change or store independently. Follow the project role rules; archiving is performed only after all stages and independent acceptance are complete. If identity, ownership, store, authorization, or results are unclear, stop and report to the manager.
+  9: 
+ 10: If a store is selected, discover its ID with `openspec store list --json` and keep `--store "<id>"` on every applicable OpenSpec command throughout. Otherwise use the nearest local OpenSpec root. Resolve paths from the selected store's status, not from a hardcoded repository path.
+ 11: 
+ 12: ## Check prerequisites
+ 13: 
+ 14: 1. Confirm the change, selected store, task branch, and authority to sync and archive. An explicitly authorized complete workflow needs no repeated confirmation for ordinary operations. Stop at a user-specified pause, when the action exceeds authorization, or when a decision is required; do not infer consent.
+ 15: 2. Run `openspec status --change "<name>" --json` with the selected store flag. Read `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, and artifact statuses. All required artifacts must be `done` or explicitly `skipped`; otherwise stop. Read the actual tasks file and confirm every task is complete. A missing or incomplete tasks file, incomplete stage, or missing independent PASS evidence blocks archive.
+ 16: 3. Validate the change with `openspec validate "<name>" --strict` using the same store. Stop on failure. If available, `openspec instructions archive --change "<name>" --json` may provide advisory context; a failed or unsupported advisory lookup does not override the required checks. Apply relevant context only when consistent with confirmed paths, authorization and checks.
+ 17: 
+ 18: ## Sync and verify before moving
+ 19: 
+ 20: Use only `artifactPaths.specs.existingOutputPaths` from status as the source of delta specs. If there are no entries, record that no delta specs exist. If entries exist, compare every delta with the corresponding main spec under the store-aware `<planningHome.root>/openspec/specs/<capability-path>/spec.md`, preserving the full capability path. Run `openspec-sync-specs-local` for **all** entries with the same confirmed change and store, and wait synchronously until it finishes; never move the source while sync is in flight. The local sync obtains valid specs instructions before writes and validates its output.
+ 21: 
+ 22: After sync, independently compare every delta against its main spec: added requirements must be present; modified descriptions and scenarios must be reflected while unrelated scenarios remain; removed requirements must be absent (including an empty retired capability, subject to any explicitly reported retained spec); renamed requirements must exist under the new name and not the old. Validate the resulting main specs and change. If sync fails, validation fails, any comparison is inconsistent, or any delta remains unapplied, report the evidence and stop without archiving. Do not treat partial sync as success.
+ 23: 
+ 24: ## Archive and verify
+ 25: 
+ 26: Use `<planningHome.changesDir>/archive` as the destination. The target is the change name if it already begins with `YYYY-MM-DD-`; otherwise prefix the current date once. Check the exact destination before moving. If it exists, stop without overwriting or renaming it. Create the archive directory if necessary and move the entire `changeRoot` to the target, preserving all files including `.openspec.yaml` metadata.
+ 27: 
+ 28: Verify the original change path is absent, the target exists with its metadata and expected artifacts, and OpenSpec status/list reflects the archived state at the selected root. Report the change, schema, store, destination, validation and sync results, plus any verification failure. If the move or post-move verification fails, report the actual state and stop; do not claim success or silently overwrite anything. The manager handles subsequent stage upload under the project rules.
+
