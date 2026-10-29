@@ -1,0 +1,152 @@
+
+--- a1-a2-command-output.txt ---
+---
+name: openspec-propose-local
+description: Use when planning an existing, manager-created OpenSpec change for this project's coordinated development workflow.
+---
+
+# OpenSpec Propose Local
+
+Plan the change assigned by the manager. This skill produces planning artifacts only; hand off to the manager for development rather than implementing code. The manager confirms the change belongs to the current task branch and provides its name. If the change is absent, its ownership is unclear, or the branch does not match, stop and report the issue to the manager. Do not create a change.
+
+## Scope and context
+
+Understand the requested outcome and fixed acceptance before writing. Report material ambiguity affecting scope, observable behavior, compatibility or acceptance to the manager; record reasonable minor assumptions. Use the change's configured schema; an alternative must already be explicitly selected for that change. Read the current artifacts and project constraints before editing; do not overwrite existing work blindly.
+
+If a registered store is named or contains the work, run `openspec store list --json`, identify its id, and keep `--store "<id>"` on all applicable OpenSpec commands throughout this workflow. Otherwise use the nearest configured OpenSpec root. Resolve paths from CLI output, not assumptions about repository paths.
+
+## Build artifacts
+
+1. Run `openspec status --change "<name>" --json`. Read `planningHome`, `changeRoot`, `artifactPaths`, `actionContext`, `applyRequires` and each artifact's `requires` and `status`.
+2. Compute the required set as `applyRequires` and its transitive dependencies. Process ready artifacts in dependency order. Existing artifacts need inspection, not blind replacement; read completed dependencies from disk again before each artifact.
+3. For each missing artifact, run `openspec instructions <artifact-id> --change "<name>" --json`. Follow its `instruction` and `template`, its `resolvedOutputPath`, and its `dependencies`. Treat `context` and `rules` as constraints, not content to copy into the output. If creation is delegated to a specific skill or command, use it and verify the resulting file exists. If the output path is a glob, use the instruction to choose the concrete path.
+4. Respect `skipped` status and `skipped`/`warning` instructions: do not create skipped artifacts. Skip an otherwise required artifact only when its own instruction marks it conditional; record the reason. A conditional dependency skipped this way does not prevent producing its dependent artifact. Do not infer that a required spec is optional.
+5. Verify each written artifact exists, then rerun status and continue until the required transitive set is complete or legitimately skipped. Status alone checks existence, so inspect dependency edges even for artifacts marked done. Preserve capability paths and use the schema's structure.
+6. Run `openspec status --change "<name>"` and `openspec validate "<name>" --strict` with the selected store if applicable. Inspect the artifacts for consistency, fixed acceptance, and actionable tasks. On failure or unresolved ambiguity stop and report evidence; do not declare readiness.
+
+## Handoff and authorization
+
+Report the change name and resolved location, artifacts created or retained, conditional skips and reasons, validation results, and any unresolved issue to the manager. If the user has authorized the complete development task and planning is ready, hand off for the manager to dispatch the specified atomic task without requesting the same authorization again. If the request is planning only or the user specified a stop point, stop at that boundary. Scope changes or unresolved decisions still require escalation under project rules. This planning role never starts implementation itself.
+
+
+
+--- a1-a2-content.txt ---
+---
+name: openspec-propose-local
+description: Use when planning an existing, manager-created OpenSpec change for this project's coordinated development workflow.
+---
+
+# OpenSpec Propose Local
+
+Plan the change assigned by the manager. This skill produces planning artifacts only; hand off to the manager for development rather than implementing code. The manager confirms the change belongs to the current task branch and provides its name. If the change is absent, its ownership is unclear, or the branch does not match, stop and report the issue to the manager. Do not create a change.
+
+## Scope and context
+
+Understand the requested outcome and fixed acceptance before writing. Report material ambiguity affecting scope, observable behavior, compatibility or acceptance to the manager; record reasonable minor assumptions. Use the change's configured schema; an alternative must already be explicitly selected for that change. Read the current artifacts and project constraints before editing; do not overwrite existing work blindly.
+
+If a registered store is named or contains the work, run `openspec store list --json`, identify its id, and keep `--store "<id>"` on all applicable OpenSpec commands throughout this workflow. Otherwise use the nearest configured OpenSpec root. Resolve paths from CLI output, not assumptions about repository paths.
+
+## Build artifacts
+
+1. Run `openspec status --change "<name>" --json`. Read `planningHome`, `changeRoot`, `artifactPaths`, `actionContext`, `applyRequires` and each artifact's `requires` and `status`.
+2. Compute the required set as `applyRequires` and its transitive dependencies. Process ready artifacts in dependency order. Existing artifacts need inspection, not blind replacement; read completed dependencies from disk again before each artifact.
+3. For each missing artifact, run `openspec instructions <artifact-id> --change "<name>" --json`. Follow its `instruction` and `template`, its `resolvedOutputPath`, and its `dependencies`. Treat `context` and `rules` as constraints, not content to copy into the output. If creation is delegated to a specific skill or command, use it and verify the resulting file exists. If the output path is a glob, use the instruction to choose the concrete path.
+4. Respect `skipped` status and `skipped`/`warning` instructions: do not create skipped artifacts. Skip an otherwise required artifact only when its own instruction marks it conditional; record the reason. A conditional dependency skipped this way does not prevent producing its dependent artifact. Do not infer that a required spec is optional.
+5. Verify each written artifact exists, then rerun status and continue until the required transitive set is complete or legitimately skipped. Status alone checks existence, so inspect dependency edges even for artifacts marked done. Preserve capability paths and use the schema's structure.
+6. Run `openspec status --change "<name>"` and `openspec validate "<name>" --strict` with the selected store if applicable. Inspect the artifacts for consistency, fixed acceptance, and actionable tasks. On failure or unresolved ambiguity stop and report evidence; do not declare readiness.
+
+## Handoff and authorization
+
+Report the change name and resolved location, artifacts created or retained, conditional skips and reasons, validation results, and any unresolved issue to the manager. If the user has authorized the complete development task and planning is ready, hand off for the manager to dispatch the specified atomic task without requesting the same authorization again. If the request is planning only or the user specified a stop point, stop at that boundary. Scope changes or unresolved decisions still require escalation under project rules. This planning role never starts implementation itself.
+
+
+
+--- a1-a2-numbered.txt ---
+  1: ---
+  2: name: openspec-propose-local
+  3: description: Use when planning an existing, manager-created OpenSpec change for this project's coordinated development workflow.
+  4: ---
+  5: 
+  6: # OpenSpec Propose Local
+  7: 
+  8: Plan the change assigned by the manager. This skill produces planning artifacts only; hand off to the manager for development rather than implementing code. The manager confirms the change belongs to the current task branch and provides its name. If the change is absent, its ownership is unclear, or the branch does not match, stop and report the issue to the manager. Do not create a change.
+  9: 
+ 10: ## Scope and context
+ 11: 
+ 12: Understand the requested outcome and fixed acceptance before writing. Report material ambiguity affecting scope, observable behavior, compatibility or acceptance to the manager; record reasonable minor assumptions. Use the change's configured schema; an alternative must already be explicitly selected for that change. Read the current artifacts and project constraints before editing; do not overwrite existing work blindly.
+ 13: 
+ 14: If a registered store is named or contains the work, run `openspec store list --json`, identify its id, and keep `--store "<id>"` on all applicable OpenSpec commands throughout this workflow. Otherwise use the nearest configured OpenSpec root. Resolve paths from CLI output, not assumptions about repository paths.
+ 15: 
+ 16: ## Build artifacts
+ 17: 
+ 18: 1. Run `openspec status --change "<name>" --json`. Read `planningHome`, `changeRoot`, `artifactPaths`, `actionContext`, `applyRequires` and each artifact's `requires` and `status`.
+ 19: 2. Compute the required set as `applyRequires` and its transitive dependencies. Process ready artifacts in dependency order. Existing artifacts need inspection, not blind replacement; read completed dependencies from disk again before each artifact.
+ 20: 3. For each missing artifact, run `openspec instructions <artifact-id> --change "<name>" --json`. Follow its `instruction` and `template`, its `resolvedOutputPath`, and its `dependencies`. Treat `context` and `rules` as constraints, not content to copy into the output. If creation is delegated to a specific skill or command, use it and verify the resulting file exists. If the output path is a glob, use the instruction to choose the concrete path.
+ 21: 4. Respect `skipped` status and `skipped`/`warning` instructions: do not create skipped artifacts. Skip an otherwise required artifact only when its own instruction marks it conditional; record the reason. A conditional dependency skipped this way does not prevent producing its dependent artifact. Do not infer that a required spec is optional.
+ 22: 5. Verify each written artifact exists, then rerun status and continue until the required transitive set is complete or legitimately skipped. Status alone checks existence, so inspect dependency edges even for artifacts marked done. Preserve capability paths and use the schema's structure.
+ 23: 6. Run `openspec status --change "<name>"` and `openspec validate "<name>" --strict` with the selected store if applicable. Inspect the artifacts for consistency, fixed acceptance, and actionable tasks. On failure or unresolved ambiguity stop and report evidence; do not declare readiness.
+ 24: 
+ 25: ## Handoff and authorization
+ 26: 
+ 27: Report the change name and resolved location, artifacts created or retained, conditional skips and reasons, validation results, and any unresolved issue to the manager. If the user has authorized the complete development task and planning is ready, hand off for the manager to dispatch the specified atomic task without requesting the same authorization again. If the request is planning only or the user specified a stop point, stop at that boundary. Scope changes or unresolved decisions still require escalation under project rules. This planning role never starts implementation itself.
+
+
+--- a1-a2-status.txt ---
+Get-Content success=True
+
+
+--- a3-exit-codes.txt ---
+git=0
+python=0
+openspec=0
+
+
+--- a3-git.txt ---
+
+
+--- a3-openspec.txt ---
+Change 'openspec-local-workflow' is valid
+
+
+--- a3-skill.txt ---
+Skill is valid!
+
+
+--- branch-after.txt ---
+feature/agent-development-workflow开发
+
+
+--- hashes-after.txt ---
+BFB0B72A5BF99DBB656F95EFEBE77D908B165BB692D5B1344B8483C1F8B9A77F  C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t1\acceptance.txt
+E49542180914E2056C654804782BC4F95542AE29FD1A39BC9B02575482B18DAC  C:\Users\origin\IdeaProjects\Agent\tmp\openspec-local-p1t1\diff.patch
+06FC5E8C4A290D7BD64032CCBE51C5B173E9D706E3381A74BF8194892D44ED4D  C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-propose-local\SKILL.md
+0C95777DD8CC28F52DC4D6E2A51BEEB1917A6638BED51BAA710735721784D731  C:\Users\origin\IdeaProjects\Agent\.agents\skills\openspec-propose\SKILL.md
+C7A41D21DB105AF3F363B76E8697A42FFCE4A725BAE952362E3B3DBF32D9141C  C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\proposal.md
+E8446EDDACDDE5430D3051DCCFD7BC45600E4FC8081CE37182BCE00DA0B1C3F9  C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\design.md
+F42AB5164612391D6D078D64A4B265C2EE26B21158BC6147EEC1C75715EF0089  C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\specs\agent-development-workflow\spec.md
+AA3CA0972CEF33DD91135A2165C3340AB6C72F90CCA51DA08BF9F434AD86ECCE  C:\Users\origin\IdeaProjects\Agent\openspec\changes\openspec-local-workflow\tasks.md
+
+
+--- hashes-before.txt ---
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    BFB0B72A5BF99DBB656F95EFEBE77D908B165BB692D5B1344B8483C1F8B9A77F C:\Users\origin\IdeaProjects\Agent\tmp\opens…
+SHA256    E49542180914E2056C654804782BC4F95542AE29FD1A39BC9B02575482B18DAC C:\Users\origin\IdeaProjects\Agent\tmp\opens…
+SHA256    06FC5E8C4A290D7BD64032CCBE51C5B173E9D706E3381A74BF8194892D44ED4D C:\Users\origin\IdeaProjects\Agent\.agents\s…
+SHA256    0C95777DD8CC28F52DC4D6E2A51BEEB1917A6638BED51BAA710735721784D731 C:\Users\origin\IdeaProjects\Agent\.agents\s…
+SHA256    C7A41D21DB105AF3F363B76E8697A42FFCE4A725BAE952362E3B3DBF32D9141C C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    E8446EDDACDDE5430D3051DCCFD7BC45600E4FC8081CE37182BCE00DA0B1C3F9 C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    F42AB5164612391D6D078D64A4B265C2EE26B21158BC6147EEC1C75715EF0089 C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    AA3CA0972CEF33DD91135A2165C3340AB6C72F90CCA51DA08BF9F434AD86ECCE C:\Users\origin\IdeaProjects\Agent\openspec\…
+
+
+
+
+--- head-after.txt ---
+1ffd9f08982a600719ea484eb7052fe3f3a85a3c
+
+
+--- time.txt ---
+2026-10-29T14:07:13.4667549+08:00
+

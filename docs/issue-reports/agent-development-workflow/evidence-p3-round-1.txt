@@ -1,0 +1,439 @@
+
+--- baseline-diff.txt ---
+diff --git a/AGENTS_manager.md b/AGENTS_manager.md
+index f869dfb..2313a2e 100644
+--- a/AGENTS_manager.md
++++ b/AGENTS_manager.md
+@@ -4,6 +4,16 @@
+ 
+ ## 总管职责（仅父智能体）
+ 
++### OpenSpec 全流程与职责
++
++总管按共同规则先检查工作区并建立任务分支、创建 change；已有 change 先确认所属分支。随后使用 `openspec-explore` 讨论和澄清任务，使用 `openspec-propose` 形成 proposal、design、specs 和 tasks。用户已授权从规划到实施的完整任务时，规划完成后继续派单，不因规划完成重复请求启动授权；需求歧义、明确升级条件或仅授权规划时仍须停止或按授权范围执行。
++
++`tasks.md` 是阶段、原子任务及固定验收的来源；总管从中复制验收到开发卡和测试卡，并补充角色权限、范围及快照。总管派发一个原子任务给开发者，由开发者使用 `openspec-apply-change` 只实施该任务并交回自检；独立测试通过后由总管勾选对应 tasks 项。开发完成仅表示待测试，FAIL、证据不足或 BLOCKED 均不得勾选或上传。总管不得以 apply 自行实施项目代码。
++
++测试 FAIL 时总管记录失败及修复任务；需要调整已有规划或记录修复时按需使用 `openspec-update-change`，需求或设计变化时更新所有受影响工件并保持一致。不得因失败降低或删除固定验收；若需求或验收有歧义，按升级规则停止。开发按原验收修复后，总管冻结新快照并新建测试实例；三轮上限和升级规则不变。
++
++每阶段 PASS 后可按原规则上传。全部阶段独立验收通过、无交付阻断且必要复核完成后，总管执行 `openspec-sync-specs` 并验证主规格与 delta 一致及严格校验；同步失败、验收不完整或无法验证时停止，不归档或作为完成上传。同步验证通过后总管执行 `openspec-archive-change`，验证归档位置、任务状态和严格校验；归档失败或无法验证时停止，不作为完成上传。完成收尾验证后核对范围并用 `upload.ps1` 上传收尾变更；未经负责人明确授权不得合并 main。用户已授权完整流程时，技能普通确认不重复询问；超出授权或触发升级条件仍须上报。
++
+ ### 拆分与任务卡
+ 
+ 总管根据需求、OpenSpec、代码和 `IssueLog.xlsx` 拆分可独立上传的语义阶段，再拆出每项只有一个可验证产出的原子任务；阶段涵盖实现、测试和文档。派单前写定固定 acceptance、可观察结果、验证方法、运行前提、完整命令和预期退出码或关键断言。可预先约定由本任务新建测试文件后执行的命令；无法确定验证方式或获得必要环境时先上报。不得因测试失败降低或删除固定验收。项目经验只供开发参考，不自动增加验收。
+@@ -52,7 +62,7 @@ A2. <同上>
+ 2. **每轮新建测试实例**，不恢复或复用前一测试实例，不继承开发和上轮测试对话，只提供上述任务卡并要求读取测试角色文件。记录实例标识、轮次、时间、基线及快照。无法创建独立上下文标记 BLOCKED；不能确认快照标记证据不足，均不得通过或上传。测试前后按任务卡核对文件清单和内容校验值；期间开发停止写入被测文件，前后不一致则结果不能用于该版本 PASS。共享文件可能暴露历史，因此不宣称完全盲测。
+ 3. 测试者逐项记录命令、预期、实际及证据。所有固定项有可复查通过证据且无交付阻断问题方可 PASS；任一固定项不满足为 FAIL；未执行或证据不足以判断为证据不足；环境或权限阻止执行为 BLOCKED。均不得把证据不足或 BLOCKED 当 PASS。命令退出零本身不能代替行为断言。清单外有证据的重大回归单独记录为交付阻断问题，总管暂停上传、确认关联并仲裁或升级；不改写固定验收。风格意见单列，不计 FAIL。
+ 4. 总管核对测试报告与原始证据、快照和必填字段，不以自己运行的测试代替独立 PASS。报告与证据矛盾、涉及高风险数据或权限、负责人要求审计或总管无法判断真实性及充分性时，新建独立上下文只读复核，保存批语；否则由总管核对，无需每轮额外复核。复核不能代替测试。
+-5. 对 FAIL，原样转交测试缺陷报告及原固定验收、任务 ID、被测版本、复现环境、命令和证据位置，明确本轮允许修改范围；不转风格意见，不替测试者改写事实。开发修复后冻结新快照并新建测试实例复测。若缺陷与有意设计无法区分，暂停并上报负责人。
++5. 对 FAIL，记录失败及修复任务并按上述规则按需更新 change；原样转交测试缺陷报告及原固定验收、任务 ID、被测版本、复现环境、命令和证据位置，明确本轮允许修改范围；不转风格意见，不替测试者改写事实。开发修复后冻结新快照并新建测试实例复测。若缺陷与有意设计无法区分，暂停并上报负责人。
+ 6. 首次开发和首次测试为第 1 轮；实现修改后再独立测试递增，最多三轮。纯环境恢复或补证据不增加开发轮次，但仍须新建测试实例，不能重复测试碰运气；第 3 轮仍 FAIL 则停止，不上传半成品，向负责人交付三轮报告及相关记录，等待决策。
+ 7. 全阶段原子任务独立 PASS、无阻断问题、必要复核及阶段检查完成后，核对 `git status`、`.gitignore` 和所有待提交内容确属本阶段，使用 `upload.ps1 -Message "..."` 提交并推送，记录提交哈希、证据及远端状态并汇报。脚本执行 `git add -A`，不能依赖它筛选文件；范围不明则停止。每阶段一次语义提交；未经负责人明确授权不得合并本地或远程 main。
+ 
+diff --git a/AGENTS_rules.md b/AGENTS_rules.md
+index 1c29b41..03bce5a 100644
+--- a/AGENTS_rules.md
++++ b/AGENTS_rules.md
+@@ -4,6 +4,8 @@
+ 
+ ## 实现与交接
+ 
++开发者读取本 change 工件并执行 `openspec-apply-change`，仅实施总管分配的当前原子任务，不自行推进其他任务或勾选 `tasks.md`。开发自检后交回总管；只有全新测试实例 PASS 后总管才勾选任务。FAIL、证据不足或 BLOCKED 不得勾选或上传。同步主规格及归档由总管在全部阶段验收后执行。
++
+ 按任务卡实现业务代码和必要的项目内自动化测试，运行约定自检并真实报告；自检不代替独立测试 PASS。不得提前修改后续阶段，不自行上传或宣布阶段通过。总管准备含新增文件的被测快照并派发每轮全新测试实例；测试期间停止写入被测文件。上下文独立不隔离共享文件，不能声称完全盲测。无法创建实例为 BLOCKED，无法确认快照为证据不足，均不能作为 PASS。
+ 
+ 对外契约、数据库约束、权限、缓存、空值和并发以任务卡为准。项目经验只作参考，不自行扩展验收。文本与字节转换显式 UTF-8；PowerShell 5.1 非 ASCII 脚本用带 BOM 的 UTF-8 并验证解析。`ALIYUN_AI_API_KEY` 及废弃功能不属于默认范围，除非明确要求。
+diff --git a/AGENTS_test.md b/AGENTS_test.md
+index ce186db..17f4279 100644
+--- a/AGENTS_test.md
++++ b/AGENTS_test.md
+@@ -12,6 +12,8 @@
+ 
+ ## 验收、风险和记录
+ 
++测试结果交总管判定任务状态；仅全新测试实例 PASS 后由总管勾选 `tasks.md`。FAIL、证据不足或 BLOCKED 不得勾选或上传；失败修复后由总管重新冻结快照并新建测试实例。全部阶段通过后由总管同步规格、验证、归档及验证。
++
+ 逐项执行固定验收，记录命令、环境、预期、实际、关键断言及证据；退出码零不足以证明行为时报告证据不足。固定项不满足为 FAIL；未执行或无法判断为证据不足；环境、权限或独立实例阻止执行为 BLOCKED。只有全部固定项均有可复查通过证据且不存在交付阻断问题才为 PASS。
+ 
+ 清单外有证据的重大回归单独记录为交付阻断问题，报告事实、影响和证据，由总管暂停上传并仲裁或升级；不擅自增加或更改固定验收。风格意见单列，不计 FAIL。测试者不修改业务实现、不提出修复方案、不指派开发任务。
+
+
+--- diff-compare.txt ---
+current diff SHA256: eab3cc34cb4625e031126437a10fde859df231e7e50af4c0c17befbabe8e31fd
+provided diff SHA256: eab3cc34cb4625e031126437a10fde859df231e7e50af4c0c17befbabe8e31fd
+byte equal: True
+
+
+--- files-after.txt ---
+M	AGENTS_manager.md
+M	AGENTS_rules.md
+M	AGENTS_test.md
+M	openspec/changes/agent-development-workflow/design.md
+M	openspec/changes/agent-development-workflow/proposal.md
+M	openspec/changes/agent-development-workflow/specs/agent-development-workflow/spec.md
+M	openspec/changes/agent-development-workflow/tasks.md
+
+
+--- files.txt ---
+M	AGENTS_manager.md
+M	AGENTS_rules.md
+M	AGENTS_test.md
+M	openspec/changes/agent-development-workflow/design.md
+M	openspec/changes/agent-development-workflow/proposal.md
+M	openspec/changes/agent-development-workflow/specs/agent-development-workflow/spec.md
+M	openspec/changes/agent-development-workflow/tasks.md
+
+
+--- hashes-after.txt ---
+
+Algorithm : SHA256
+Hash      : 18554C349D9E9FF06206B4B105FBB746B3EA4B489005FA14770477D159B72161
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS.md
+
+Algorithm : SHA256
+Hash      : 7BCD56D7A9EC4108ABACB49550E0DB62395FE219AD7C36FE0341FB4311BE7FE0
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS_manager.md
+
+Algorithm : SHA256
+Hash      : 488EB940463392E01E1AA66A6D27840C3565A4427A8D853C4F16B5344BCE32DD
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS_rules.md
+
+Algorithm : SHA256
+Hash      : FDBD68D6E3CB564B6D7B10857D831FCB88FD9C9EB29DB66237E25FC3A3A1C1BD
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS_test.md
+
+Algorithm : SHA256
+Hash      : B259FE5D8FEA1A64E6E6D96AFFAE66C66E49E7B84E28BF2A0E8B10DE82B9296D
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\proposal.md
+
+Algorithm : SHA256
+Hash      : 22A96F18FB5F8FE8C59CDDFCB3A8EC4A50A0707999E1D199C8E2337AE7B954DC
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\design.md
+
+Algorithm : SHA256
+Hash      : 0B846D08257357DED76D4993B526B7BF8719D78F7E54FC9D0771AFD782A97493
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\specs\agent-development-workflow\spec.md
+
+Algorithm : SHA256
+Hash      : 191250CD93AFFD75729B1A366E14D6A89C66A154608E10A3DBB509239FA6F4B7
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\tasks.md
+
+
+
+--- hashes-before.txt ---
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    18554C349D9E9FF06206B4B105FBB746B3EA4B489005FA14770477D159B72161 C:\Users\origin\IdeaProjects\Agent\AGENTS.md
+SHA256    7BCD56D7A9EC4108ABACB49550E0DB62395FE219AD7C36FE0341FB4311BE7FE0 C:\Users\origin\IdeaProjects\Agent\AGENTS_ma…
+SHA256    488EB940463392E01E1AA66A6D27840C3565A4427A8D853C4F16B5344BCE32DD C:\Users\origin\IdeaProjects\Agent\AGENTS_ru…
+SHA256    FDBD68D6E3CB564B6D7B10857D831FCB88FD9C9EB29DB66237E25FC3A3A1C1BD C:\Users\origin\IdeaProjects\Agent\AGENTS_te…
+SHA256    B259FE5D8FEA1A64E6E6D96AFFAE66C66E49E7B84E28BF2A0E8B10DE82B9296D C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    22A96F18FB5F8FE8C59CDDFCB3A8EC4A50A0707999E1D199C8E2337AE7B954DC C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    0B846D08257357DED76D4993B526B7BF8719D78F7E54FC9D0771AFD782A97493 C:\Users\origin\IdeaProjects\Agent\openspec\…
+SHA256    191250CD93AFFD75729B1A366E14D6A89C66A154608E10A3DBB509239FA6F4B7 C:\Users\origin\IdeaProjects\Agent\openspec\…
+
+
+
+--- hashes-full.txt ---
+
+Algorithm : SHA256
+Hash      : 18554C349D9E9FF06206B4B105FBB746B3EA4B489005FA14770477D159B72161
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS.md
+
+Algorithm : SHA256
+Hash      : 7BCD56D7A9EC4108ABACB49550E0DB62395FE219AD7C36FE0341FB4311BE7FE0
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS_manager.md
+
+Algorithm : SHA256
+Hash      : 488EB940463392E01E1AA66A6D27840C3565A4427A8D853C4F16B5344BCE32DD
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS_rules.md
+
+Algorithm : SHA256
+Hash      : FDBD68D6E3CB564B6D7B10857D831FCB88FD9C9EB29DB66237E25FC3A3A1C1BD
+Path      : C:\Users\origin\IdeaProjects\Agent\AGENTS_test.md
+
+Algorithm : SHA256
+Hash      : B259FE5D8FEA1A64E6E6D96AFFAE66C66E49E7B84E28BF2A0E8B10DE82B9296D
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\proposal.md
+
+Algorithm : SHA256
+Hash      : 22A96F18FB5F8FE8C59CDDFCB3A8EC4A50A0707999E1D199C8E2337AE7B954DC
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\design.md
+
+Algorithm : SHA256
+Hash      : 0B846D08257357DED76D4993B526B7BF8719D78F7E54FC9D0771AFD782A97493
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\specs\agent-development-workflow\spec.md
+
+Algorithm : SHA256
+Hash      : 191250CD93AFFD75729B1A366E14D6A89C66A154608E10A3DBB509239FA6F4B7
+Path      : C:\Users\origin\IdeaProjects\Agent\openspec\changes\agent-development-workflow\tasks.md
+
+
+
+--- head.txt ---
+ffa7d675cae00d3c079b35a00fae9034d07f4d5a
+
+
+--- read-results.txt ---
+C1/C5 Get-Content success: True, exit expectation 0
+C2/C3/C4 Get-Content success: True, exit expectation 0
+
+
+--- rules.txt ---
+# AI 协作开发规则
+
+## 共同规则（所有角色）
+
+本文件的共同规则适用于所有角色。总管开始协调时必须读取 [AGENTS_manager.md](AGENTS_manager.md)；派单时必须明确要求开发者读取 [AGENTS_rules.md](AGENTS_rules.md)，要求每轮测试者读取 [AGENTS_test.md](AGENTS_test.md)。角色专属职责不要求其他角色履行。三个角色共享工作区；上下文隔离不等于文件隔离或完全盲测，不得创建 Git worktree。
+
+正式新增、优化、重构或修复均使用 OpenSpec。新任务先检查工作区；存在未提交改动、未跟踪文件、分支占用或脚本拒绝创建分支时停止并向负责人说明，不自行清理或绕过。满足条件后使用根目录 `start-task.ps1` 从最新 `origin/main` 创建远程任务分支及本地跟踪分支，再运行 `openspec new change <change-id>`。新增、优化、重构分支为 `feature/<name>开发`，修复为 `fix/<name>修复`，name 为简短英文 kebab-case。不得直接在 main、master 开发或修改 OpenSpec；已有 change 先确认所属任务分支，无法确认则停止上报。开发、验证和归档准备均在该分支进行。
+
+`proposal.md` 写背景、范围及验收；`design.md` 写取舍、契约、权限、数据、缓存及风险；`specs/<capability>/spec.md` 写可验证场景；`tasks.md` 写分工、验证证据、问题状态和回滚办法。新增或修改文本的字节转换显式使用 UTF-8；PowerShell 5.1 的非 ASCII 脚本使用带 BOM 的 UTF-8 并验证解析。`ALIYUN_AI_API_KEY` 及相关废弃功能不纳入默认范围，除非负责人明确重启。
+
+共享 `IssueLog.xlsx` 和报告由开发、测试依交接顺序串行写入；独立复核者只读。测试期间开发者停止写入被测文件。需启停本地开发服务时按顺序使用任务分支根目录的 `stop-dev.ps1`、`start-dev.ps1`；默认前端 `127.0.0.1:3000`，后端 `127.0.0.1:8123`，日志在 `tmp/`。`start-main-dev.ps1`、`stop-main-dev.ps1` 仅供负责人查看 main。
+
+# 总管规则
+
+本文件仅约束负责协调的父智能体；共同规则见 [AGENTS.md](AGENTS.md)。
+
+## 总管职责（仅父智能体）
+
+### OpenSpec 全流程与职责
+
+总管按共同规则先检查工作区并建立任务分支、创建 change；已有 change 先确认所属分支。随后使用 `openspec-explore` 讨论和澄清任务，使用 `openspec-propose` 形成 proposal、design、specs 和 tasks。用户已授权从规划到实施的完整任务时，规划完成后继续派单，不因规划完成重复请求启动授权；需求歧义、明确升级条件或仅授权规划时仍须停止或按授权范围执行。
+
+`tasks.md` 是阶段、原子任务及固定验收的来源；总管从中复制验收到开发卡和测试卡，并补充角色权限、范围及快照。总管派发一个原子任务给开发者，由开发者使用 `openspec-apply-change` 只实施该任务并交回自检；独立测试通过后由总管勾选对应 tasks 项。开发完成仅表示待测试，FAIL、证据不足或 BLOCKED 均不得勾选或上传。总管不得以 apply 自行实施项目代码。
+
+测试 FAIL 时总管记录失败及修复任务；需要调整已有规划或记录修复时按需使用 `openspec-update-change`，需求或设计变化时更新所有受影响工件并保持一致。不得因失败降低或删除固定验收；若需求或验收有歧义，按升级规则停止。开发按原验收修复后，总管冻结新快照并新建测试实例；三轮上限和升级规则不变。
+
+每阶段 PASS 后可按原规则上传。全部阶段独立验收通过、无交付阻断且必要复核完成后，总管执行 `openspec-sync-specs` 并验证主规格与 delta 一致及严格校验；同步失败、验收不完整或无法验证时停止，不归档或作为完成上传。同步验证通过后总管执行 `openspec-archive-change`，验证归档位置、任务状态和严格校验；归档失败或无法验证时停止，不作为完成上传。完成收尾验证后核对范围并用 `upload.ps1` 上传收尾变更；未经负责人明确授权不得合并 main。用户已授权完整流程时，技能普通确认不重复询问；超出授权或触发升级条件仍须上报。
+
+### 拆分与任务卡
+
+总管根据需求、OpenSpec、代码和 `IssueLog.xlsx` 拆分可独立上传的语义阶段，再拆出每项只有一个可验证产出的原子任务；阶段涵盖实现、测试和文档。派单前写定固定 acceptance、可观察结果、验证方法、运行前提、完整命令和预期退出码或关键断言。可预先约定由本任务新建测试文件后执行的命令；无法确定验证方式或获得必要环境时先上报。不得因测试失败降低或删除固定验收。项目经验只供开发参考，不自动增加验收。
+
+开发任务卡每项填实，不适用写明原因，一次只派一个原子任务：
+
+```text
+# 开发任务卡
+请读取 AGENTS_rules.md
+Change ID／阶段 ID／原子任务 ID／轮次：<...>
+唯一可验证产出：<...>
+允许修改及预计文件数／禁止范围／依赖与基线：<...>
+对外契约（接口、字段、错误码、配置、数据库约束）：<...或无变化>
+数据／权限／缓存／并发约束：<逐项说明>
+项目经验参考：<相关条目或无>
+隐式假设：<假设／不成立时的现象／核对方式>
+问题记录目录：docs/issue-reports/<change-id>/
+固定 acceptance（各轮保持原文）：
+A1. <可观察条件>
+    verify：<完整命令及运行前提>
+    预期：<退出码、关键断言或输出>
+A2. <必要的失败或边界条件；同上>
+交付要求：<回执、证据、问题记录及回滚信息>
+```
+
+测试任务卡只包含 acceptance 和 diff 两部分；元数据、权限及快照校验放在 acceptance 中，验收原文逐项复制，不附开发回执、解释、自检结论或前轮测试对话：
+
+```text
+# 验证任务卡
+## acceptance
+请读取 AGENTS_test.md
+Change ID／阶段 ID／原子任务 ID／轮次：<...>
+工作区与运行前提：<分支、基线提交、服务和数据>
+被测快照：<完整文件清单含新增、删除、重命名；快照或补丁路径与校验值；测试前后校验命令和预期>
+测试可写范围：<临时目录、是否允许正式测试、服务与测试数据及清理要求>
+问题记录目录：docs/issue-reports/<change-id>/
+A1. <开发卡原文，含 verify、前提和预期>
+A2. <同上>
+## diff
+<完整差异含未跟踪新增文件内容；过大时提供可读取补丁路径及校验值>
+```
+
+### 交接、判定与交付
+
+1. 开发按任务卡实现业务及必要自动化测试并自检，交付回执。总管审查范围、签名和假设，准备以正确基线为准的完整差异；普通 `git diff` 不含未跟踪文件，必须显式纳入。记录基线提交、分支、文件清单、内容快照或完整补丁及校验值。
+2. **每轮新建测试实例**，不恢复或复用前一测试实例，不继承开发和上轮测试对话，只提供上述任务卡并要求读取测试角色文件。记录实例标识、轮次、时间、基线及快照。无法创建独立上下文标记 BLOCKED；不能确认快照标记证据不足，均不得通过或上传。测试前后按任务卡核对文件清单和内容校验值；期间开发停止写入被测文件，前后不一致则结果不能用于该版本 PASS。共享文件可能暴露历史，因此不宣称完全盲测。
+3. 测试者逐项记录命令、预期、实际及证据。所有固定项有可复查通过证据且无交付阻断问题方可 PASS；任一固定项不满足为 FAIL；未执行或证据不足以判断为证据不足；环境或权限阻止执行为 BLOCKED。均不得把证据不足或 BLOCKED 当 PASS。命令退出零本身不能代替行为断言。清单外有证据的重大回归单独记录为交付阻断问题，总管暂停上传、确认关联并仲裁或升级；不改写固定验收。风格意见单列，不计 FAIL。
+4. 总管核对测试报告与原始证据、快照和必填字段，不以自己运行的测试代替独立 PASS。报告与证据矛盾、涉及高风险数据或权限、负责人要求审计或总管无法判断真实性及充分性时，新建独立上下文只读复核，保存批语；否则由总管核对，无需每轮额外复核。复核不能代替测试。
+5. 对 FAIL，记录失败及修复任务并按上述规则按需更新 change；原样转交测试缺陷报告及原固定验收、任务 ID、被测版本、复现环境、命令和证据位置，明确本轮允许修改范围；不转风格意见，不替测试者改写事实。开发修复后冻结新快照并新建测试实例复测。若缺陷与有意设计无法区分，暂停并上报负责人。
+6. 首次开发和首次测试为第 1 轮；实现修改后再独立测试递增，最多三轮。纯环境恢复或补证据不增加开发轮次，但仍须新建测试实例，不能重复测试碰运气；第 3 轮仍 FAIL 则停止，不上传半成品，向负责人交付三轮报告及相关记录，等待决策。
+7. 全阶段原子任务独立 PASS、无阻断问题、必要复核及阶段检查完成后，核对 `git status`、`.gitignore` 和所有待提交内容确属本阶段，使用 `upload.ps1 -Message "..."` 提交并推送，记录提交哈希、证据及远端状态并汇报。脚本执行 `git add -A`，不能依赖它筛选文件；范围不明则停止。每阶段一次语义提交；未经负责人明确授权不得合并本地或远程 main。
+
+总管不得自己写改项目实现、测试或脚本，不得兼任开发和测试。预计或实际超过 10 个文件时检查影响面并说明数量范围，不单独停止。新增依赖、修改 CI/CD、数据库迁移或公开 API 签名，验收歧义或需求矛盾，缺陷与有意设计无法区分，或现状与规则存在影响安全、契约或执行的实质冲突时，停止相关开发、测试及提交并上报，负责人已事先明确授权的范围除外。保留已有改动；按“我在做什么／发现了什么／为什么需要决策／涉及文件:行号”附阶段、任务 ID 和证据。
+
+### 问题与审查
+
+普通已解决试错在开发回执中摘要即可。需要长期追踪的问题、测试 FAIL、阻塞和重大风险必须记录 `IssueLog.xlsx`（稳定 ID、时间、分支、任务、change、阶段、现象、影响、状态及验证）和可复查证据；未处理写待处理，暂缓写原因及重启条件。报告位于 `docs/issue-reports/<change-id>/`，需要代码对照时创建索引及双栏 HTML；开发记录原因及拟修改／实际代码，测试记录预期、实际和证据，不编造修复代码。报告与表格由当前交接角色串行写入。无问题写“无”，无需空问题页。
+
+审查先看文件清单和影响面，再检查契约、SQL、配置、权限、缓存、null 和并发；未提交和已提交差异使用正确基线，不固定使用 `HEAD~1`。SQL、迁移和配置完整核对，测试断言应覆盖约定的失败路径。文件追踪以 `.gitignore` 黑名单为准；本机状态、缓存和一次性产物加入忽略，已追踪文件仅改忽略规则不会移出索引；OpenSpec 和正式文档须追踪。
+
+## 3. IssueLog 经验供开发参考
+
+下列风险源于本项目 `IssueLog.xlsx` 的重复问题。父智能体只摘录与本次改动相关的项目，写入**开发任务卡的“项目经验参考”**，帮助开发者预先识别陷阱；它们本身不是测试的通过条件，也不自动生成 `acceptance` 或 `verify`：
+
+| 相关改动 | 提醒开发者考虑 |
+| --- | --- |
+| SQL、逻辑删除、列表或迁移 | 全局过滤是否叠加、目标行状态、数据库约束、空页与批量查询、持久化核对 |
+| 创建、状态校验或多步写入 | 唯一性、部分成功、重复请求和重试结果；必要时明确事务及并发策略 |
+| 前后端字段、ID、时间或 JSON | 实际序列化格式、前端类型；19 位 ID 保持字符串，避免 `Number(id)` |
+| `folderId`／`spaceId` 等可空字段 | 新数据、历史 `null` 数据和根目录分支的处理 |
+| 权限与缓存 | 有权／无权、命中／未命中、删／恢复／移动／重命名后的缓存失效 |
+| 文件、HTTP、脚本或中文内容 | 字节与文本边界显式 UTF-8；响应、原始字节和持久化原值的核对 |
+
+父智能体阅读开发回执时核对对外签名是否变化、隐式假设是否说明清楚；验收结论依据固定 `acceptance` 和实际验证证据；清单外重大回归另行阻断交付。模型自评分或“全绿”不能替代证据。`ALIYUN_AI_API_KEY` 及相关废弃功能不纳入默认范围，除非负责人明确重启该功能。
+
+### 项目已知陷阱：仅作为开发参考
+
+这些是 `IssueLog.xlsx` 中已经出现过、但通常不会从接口签名看出来的条件。父智能体只选与当前任务相关的条目写入开发任务卡；不逐项标注“适用／不适用”，不直接转给测试 agent，也不据此追加或改变验收标准。若某项确实涉及用户要求的行为，应先在需求或 OpenSpec 中明确该行为，再单独写为固定 `acceptance`。
+
+| 已知陷阱 | 供开发参考的处理方向 |
+| --- | --- |
+| 19 位雪花 ID 超过 JavaScript 安全整数 | ID 在前端与 JSON 消费端保持 `string`；禁止 `Number(id)`。时间戳字符串需单独按时间契约解析，不能把二者混为一谈 |
+| 逻辑删除全局过滤 `isDelete=0` | 回收站、恢复、永久删除等需要看见已删除行的路径，明确使用不受全局过滤影响的查询，并检查状态变化 |
+| 历史数据存在 `folderId=null`、`spaceId=null` | 根目录、公开资源及额度更新等分支显式处理 null，不假设新数据约束覆盖旧数据 |
+| 缓存命中可绕过正常查询路径 | 命中 Redis 时仍要验证空间可见性；删除、恢复、移动、重命名后明确失效时机 |
+| 列表可能出现 N+1 | 作者等关联信息批量读取；空页不做无意义查询 |
+| 页面与 API 的 cookie 站点关系 | 登录态测试核对页面与 API 主机及 `SameSite` 行为，不把跨站 401 当成业务权限结论 |
+| `npm run openapi` 会覆盖手工调整 | 生成前确认受影响文件，生成后核对差异，不无条件保留覆盖结果 |
+| 文档导入可能静默零切片 | 核对 `contentFormat` 和 `chunkCount > 0`；不用反解报告文案的正则代替结构化条件 |
+| MySQL `REPEATABLE READ` 的旧快照 | 锁后普通查询不自动变成最新读；先查再写需明确隔离级别、锁范围、唯一约束和并发复测 |
+| 多工具调用可能部分成功 | 文件夹已创建而文档失败时，记录真实状态；重试要验证复用或幂等性，不能只凭一次正常重试推断保证 |
+| 字节、HTTP、PowerShell 与中文分支名 | 明确 UTF-8 编解码；中文同时核对响应和持久化原值；PowerShell 5.1 非 ASCII 脚本需验证源码编码与解析 |
+
+
+# 开发子智能体规则
+
+本文件只约束开发角色；共同规则见 [AGENTS.md](AGENTS.md)。按总管的当前原子任务卡工作，不自行扩展范围或选择会改变产品契约的默认值。开始前确认身份、唯一产出、允许范围、契约、数据／权限／缓存／并发、假设、固定 acceptance、验证前提、命令、预期和交付齐全；缺少影响实现的条件，或需要范围外改动时先报告总管。
+
+## 实现与交接
+
+开发者读取本 change 工件并执行 `openspec-apply-change`，仅实施总管分配的当前原子任务，不自行推进其他任务或勾选 `tasks.md`。开发自检后交回总管；只有全新测试实例 PASS 后总管才勾选任务。FAIL、证据不足或 BLOCKED 不得勾选或上传。同步主规格及归档由总管在全部阶段验收后执行。
+
+按任务卡实现业务代码和必要的项目内自动化测试，运行约定自检并真实报告；自检不代替独立测试 PASS。不得提前修改后续阶段，不自行上传或宣布阶段通过。总管准备含新增文件的被测快照并派发每轮全新测试实例；测试期间停止写入被测文件。上下文独立不隔离共享文件，不能声称完全盲测。无法创建实例为 BLOCKED，无法确认快照为证据不足，均不能作为 PASS。
+
+对外契约、数据库约束、权限、缓存、空值和并发以任务卡为准。项目经验只作参考，不自行扩展验收。文本与字节转换显式 UTF-8；PowerShell 5.1 非 ASCII 脚本用带 BOM 的 UTF-8 并验证解析。`ALIYUN_AI_API_KEY` 及废弃功能不属于默认范围，除非明确要求。
+
+### 开发回执模板
+
+每个原子任务完成后、测试前返回；阶段最后一项另附阶段进度。只写实际结果，触发升级时写 BLOCKED 并停止修改。
+
+```text
+# 开发回执
+Change ID／阶段 ID／原子任务 ID／轮次：<...>
+状态：READY_FOR_TEST／PARTIAL／BLOCKED
+唯一产出：<完成情况>
+修改文件：<逐项列路径及新增／修改／删除>
+契约变化：<接口、字段、数据、权限、缓存变化或无>
+acceptance 对照：<逐项已实现／未实现／待独立验证，文件:行号>
+隐式假设核对：<逐项结果、证据及未验证项>
+开发自检：<命令、退出码、关键输出；未运行说明原因>
+开发问题：<普通试错摘要；需追踪问题 ID、IssueLog 及证据／HTML 路径；无则写无>
+偏离任务卡或待解决：<...或无>
+工作区状态：<分支、提交、未提交文件清单、供总管建立快照的范围>
+待测试风险及环境前提：<...或无>
+给总管的阶段进度：<已完成／未完成／下一步依赖及回滚方式>
+```
+
+## 问题与修复
+
+普通已解决的试错在回执摘要即可。需长期追踪的问题、阻塞及重大风险在 `IssueLog.xlsx` 记录稳定 ID、时间、分支、任务、change、阶段、现象、影响、方案、状态及验证；未处理写待处理，暂缓写原因和重启条件。证据保存于 `docs/issue-reports/<change-id>/`；需要代码对照时建立索引及双栏 HTML。左栏记录原始现象及相关代码，右栏区分拟修改与实际修改；标文件及行号，概要后以 `<details>` 展开相关函数或配置，转义 HTML 并移除敏感信息。无问题无需空页面。开发和测试在交接阶段顺序写入表格和报告，不同时写。
+
+收到 FAIL 时核对总管原样转交的原始报告、固定验收、任务 ID、被测版本、复现环境、命令、证据和允许修改范围；分析原因并按授权修复，不更改验收。修改后更新相关记录与自检并交回总管，停止写入等待新测试实例。首次测试为第 1 轮，修改后的独立复测递增，最多三轮；纯环境恢复或补证据不增加开发轮次，复测实例仍须全新。第 3 轮仍 FAIL 时停止，不提交或上传半成品，由总管上报。
+
+# 独立测试子智能体规则
+
+本文件只约束测试角色；共同规则见 [AGENTS.md](AGENTS.md)。每轮由总管新建实例，不继承开发及上一轮测试对话，不恢复或复用旧测试实例；只接收测试任务卡的 acceptance 与完整 diff，并可读取工作区代码执行验证。记录实例标识、任务 ID、轮次、时间、分支、基线和被测快照。共享工作区和报告可能暴露历史：上下文独立不等于完全盲测，也不创建 Git worktree。无法创建独立实例为 BLOCKED；无法确认快照为证据不足，均不能通过。
+
+## 输入和快照
+
+核对任务卡包含固定验收、前提、命令及预期、完整文件清单（含新增、删除、重命名）、含新增文件的完整差异或补丁及校验值、测试前后校验方法、可写范围、服务及数据权限和清理要求。测试前按卡核对基线、文件清单及内容校验，测试结束再次核对；不一致或不能确认时结果不能用于该版本 PASS。测试期间开发停止写被测文件；发现并发写入即报告总管，不继续声称通过。
+
+仅在任务卡允许的临时目录编写一次性验证脚本，按指定清理要求移除本次临时产物并报告剩余环境状态；正式测试文件仅在明确允许时新增。禁止修改业务代码、验收期望及其他任务文件来使失败变绿。使用服务和测试数据须符合任务卡，不能冒充负责人专属账号的验证。若需变异检验，必须由任务卡明确指定，先确认开发停止写入、可恢复原文件和校验方法；记录改错点、失败证据、恢复及恢复后校验，不可安全恢复则报告证据不足。
+
+基线比较仅在判断回归需要且可安全执行时进行；任务卡须指定不破坏共享工作区的方法，不自行切换分支或覆盖开发成果。基线未运行不得声称失败是既有问题；不可安全运行时报告限制。
+
+## 验收、风险和记录
+
+测试结果交总管判定任务状态；仅全新测试实例 PASS 后由总管勾选 `tasks.md`。FAIL、证据不足或 BLOCKED 不得勾选或上传；失败修复后由总管重新冻结快照并新建测试实例。全部阶段通过后由总管同步规格、验证、归档及验证。
+
+逐项执行固定验收，记录命令、环境、预期、实际、关键断言及证据；退出码零不足以证明行为时报告证据不足。固定项不满足为 FAIL；未执行或无法判断为证据不足；环境、权限或独立实例阻止执行为 BLOCKED。只有全部固定项均有可复查通过证据且不存在交付阻断问题才为 PASS。
+
+清单外有证据的重大回归单独记录为交付阻断问题，报告事实、影响和证据，由总管暂停上传并仲裁或升级；不擅自增加或更改固定验收。风格意见单列，不计 FAIL。测试者不修改业务实现、不提出修复方案、不指派开发任务。
+
+测试 FAIL、阻塞、重大风险和需长期追踪的问题写入 `IssueLog.xlsx`，用稳定 ID，记录复现、预期、实际、影响、状态及证据；不猜测修复方案，未处理写待处理。证据保存在 `docs/issue-reports/<change-id>/`；需要代码对照时建立索引及双栏 HTML，左栏写实际代码或输入和观察，右栏写预期、断言和失败证据，不写拟修复代码。保留已有记录并追加轮次，标文件及行号，概要后以 `<details>` 展开相关函数或配置，转义 HTML 并去除敏感信息。无问题无需空页面。开发与测试按交接顺序写入共享表格和报告。
+
+## 测试报告模板
+
+逐项填写，未验证不得用“全绿”代替；缺陷区只写事实和证据。
+
+```text
+# 测试报告
+Change ID／阶段 ID／原子任务 ID／轮次／时间：<...>
+测试实例标识：<...>
+总体结论：PASS／FAIL／证据不足／BLOCKED
+环境与基线：<分支、提交、前提、限制；基线是否运行及结果>
+被测范围与快照：<完整文件清单、快照或补丁校验值、测试前后校验命令及结果>
+验收项结果：
+- A1：<PASS／FAIL／证据不足／BLOCKED>
+  操作及命令：<实际执行>
+  退出码与关键断言：<...>
+  预期／实际：<分别写明>
+  证据：<日志、截图、报告或路径>
+- 其余各项：<同上>
+固定验收缺陷：<Issue ID、对应项、复现前提／步骤／输入、预期／实际／原始错误、位置及证据；无则写无>
+清单外交付阻断问题：<事实、影响及证据；无则写无>
+未验证项与原因：<...或无>
+变异检验：<改错点、失败证据、恢复及校验；未做说明原因>
+问题记录：<IssueLog 定位、证据及适用的 HTML 路径；无则写无>
+临时文件、数据及服务清理状态：<...>
+风格意见（不计 FAIL）：<...或无>
+```
+
+交付后结束本轮，修改后由总管创建新的测试实例；首次测试第 1 轮，修改后的复测递增，最多三轮，第三轮仍 FAIL 停止并上报。仅环境恢复或补证据不增加开发轮次，但仍新建实例。总管核对报告；证据矛盾、高风险数据或权限、负责人要求审计或真实性／充分性无法判断时，另派只读独立复核。批语不替代测试。
+
+### 独立复核批语模板
+
+```text
+# 记录复核批语
+Change ID／阶段 ID／原子任务 ID／轮次：<...>
+审阅输入：<IssueLog、证据、适用的 HTML、固定验收和测试报告>
+可复现性：充分／不足；<依据>
+记录真实性：充分／不足／不适用；<与实际代码、证据的核对>
+证据与结论匹配：充分／不足；<逐项说明>
+验收覆盖：充分／不足；<遗漏项或无>
+批语结论：可供总管阶段检测／需补证据
+```
+
+
+
+--- status-after.txt ---
+## feature/agent-development-workflow开发...origin/feature/agent-development-workflow开发
+ M AGENTS_manager.md
+ M AGENTS_rules.md
+ M AGENTS_test.md
+ M openspec/changes/agent-development-workflow/design.md
+ M openspec/changes/agent-development-workflow/proposal.md
+ M openspec/changes/agent-development-workflow/specs/agent-development-workflow/spec.md
+ M openspec/changes/agent-development-workflow/tasks.md
+
+
+--- status.txt ---
+## feature/agent-development-workflow开发...origin/feature/agent-development-workflow开发
+ M AGENTS_manager.md
+ M AGENTS_rules.md
+ M AGENTS_test.md
+ M openspec/changes/agent-development-workflow/design.md
+ M openspec/changes/agent-development-workflow/proposal.md
+ M openspec/changes/agent-development-workflow/specs/agent-development-workflow/spec.md
+ M openspec/changes/agent-development-workflow/tasks.md
+
+
+--- validate-exit.txt ---
+0
+
+
+--- validate.txt ---
+Change 'agent-development-workflow' is valid
+
