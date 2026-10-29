@@ -95,7 +95,33 @@ F3. 原版 archive 技能不变，local 技能通过结构校验，OpenSpec chan
 
 ## 2. 角色与主规格衔接
 
-- [ ] 2.1 原子任务 P2-T1：四份 AGENTS 指向六个 local 技能，落实总管勾选、开发过程记录及独立测试汇总；读取四份文件核对前述角色、失败及 BLOCKED 分支，严格校验 change。
+- [x] 2.1 原子任务 P2-T1：四份 AGENTS 指向六个 local 技能，落实总管勾选、开发过程记录及独立测试汇总；读取四份文件核对前述角色、失败及 BLOCKED 分支，严格校验 change。
+
+### P2-T1 固定验收（每轮保持原文）
+
+G1. 四份 AGENTS 的适用工作流明确使用六个 openspec local 技能，原版技能不作为该工作流的默认入口；总管检查工作区、创建任务分支并创建 change，local propose 使用已创建的 change。
+    verify：`Get-Content -Raw -Encoding UTF8 AGENTS.md,AGENTS_manager.md,AGENTS_rules.md,AGENTS_test.md`
+    预期：退出码 0；检查六个 local 名称、存在的路径、角色入口、分支和 change 创建顺序均明确一致。
+
+G2. 开发只实施总管分配的原子任务，不勾选 tasks；全新独立测试 PASS 后由总管核对证据、快照和阻断问题并勾选该任务；FAIL、BLOCKED、证据不足不得勾选或作为通过上传。
+    verify：`Get-Content -Raw -Encoding UTF8 AGENTS_manager.md,AGENTS_rules.md,AGENTS_test.md`
+    预期：退出码 0；逐项核对开发、测试、总管的任务状态和交接规则一致。
+
+G3. 开发普通已解决错误不逐条主动向总管报告，但留下真实的过程及修改记录；测试任务卡包含记录位置、范围与校验信息，测试者查看并独立验证、汇总给总管；开发需交付完成状态，不能继续时交付 BLOCKED。
+    verify：`Get-Content -Raw -Encoding UTF8 AGENTS_manager.md,AGENTS_rules.md,AGENTS_test.md`
+    预期：退出码 0；核对记录来源、任务卡、测试汇总及 BLOCKED 交接，开发结论不替代独立证据。
+
+G4. 需求、对外行为或设计需要变化时开发及时报告总管并等待决定；失败状态、修复及复测可以记录到 tasks 或问题报告，不能因失败降低固定验收；经授权的真实需求或设计变化更新相关工件且保持一致。
+    verify：`Get-Content -Raw -Encoding UTF8 AGENTS_manager.md,AGENTS_rules.md,AGENTS_test.md`
+    预期：退出码 0；逐项核对普通试错、须决策的变化、失败记录和固定验收四种分支无冲突。
+
+G5. 测试结论统一为 PASS、FAIL、BLOCKED、证据不足；环境、权限或独立实例不可用为 BLOCKED，其他无法判断或未执行为证据不足；只有全部通过且无交付阻断问题才 PASS。
+    verify：`Get-Content -Raw -Encoding UTF8 AGENTS_manager.md,AGENTS_test.md`
+    预期：退出码 0；四种状态和混合结果的报告、勾选、上传处置明确。
+
+G6. 原有工作区、分支、共享资源、任务卡、快照、三轮限制、重大回归、同步、归档、阶段上传及 main 授权边界保留；六个原版技能无修改；OpenSpec change 严格校验通过。
+    verify：`Get-Content -Raw -Encoding UTF8 AGENTS.md,AGENTS_manager.md,AGENTS_rules.md,AGENTS_test.md; git diff --exit-code -- .agents/skills/openspec-explore/SKILL.md .agents/skills/openspec-propose/SKILL.md .agents/skills/openspec-apply-change/SKILL.md .agents/skills/openspec-update-change/SKILL.md .agents/skills/openspec-sync-specs/SKILL.md .agents/skills/openspec-archive-change/SKILL.md; openspec validate openspec-local-workflow --strict`
+    预期：各命令分别退出码 0，原版无 diff，OpenSpec 输出 change valid；逐项对照本阶段基线，不丢失或矛盾。
 
 ## 交付约束
 
