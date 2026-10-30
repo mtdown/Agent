@@ -25,6 +25,7 @@ public class AgentPreviewProxy {
         PublicEvent project(String event, JsonNode data);
         String interactionJson();
         default String displayAnswer() { return null; }
+        default Map<String, Object> displayInteraction(String internal) { return AgentWikiChoiceService.safeDisplay(internal, false); }
     }
     public static final class PublicEvent {
         public final String name;
@@ -47,6 +48,11 @@ public class AgentPreviewProxy {
     }
     public StreamingResponseBody stream(Map<String, Object> payload, Map<String, Object> meta,
                                         BiConsumer<Boolean, String[]> completed, WikiEvents wikiEvents) {
+        return stream(payload, meta, completed, wikiEvents, null);
+    }
+    public StreamingResponseBody stream(Map<String, Object> payload, Map<String, Object> meta,
+                                        BiConsumer<Boolean, String[]> completed, WikiEvents wikiEvents,
+                                        java.util.function.Consumer<JsonNode> fileEvidence) {
         long startedAt = System.nanoTime();
         return out -> {
             StringBuilder answer = new StringBuilder();
@@ -95,9 +101,10 @@ public class AgentPreviewProxy {
                             }
                             String internalInteraction = wikiEvents == null ? null : wikiEvents.interactionJson();
                             if (internalInteraction != null) {
-                                Map<String, Object> display = AgentWikiChoiceService.safeDisplay(internalInteraction, false);
+                                Map<String, Object> display = wikiEvents.displayInteraction(internalInteraction);
                                 if ("wiki_write_result".equals(display.get("kind"))
-                                        || "wiki_partial_result".equals(display.get("kind")))
+                                        || "wiki_partial_result".equals(display.get("kind"))
+                                        || "wiki_write_results".equals(display.get("kind")))
                                     writeFrame(out, "event: wiki_result\ndata: " + JSON.writeValueAsString(display) + "\n\n");
                             }
                             String data = null;
@@ -105,12 +112,19 @@ public class AgentPreviewProxy {
                                 if (part.startsWith("data:")) data = part.substring(5).trim();
                             }
                             ObjectNode done = (ObjectNode) JSON.readTree(data);
+                            JsonNode rawTraces = done.remove("toolTraces");
+                            if (rawTraces != null) done.set("toolTraces", safeToolTraces(rawTraces));
                             if (firstAnswerMs == null) done.putNull("firstAnswerMs");
                             else done.put("firstAnswerMs", firstAnswerMs);
                             done.put("totalMs", elapsedMs(startedAt));
                             finalStats[0] = JSON.writeValueAsString(done);
                             success = true;
                             writeFrame(out, "event: done\ndata: " + JSON.writeValueAsString(done) + "\n\n");
+                        } else if ("personal_file_reference".equals(event)) {
+                            String data = null;
+                            for (String part : frame.toString().split("\n"))
+                                if (part.startsWith("data:")) data = part.substring(5).trim();
+                            if (data != null && fileEvidence != null) fileEvidence.accept(JSON.readTree(data));
                         } else if (event != null && event.startsWith("wiki_")) {
                             // Internal Agent tool data contains real IDs. Never forward that frame.
                             if (wikiEvents != null) {
@@ -150,6 +164,22 @@ public class AgentPreviewProxy {
     }
     private static long elapsedMs(long startedAt) {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+    }
+    private static com.fasterxml.jackson.databind.node.ArrayNode safeToolTraces(JsonNode raw) {
+        var safe = JSON.createArrayNode();
+        if (!raw.isArray()) return safe;
+        java.util.Set<String> names = java.util.Set.of("读取 Skill", "创建 Skill", "保存代码", "读取文件", "写入文件",
+                "查询可写位置", "选择保存位置", "创建 Wiki 文件夹", "创建 Wiki 文档", "保存 Wiki 文档", "其他工具");
+        java.util.Set<String> statuses = java.util.Set.of("success", "failed", "blocked", "unknown");
+        for (JsonNode item : raw) {
+            String name = item.path("name").asText();
+            String status = item.path("status").asText();
+            JsonNode duration = item.path("durationMs");
+            if (!names.contains(name) || !statuses.contains(status) || !duration.isIntegralNumber()
+                    || !duration.canConvertToLong() || duration.longValue() < 0) continue;
+            safe.addObject().put("name", name).put("status", status).put("durationMs", duration.longValue());
+        }
+        return safe;
     }
     private static void writeFrame(java.io.OutputStream out, String frame) throws java.io.IOException {
         out.write(frame.getBytes(StandardCharsets.UTF_8));

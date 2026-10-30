@@ -132,6 +132,11 @@
                   <a-spin size="small" />
                   <span>{{ msg.reasoning ? '正在生成回答…' : '正在检索并思考…' }}</span>
                 </div>
+                <div v-if="msg.agentPreview && msg.stats?.toolTraces?.length" class="wiki-choice-options">
+                  <span v-for="(trace, index) in msg.stats.toolTraces" :key="index">
+                    {{ trace.name }}：{{ trace.status === 'success' ? '成功' : trace.status === 'failed' ? '失败' : trace.status === 'blocked' ? '已阻止' : '结果未知' }}（{{ trace.durationMs }} ms）
+                  </span>
+                </div>
                 <div v-if="msg.interaction?.kind === 'destination_choice'" class="wiki-choice-options">
                   <a-button
                     v-for="option in msg.interaction.options"
@@ -143,14 +148,29 @@
                   <span v-if="msg.interaction.consumed">已选择</span>
                   <span v-else-if="Date.now() >= msg.interaction.expiresAt">选项已过期，请重新提出写入请求</span>
                 </div>
-                <div v-if="msg.interaction?.kind === 'wiki_write_result'" class="wiki-choice-options">
+                <div v-if="msg.interaction?.kind === 'wiki_write_result' && !msg.interaction.results" class="wiki-choice-options">
                   <a-button @click="openWikiResult(msg.interaction)">查看文档：{{ msg.interaction.documentTitle }}</a-button>
                 </div>
                 <div v-if="msg.interaction?.kind === 'wiki_partial_result'" class="wiki-choice-options">
                   <a-tag color="warning">文档未保存</a-tag>
                   <span>已创建：{{ msg.interaction.spaceLabel }} / {{ msg.interaction.folderName }}</span>
                 </div>
+                <div v-if="(msg.interaction?.kind === 'wiki_write_results' || msg.interaction?.kind === 'wiki_write_result') && msg.interaction.results" class="wiki-choice-options">
+                  <template v-for="(result, index) in msg.interaction.results" :key="index">
+                    <a-button v-if="result.kind === 'wiki_write_result' && result.openToken" @click="openWikiResult(result)">查看文档：{{ result.documentTitle }}</a-button>
+                    <span v-else-if="result.kind === 'wiki_write_result'">{{ result.documentTitle }}：路径不可用</span>
+                    <span v-else-if="result.kind === 'wiki_folder_result'">已创建：{{ result.spaceLabel }} / {{ result.folderName }}</span>
+                    <span v-else-if="result.kind === 'wiki_operation_result'">{{ result.operation === 'create_wiki_folder' ? '创建文件夹' : result.operation === 'create_wiki_document' ? '创建文档' : '创建文件夹和文档' }}：{{ result.status === 'unknown' ? '结果未知，请先核查目标位置' : result.status === 'blocked' ? '操作被阻止' : result.status === 'failed' ? '操作失败' : '结果当前不可用' }}</span>
+                    <span v-else>结果当前不可用</span>
+                  </template>
+                </div>
                 <!-- 引用区 -->
+                <div v-if="msg.personalReferences?.length" class="citations">
+                  <div class="citations-title">个人文件引用</div>
+                  <a-button v-for="reference in msg.personalReferences" :key="reference.token" @click="openPersonalReference(msg, reference)">
+                    {{ reference.name }}（字节 {{ reference.start }}–{{ reference.end }}）
+                  </a-button>
+                </div>
                 <div v-if="msg.citations?.length" class="citations">
                   <div class="citations-title">引用依据</div>
                   <div
@@ -263,8 +283,17 @@
           </div>
           <a-spin :spinning="docPreview.loading" wrapper-class-name="doc-panel-body-wrap">
             <div ref="docPanelBodyRef" class="doc-panel-body">
+              <template v-if="docPreview.personal">
+                <div v-if="docPreview.error" class="doc-empty">{{ docPreview.error }}</div>
+                <template v-else>
+                  <div>引用位置：字节 {{ docPreview.personal.referenceStart }}–{{ docPreview.personal.referenceEnd }}；当前段从字节 {{ docPreview.personal.start }} 开始</div>
+                  <pre style="white-space: pre-wrap; overflow-wrap: anywhere">{{ docPreview.content }}</pre>
+                  <a-button :disabled="!docPreview.personal.previous || docPreview.loading" @click="loadPersonalSegment(docPreview.personal.previous)">上一段</a-button>
+                  <a-button :disabled="!docPreview.personal.next || docPreview.loading" @click="loadPersonalSegment(docPreview.personal.next)">下一段</a-button>
+                </template>
+              </template>
               <DocumentWikiContentViewer
-                v-if="docPreview.content"
+                v-else-if="docPreview.content"
                 :content="docPreview.content"
                 :content-format="docPreview.contentFormat"
               />
@@ -396,7 +425,12 @@ import {
   type AgentWikiChoice,
   type AgentWikiPartialResult,
   type AgentWikiResult,
+  type AgentWikiResults,
   getAgentWikiResultPreview,
+  getPersonalFileReferences,
+  getPersonalFileSegment,
+  type PersonalFileReference,
+  type PersonalFileSegment,
   ragAskUsingStream,
   type RagAskMeta,
   type RagAskUsage,
@@ -520,6 +554,7 @@ interface ChatStats {
   answerMs?: number
   usage?: RagAskUsage | null
   deepThinking?: boolean
+  toolTraces?: import('@/api/ragController').AgentToolTrace[]
 }
 /** 一轮问答的调用明细（SSE done 携带的分步耗时时间线） */
 interface ChatTrace {
@@ -544,7 +579,10 @@ interface ChatMessage {
   stopped?: boolean
   stats?: ChatStats
   trace?: ChatTrace
-  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult
+  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | AgentWikiResults
+  messageId?: string
+  conversationId?: string
+  personalReferences?: PersonalFileReference[]
 }
 
 const ragMessages = ref<ChatMessage[]>([])
@@ -595,7 +633,19 @@ const openAgentConversation = async (id?: string) => {
       citations: parseCitationSnapshot(item.citationsJson),
       stats: readJson<ChatStats>(item.statsJson),
       interaction: item.interaction ?? undefined,
+      messageId: item.id,
+      conversationId: id,
     }))
+    for (let i = 0; i < (response.data.data ?? []).length; i++) {
+      const item = response.data.data[i]
+      if (!item?.personalFileReferences?.length) continue
+      try {
+        const refs = await getPersonalFileReferences(id, item.id)
+        if (agentConversationId.value !== id) return
+        const message = agentMessages.value[i]
+        if (message) message.personalReferences = refs.data.data
+      } catch { /* Reference metadata may have become unavailable. */ }
+    }
     await scrollToBottom()
   } catch { antMessage.error('打开对话失败或无权限') }
 }
@@ -715,6 +765,7 @@ const selectWikiDestination = async (
           usage: done.usage ?? null,
           firstAnswerMs: done.firstAnswerMs == null ? null : Number(done.firstAnswerMs),
           totalMs: done.totalMs == null ? undefined : Number(done.totalMs),
+          toolTraces: done.toolTraces,
         }
       },
       onError: (error) => { assistantMsg.status = 'error'; assistantMsg.error = error },
@@ -787,6 +838,7 @@ const send = async () => {
           usage: done.usage ?? null,
           firstAnswerMs: done.firstAnswerMs == null ? null : Number(done.firstAnswerMs),
           totalMs: done.totalMs == null ? undefined : Number(done.totalMs),
+          toolTraces: done.toolTraces,
         }
       },
       onError: (msg) => { assistantMsg.status = 'error'; assistantMsg.error = msg },
@@ -858,7 +910,20 @@ const send = async () => {
   } finally {
     streaming.value = false
     abortController.value = null
-    if (assistantMsg.agentPreview) loadAgentConversations()
+    if (assistantMsg.agentPreview) {
+      loadAgentConversations()
+      const conversation = agentConversationId.value
+      if (conversation && assistantMsg.status === 'done') {
+        try {
+          const response = await getAgentConversation(conversation)
+          const last = [...response.data.data].reverse().find(item => item.role === 'assistant')
+          if (last?.personalFileReferences?.length && agentConversationId.value === conversation) {
+            const refs = await getPersonalFileReferences(conversation, last.id)
+            assistantMsg.messageId = last.id; assistantMsg.conversationId = conversation; assistantMsg.personalReferences = refs.data.data
+          }
+        } catch { /* Message remains readable if reference metadata is unavailable. */ }
+      }
+    }
     scrollToBottom()
   }
 }
@@ -900,11 +965,37 @@ const docPreview = ref<{
   docNumber?: string
   content?: string
   contentFormat?: string
+  personal?: PersonalFileSegment & { conversation: string; message: string; token: string }
+  error?: string
 }>({
   open: false,
   loading: false,
   title: '',
 })
+
+const openPersonalReference = async (msg: ChatMessage, reference: PersonalFileReference) => {
+  if (!msg.conversationId || !msg.messageId) return
+  docPreview.value = { open: true, loading: true, title: reference.name,
+    personal: { conversation: msg.conversationId, message: msg.messageId, token: reference.token,
+      text: '', start: 0, referenceStart: reference.start, referenceEnd: reference.end, previous: null, next: null } }
+  await loadPersonalSegment(null)
+}
+const loadPersonalSegment = async (cursor: string | null) => {
+  const current = docPreview.value.personal
+  if (!current) return
+  const panel = docPreview.value
+  panel.loading = true; panel.content = ''; panel.error = undefined
+  try {
+    const response = await getPersonalFileSegment(current.conversation, current.message, current.token, cursor ?? undefined)
+    if (docPreview.value !== panel) return
+    panel.personal = { ...response.data.data, conversation: current.conversation, message: current.message, token: current.token }
+    panel.content = response.data.data.text
+  } catch {
+    if (docPreview.value !== panel) return
+    panel.content = ''; panel.error = '引用不可用、权限已失效或文件已变化，请重新获取引用。'
+    panel.personal = { ...current, previous: null, next: null }
+  } finally { if (docPreview.value === panel) panel.loading = false }
+}
 
 /** 点击引用/角标：右侧打开文档并高亮引用切片 */
 const openCitation = (citation: RagCitation) => {

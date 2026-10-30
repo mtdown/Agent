@@ -1,0 +1,14 @@
+completed=true
+STREAM:
+event: delta
+data: {"content":"已在Personal创建文件夹「Task」。写入结果未知，请先核查目标位置。"}
+
+event: wiki_result
+data: {"kind":"wiki_write_result","turnId":"12","spaceLabel":"Personal","folderName":"Task","documentTitle":"First","openToken":"[REDACTED]"}
+
+event: done
+data: {"firstAnswerMs":null,"totalMs":74}
+
+
+HISTORY CONTENT: 已在Personal创建文件夹「Task」。写入结果未知，请先核查目标位置。
+HISTORY INTERACTION KIND: wiki_write_result

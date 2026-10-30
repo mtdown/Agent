@@ -65,8 +65,7 @@ public final class AgentController {
                 Map<String, AgentLoop.Tool> tools = AgentToolRegistry.bind(ask.userId, library,
                         ask.selectedSpaceId);
                 String query = ask.selectedSpaceId == null ? ask.query : ask.query +
-                        "\n\n[用户已点击确认本次 Wiki 写入空间。目标 spaceId=" + ask.selectedSpaceId +
-                        "。仅使用这个 ID 创建文件夹和文档，无须再次请求选择；创建工具会拒绝其他空间。]";
+                        "\n\n[用户已点击确认本次 Wiki 写入空间。先调用 plan_wiki_destination 获取本次确认的位置引用，再用其创建文件夹和文档；创建工具会拒绝其他空间。]";
                 AgentLoop.Result result = loop.run(query, prior, ask.evidence, ask.skillCatalog, tools, chunk -> {
                     try { send(out, "delta", one("content", chunk)); }
                     catch (IOException e) { disconnected.set(true); throw new UncheckedIOException(e); }
@@ -75,6 +74,10 @@ public final class AgentController {
                     send(out, "wiki_choice_request", JSON.readTree(result.choiceRequest));
                 for (AgentLoop.ToolEvent item : result.wikiEvents) {
                     if ("plan_wiki_destination".equals(item.name)) continue;
+                    if ("personal_file_reference".equals(item.name)) {
+                        send(out, "personal_file_reference", JSON.readTree(item.result));
+                        continue;
+                    }
                     Map<String, Object> event = new LinkedHashMap<>();
                     event.put("name", item.name);
                     event.put("result", JSON.readTree(item.result));
@@ -84,6 +87,7 @@ public final class AgentController {
                 done.put("usage", result.usage);
                 done.put("firstAnswerMs", result.firstAnswerMs);
                 done.put("totalMs", result.totalMs);
+                done.put("toolTraces", result.toolTraces);
                 send(out, "done", done);
             } catch (UncheckedIOException | AgentLoop.Cancelled e) {
                 // Downstream closed: stop work without attempting another frame.

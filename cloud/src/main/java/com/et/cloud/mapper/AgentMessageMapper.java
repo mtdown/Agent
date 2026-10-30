@@ -15,8 +15,8 @@ public interface AgentMessageMapper extends BaseMapper<AgentMessage> {
             "WHERE conversationId = #{conversationId} ORDER BY id")
     List<Map<String, Object>> listByConversation(@Param("conversationId") long conversationId);
 
-    @Select("SELECT role, LEFT(content, 4000) content FROM (" +
-            "SELECT m.id, m.role, m.content FROM agent_message m JOIN agent_message u ON u.id = m.turnId " +
+    @Select("SELECT role, LEFT(content, 4000) content, interactionJson FROM (" +
+            "SELECT m.id, m.role, m.content, m.interactionJson FROM agent_message m JOIN agent_message u ON u.id = m.turnId " +
             "WHERE m.conversationId = #{conversationId} AND u.status = 'DONE' AND m.status = 'DONE' " +
             "ORDER BY m.id DESC LIMIT 12) recent ORDER BY id")
     List<Map<String, Object>> recentCompleted(@Param("conversationId") long conversationId);

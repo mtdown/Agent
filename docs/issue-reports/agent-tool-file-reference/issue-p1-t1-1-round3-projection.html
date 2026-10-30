@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>ATFR-P1-T1.1-R3-001</title><h1>第3轮投影证据</h1><p>输入与实际输出，右栏为验收意义和影响；令牌脱敏。</p><table border="1"><tr><th>实际输入与输出</th><th>预期与影响</th></tr><tr><td><details open><summary>探针与输出</summary><pre>package com.et.cloud.controller;
+import com.et.cloud.model.entity.User;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import static org.mockito.Mockito.*;
+public class Round3ExtraProbe {
+ static ObjectMapper j=new ObjectMapper();
+ static void event(AgentWikiChoiceProjection p,String x)throws Exception{p.project(&quot;wiki_tool_event&quot;,j.readTree(x));}
+ public static void main(String[]a)throws Exception{
+ User u=new User();u.setId(7L); AgentWikiChoiceService s=mock(AgentWikiChoiceService.class); when(s.displayLabelFor(u,&quot;55&quot;)).thenReturn(&quot;Personal&quot;);
+ AgentWikiChoiceProjection p=new AgentWikiChoiceProjection(s,u,11,12);
+ event(p,&quot;{\&quot;name\&quot;:\&quot;create_wiki_document\&quot;,\&quot;result\&quot;:{\&quot;spaceId\&quot;:\&quot;55\&quot;,\&quot;folderId\&quot;:\&quot;123\&quot;,\&quot;folderName\&quot;:\&quot;Folder A\&quot;,\&quot;documentId\&quot;:\&quot;456\&quot;,\&quot;title\&quot;:\&quot;Document A\&quot;}}&quot;);
+ event(p,&quot;{\&quot;name\&quot;:\&quot;create_wiki_folder\&quot;,\&quot;result\&quot;:{\&quot;spaceId\&quot;:\&quot;55\&quot;,\&quot;folderId\&quot;:\&quot;124\&quot;,\&quot;name\&quot;:\&quot;Folder B\&quot;}}&quot;);
+ event(p,&quot;{\&quot;name\&quot;:\&quot;write_wiki_document\&quot;,\&quot;result\&quot;:{\&quot;status\&quot;:\&quot;unknown\&quot;}}&quot;);
+ System.out.println(&quot;CASE1 answer=&quot;+p.displayAnswer()); System.out.println(&quot;CASE1 card=&quot;+AgentWikiChoiceService.safeDisplay(p.interactionJson(),false));
+ AgentWikiChoiceProjection q=new AgentWikiChoiceProjection(s,u,11,12);
+ event(q,&quot;{\&quot;name\&quot;:\&quot;create_wiki_document\&quot;,\&quot;result\&quot;:{\&quot;spaceId\&quot;:\&quot;55\&quot;,\&quot;folderId\&quot;:\&quot;123\&quot;,\&quot;folderName\&quot;:\&quot;Folder A\&quot;,\&quot;documentId\&quot;:\&quot;456\&quot;,\&quot;title\&quot;:\&quot;Document A\&quot;}}&quot;);
+ event(q,&quot;{\&quot;name\&quot;:\&quot;create_wiki_document\&quot;,\&quot;result\&quot;:{\&quot;spaceId\&quot;:\&quot;55\&quot;,\&quot;folderId\&quot;:\&quot;123\&quot;,\&quot;folderName\&quot;:\&quot;Folder A\&quot;,\&quot;documentId\&quot;:\&quot;457\&quot;,\&quot;title\&quot;:\&quot;Document B\&quot;}}&quot;);
+ System.out.println(&quot;CASE2 answer=&quot;+q.displayAnswer()); System.out.println(&quot;CASE2 card=&quot;+AgentWikiChoiceService.safeDisplay(q.interactionJson(),false));
+ }
+}
+CASE1 answer=已在Personal的文件夹「Folder B」创建文档「Document A」。另一次写入结果未知，请先核查目标位置。
+CASE1 card={kind=wiki_write_result, turnId=12, spaceLabel=Personal, folderName=Folder A, documentTitle=Document A, openToken=[redacted]}
+CASE2 answer=已在Personal的文件夹「Folder A」创建文档「Document B」。
+CASE2 card={kind=wiki_write_result, turnId=12, spaceLabel=Personal, folderName=Folder A, documentTitle=Document B, openToken=[redacted]}
+</pre></details></td><td>文档 A 的位置应与成功事件一致。实际答复归到 Folder B 而卡为 Folder A。多个已确认成功结果不可误认为只有后一项；实际仅保留 Document B。</td></tr></table>

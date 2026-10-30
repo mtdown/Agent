@@ -1,0 +1,3 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>2.1 第1轮 junction 逃逸</title><style>body{font:16px sans-serif;margin:2rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #777;padding:1rem;vertical-align:top}pre{white-space:pre-wrap}</style><h1>ATFR-P2-T2.1-R1-001：Windows junction 逃逸</h1><table><tr><th>实际输入与观察</th><th>预期与断言</th></tr><tr><td>用户目录下 link 是指向临时 outside 目录的 junction。<pre>store.write(7, "link/escape.txt", "x", "create")
+JUNCTION_WRITE_ACCEPTED
+outsideExists=True</pre></td><td>拒绝目录逃逸；outside/escape.txt 不存在。实际写入成功并在外部创建文件。</td></tr></table><details><summary>相关代码位置及证据</summary><p>AgentPersonalFileStore.java：resolve 中对路径的 Files.isSymbolicLink 检查；writeLocked 重新检查并提交。详见独立探针源码、输出和报告。原始测试使用临时目录。</p></details></html>

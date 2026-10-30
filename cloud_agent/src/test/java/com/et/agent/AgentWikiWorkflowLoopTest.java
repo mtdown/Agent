@@ -21,6 +21,7 @@ class AgentWikiWorkflowLoopTest {
         }
         AtomicInteger turn = new AtomicInteger();
         AgentLoop.ToolAwareModel model = new AgentLoop.ToolAwareModel() {
+            String spaceAlias;
             @Override public AgentLoop.Turn stream(List<AgentLoop.Message> history, Set<String> toolNames,
                                                    java.util.function.Consumer<String> delta,
                                                    java.util.function.BooleanSupplier cancelled) {
@@ -31,8 +32,14 @@ class AgentWikiWorkflowLoopTest {
                     case 0: return call("get_skill", "{\"id\":\"builtin:wiki-write\",\"version\":1}");
                     case 1: return call("list_writable_wiki_locations", "{}");
                     case 2: return call("plan_wiki_destination", "{\"destinationType\":\"public\"}");
-                    case 3: return call("create_wiki_folder", "{\"spaceId\":\"1\",\"taskName\":\"报告\"}");
-                    case 4: return call("create_wiki_document", "{\"spaceId\":\"1\",\"folderId\":\"21\",\"content\":\"# 报告\\n正文\"}");
+                    case 3:
+                        spaceAlias = field(history.get(history.size() - 1).content, "spaceId");
+                        assertNotEquals("1", spaceAlias);
+                        return call("create_wiki_folder", "{\"spaceId\":\"" + spaceAlias + "\",\"taskName\":\"报告\"}");
+                    case 4:
+                        String folderAlias = field(history.get(history.size() - 1).content, "folderId");
+                        assertNotEquals("21", folderAlias);
+                        return call("create_wiki_document", "{\"spaceId\":\"" + spaceAlias + "\",\"folderId\":\"" + folderAlias + "\",\"content\":\"# 报告\\n正文\"}");
                     default:
                         assertTrue(history.stream().anyMatch(item -> "tool".equals(item.role)
                                 && item.content.contains("\"documentId\"")));
@@ -45,8 +52,15 @@ class AgentWikiWorkflowLoopTest {
                 "get_skill", args -> "{\"steps\":[]}",
                 "list_writable_wiki_locations", args -> "{\"spaces\":[{\"id\":\"1\"}]}",
                 "plan_wiki_destination", args -> "{\"choiceRequired\":false,\"spaceId\":\"1\"}",
-                "create_wiki_folder", args -> "{\"folderId\":\"21\"}",
-                "create_wiki_document", args -> "{\"documentId\":\"31\"}");
+                "create_wiki_folder", args -> {
+                    assertEquals("1", field(args, "spaceId"));
+                    return "{\"folderId\":\"21\"}";
+                },
+                "create_wiki_document", args -> {
+                    assertEquals("1", field(args, "spaceId"));
+                    assertEquals("21", field(args, "folderId"));
+                    return "{\"documentId\":\"31\"}";
+                });
         List<String> text = new ArrayList<>();
         AgentLoop loop = new AgentLoop(model, Map.of(), 6, 10_000, 10_000);
         AgentLoop.Result result = loop.run("将报告写入公开空间", List.of(), null, "builtin:wiki-write@1", tools,
@@ -55,6 +69,14 @@ class AgentWikiWorkflowLoopTest {
         assertEquals(List.of(), text);
         assertTrue(result.wikiEvents.stream().anyMatch(item -> item.name.equals("create_wiki_document")
                 && item.result.contains("\"documentId\"")));
+    }
+
+    private static String field(String json, String name) {
+        try {
+            String value = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json).path(name).asText();
+            assertFalse(value.isEmpty());
+            return value;
+        } catch (java.io.IOException e) { throw new AssertionError(e); }
     }
 
     private static AgentLoop.Turn call(String name, String args) {

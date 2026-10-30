@@ -7,7 +7,8 @@ import java.util.function.Consumer;
 
 /** Bounded model/tool/result loop. A model turn may stream text before returning tool calls. */
 public final class AgentLoop {
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     public interface Model {
         Turn stream(List<Message> history, Consumer<String> answerDelta, BooleanSupplier cancelled);
     }
@@ -54,11 +55,20 @@ public final class AgentLoop {
         public final long totalMs;
         public final String choiceRequest;
         public final List<ToolEvent> wikiEvents;
+        public final List<ToolTrace> toolTraces;
         public Result(Usage usage, Long firstAnswerMs, long totalMs,
-                      String choiceRequest, List<ToolEvent> wikiEvents) {
+                      String choiceRequest, List<ToolEvent> wikiEvents, List<ToolTrace> toolTraces) {
             this.usage = usage; this.firstAnswerMs = firstAnswerMs; this.totalMs = totalMs;
             this.choiceRequest = choiceRequest;
             this.wikiEvents = Collections.unmodifiableList(new ArrayList<>(wikiEvents));
+            this.toolTraces = Collections.unmodifiableList(new ArrayList<>(toolTraces));
+        }
+    }
+    public static final class ToolTrace {
+        public final String name, status;
+        public final long durationMs;
+        ToolTrace(String name, String status, long durationMs) {
+            this.name = name; this.status = status; this.durationMs = durationMs;
         }
     }
     public static final class ToolEvent {
@@ -130,8 +140,11 @@ public final class AgentLoop {
         int toolResultChars = 0;
         Map<String, Tool> availableTools = new HashMap<>(tools);
         if (requestTools != null) availableTools.putAll(requestTools);
-        boolean guardWikiText = availableTools.containsKey("plan_wiki_destination");
+        boolean guardWikiText = availableTools.keySet().stream().anyMatch(AgentWikiBoundary::isWikiTool);
         List<ToolEvent> wikiEvents = new ArrayList<>();
+        List<ToolTrace> toolTraces = new ArrayList<>();
+        boolean writeOutcomeUnknown = false;
+        AgentWikiBoundary wikiAliases = new AgentWikiBoundary();
         for (int turnNumber = 1; turnNumber <= maxTurns; turnNumber++) {
             check(started, cancelled);
             StringBuilder answer = new StringBuilder();
@@ -153,52 +166,110 @@ public final class AgentLoop {
             if (turn.usage == null) usageAvailable = false;
             else { input += turn.usage.promptTokens; output += turn.usage.completionTokens; }
             if (turn.toolCalls == null || turn.toolCalls.isEmpty()) {
-                if (guardWikiText && wikiEvents.isEmpty())
+                if (guardWikiText && wikiEvents.stream().noneMatch(event -> AgentWikiBoundary.isWrite(event.name)))
                     for (String bufferedChunk : bufferedChunks) delta.accept(bufferedChunk);
                 return new Result(usageAvailable ? new Usage(input, output) : null, firstAnswerMs[0],
-                        elapsed(started), null, wikiEvents);
+                        elapsed(started), null, wikiEvents, toolTraces);
             }
             if (turnNumber == maxTurns) throw new IllegalStateException("Agent turn limit reached");
             history.add(new Message("assistant", answer.toString(), null, null, turn.toolCalls));
             for (ToolCall call : turn.toolCalls) {
                 if (call.id == null || call.id.isEmpty() || call.name == null || call.arguments == null)
                     throw new IllegalArgumentException("Malformed tool call");
+                AgentToolRegistry.Access access = AgentToolRegistry.access(call.name);
                 Tool tool = availableTools.get(call.name);
-                if (tool == null) throw new IllegalArgumentException("Unknown tool: " + call.name);
-                try {
-                    if (!JSON.readTree(call.arguments).isObject()) throw new IllegalArgumentException("Tool arguments must be an object");
-                } catch (java.io.IOException e) {
-                    throw new IllegalArgumentException("Malformed tool arguments", e);
-                }
+                if (tool == null) throw new IllegalArgumentException("Unknown tool");
                 String result;
+                long toolStarted = System.nanoTime();
                 try {
-                    result = tool.execute(call.arguments);
-                } catch (IllegalArgumentException | IllegalStateException e) {
-                    String message = e.getMessage() == null ? "Tool operation failed" : e.getMessage();
-                    result = "{\"saved\":false,\"error\":" + JSON.valueToTree(message).toString() + "}";
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode args = JSON.reader()
+                                .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                                .readTree(call.arguments);
+                        if (args == null || !args.isObject()) throw new IllegalArgumentException("Invalid tool arguments");
+                    } catch (java.io.IOException e) {
+                        throw new IllegalArgumentException("Invalid tool arguments");
+                    }
+                    if (writeOutcomeUnknown && access == AgentToolRegistry.Access.WRITE) {
+                        com.fasterxml.jackson.databind.node.ObjectNode blocked = JSON.createObjectNode();
+                        blocked.put("code", 50001);
+                        blocked.put("status", "blocked");
+                        blocked.put("message", "Previous write result is unknown; further writes require a new user request.");
+                        result = blocked.toString();
+                    } else result = tool.execute(wikiAliases.argumentsFor(call.name, call.arguments));
+                } catch (AgentLibraryHttpGateway.CloudFailure e) {
+                    if (e.unknown) writeOutcomeUnknown = true;
+                    com.fasterxml.jackson.databind.node.ObjectNode failure = JSON.createObjectNode();
+                    failure.put("code", e.code);
+                    failure.put("message", e.getMessage());
+                    if (e.unknown) failure.put("status", "unknown");
+                    else { failure.put("saved", false); failure.put("error", e.getMessage()); }
+                    result = failure.toString();
+                } catch (IllegalArgumentException e) {
+                    String message = e.getMessage();
+                    if (!"Code version or entrypoint does not exist".equals(message)
+                            && !"Selected Wiki destination differs from tool target".equals(message)
+                            && !"Invalid or expired Wiki location reference".equals(message)) message = "Invalid tool arguments";
+                    result = "{\"code\":40000,\"saved\":false,\"message\":" + JSON.valueToTree(message)
+                            + ",\"error\":" + JSON.valueToTree(message) + "}";
+                } catch (IllegalStateException e) {
+                    result = "{\"code\":50001,\"saved\":false,\"message\":\"Tool operation failed\",\"error\":\"Tool operation failed\"}";
+                } catch (RuntimeException e) {
+                    throw new IllegalStateException("Tool operation failed");
                 }
                 if (result == null) throw new IllegalStateException("Tool returned no result");
+                if (Arrays.asList("read_file", "read_file_segment", "search_file").contains(call.name)) {
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode parsed = JSON.readTree(result);
+                        if (parsed != null && parsed.isObject()) {
+                            com.fasterxml.jackson.databind.JsonNode fileEvidence = ((com.fasterxml.jackson.databind.node.ObjectNode) parsed).remove("referenceEvidence");
+                            if (fileEvidence != null && fileEvidence.isArray() && !fileEvidence.isEmpty())
+                                wikiEvents.add(new ToolEvent("personal_file_reference", fileEvidence.toString()));
+                            result = parsed.toString();
+                        }
+                    } catch (java.io.IOException ignored) { /* Preserve non-JSON tool results. */ }
+                }
+                if (access == AgentToolRegistry.Access.WRITE && "unknown".equals(traceStatus(result))) writeOutcomeUnknown = true;
+                toolTraces.add(new ToolTrace(traceName(call.name), traceStatus(result), Math.max(0, elapsed(toolStarted))));
                 toolResultChars += result.length();
                 if (toolResultChars > maxToolResultChars) throw new IllegalStateException("Tool result limit reached");
-                if (call.name.equals("plan_wiki_destination") || call.name.equals("list_writable_wiki_locations")
-                        || call.name.equals("create_wiki_folder") || call.name.equals("create_wiki_document")
-                        || call.name.equals("write_wiki_document"))
-                    wikiEvents.add(new ToolEvent(call.name, result));
-                if (call.name.equals("plan_wiki_destination")) {
-                    try {
-                        if (JSON.readTree(result).path("choiceRequired").asBoolean(false))
-                            return new Result(usageAvailable ? new Usage(input, output) : null,
-                                    firstAnswerMs[0], elapsed(started), result, wikiEvents);
-                    } catch (java.io.IOException e) {
-                        throw new IllegalStateException("Invalid destination planning result", e);
-                    }
-                }
-                history.add(new Message("tool", result, call.id, call.name));
+                AgentWikiBoundary.recordEvent(call.name, result, wikiEvents);
+                if (AgentWikiBoundary.choiceRequired(call.name, result))
+                    return new Result(usageAvailable ? new Usage(input, output) : null,
+                            firstAnswerMs[0], elapsed(started), result, wikiEvents, toolTraces);
+                String modelResult = wikiAliases.resultFor(call.name, result);
+                history.add(new Message("tool", modelResult, call.id, call.name));
             }
         }
         throw new IllegalStateException("Agent turn limit reached");
     }
 
+    private static String traceName(String name) {
+        switch (name) {
+            case "get_skill": return "读取 Skill";
+            case "create_skill": return "创建 Skill";
+            case "create_code": return "保存代码";
+            case "read_file": return "读取文件";
+            case "write_file": return "写入文件";
+            case "list_writable_wiki_locations": return "查询可写位置";
+            case "plan_wiki_destination": return "选择保存位置";
+            case "create_wiki_folder": return "创建 Wiki 文件夹";
+            case "create_wiki_document": return "创建 Wiki 文档";
+            case "write_wiki_document": return "保存 Wiki 文档";
+            default: return "其他工具";
+        }
+    }
+
+    private static String traceStatus(String result) {
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = JSON.readTree(result);
+            String status = node.path("status").asText("");
+            if ("unknown".equals(status) || "blocked".equals(status)) return status;
+            if ("failed".equals(status) || node.path("saved").isBoolean() && !node.path("saved").asBoolean()
+                    || node.path("code").isNumber() && node.path("code").asInt() != 0) return "failed";
+        } catch (Exception ignored) { /* The handler's return need not be JSON. */ }
+        return "success";
+    }
     private void check(long started, BooleanSupplier cancelled) {
         if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Cancelled();
         if (elapsed(started) > timeoutMs) throw new IllegalStateException("Agent request timed out");

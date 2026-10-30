@@ -1,0 +1,10 @@
+corrupt received POST 1
+corrupt tool result 1: {"saved":false,"error":"Cloud library request failed"}
+corrupt received POST 2
+corrupt tool result 2: {"saved":false,"error":"Cloud library request failed"}
+corrupt total requests=2
+disconnect received POST 1
+disconnect tool result 1: {"saved":false,"error":"Cloud library request failed"}
+disconnect received POST 2
+disconnect tool result 2: {"saved":false,"error":"Cloud library request failed"}
+disconnect total requests=2

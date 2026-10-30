@@ -130,16 +130,15 @@ class AgentWikiChoiceLocalIT {
         long conversationId = conversations.create(owner.getId());
         long turnId = conversations.begin(owner.getId(), conversationId, "保存内容", "OFF", "{}");
         AgentWikiChoiceProjection projection = new AgentWikiChoiceProjection(choices, owner, conversationId, turnId);
-        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_folder\","
-                + "\"result\":{\"spaceId\":\"" + spaceId + "\",\"folderId\":\"123\",\"name\":\"任务 2026-10-26\"}}"));
-        assertTrue(projection.displayAnswer().contains("文档尚未保存"));
+        AgentWikiCreationService.FolderResult realFolder = creation.createFolder(owner.getId(), Long.toString(spaceId), "任务");
+        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_folder\",\"result\":" + JSON.writeValueAsString(realFolder) + "}"));
+        assertFalse(projection.displayAnswer().contains("文档尚未保存"));
         assertFalse(projection.displayAnswer().contains(Long.toString(spaceId)));
-        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_document\","
-                + "\"result\":{\"spaceId\":\"" + spaceId + "\",\"folderId\":\"123\","
-                + "\"documentId\":\"456\",\"title\":\"测试文档\"}}"));
+        AgentWikiCreationService.DocumentResult realDoc = creation.createDocument(owner.getId(), Long.toString(spaceId), realFolder.folderId, "测试文档", "正文");
+        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_document\",\"result\":" + JSON.writeValueAsString(realDoc) + "}"));
         assertTrue(projection.displayAnswer().contains("测试文档"));
         assertTrue(projection.displayAnswer().contains("个人空间"));
-        assertFalse(projection.displayAnswer().contains("456"));
+        assertFalse(projection.displayAnswer().contains(realDoc.documentId));
         assertFalse(projection.displayAnswer().contains("个人区-"));
     }
 
@@ -248,5 +247,43 @@ class AgentWikiChoiceLocalIT {
         assertThrows(IllegalArgumentException.class,
                 () -> controller.previewWikiResult(Long.toString(conversationId),
                         Long.toString(turnId), openToken, request));
+    }
+
+    @Test void unknownWikiResultPersistsAndReloadsWithoutMisleadingPartialCardOrInternalIds() throws Exception {
+        long conversationId = conversations.create(owner.getId());
+        long turnId = conversations.begin(owner.getId(), conversationId, "保存正文", "OFF", "{}");
+        AgentWikiChoiceProjection projection = new AgentWikiChoiceProjection(choices, owner, conversationId, turnId);
+        AgentWikiCreationService.FolderResult realFolder = creation.createFolder(owner.getId(), Long.toString(spaceId), "任务");
+        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_folder\",\"result\":" + JSON.writeValueAsString(realFolder) + "}"));
+        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_document\",\"result\":{\"code\":50001,\"status\":\"unknown\"}}"));
+        assertTrue(projection.displayAnswer().contains("结果未知"));
+        assertNotNull(projection.interactionJson());
+        conversations.complete(owner.getId(), conversationId, turnId, projection.displayAnswer(), "[]", "{}", projection.interactionJson());
+        java.util.Map<String, Object> assistant = conversations.messages(owner.getId(), conversationId).stream()
+                .filter(item -> "assistant".equals(item.get("role"))).findFirst().orElseThrow();
+        String history = String.valueOf(assistant);
+        assertTrue(history.contains("结果未知"));
+        assertTrue(history.contains("任务"));
+        assertFalse(history.contains("文档未保存"));
+        assertFalse(history.contains("wiki_partial_result"));
+        assertFalse(history.contains("987654321098765432"));
+        assertFalse(history.contains("spaceId"));
+    }
+
+    @Test void confirmedDocumentAndLaterUnknownPersistAsDistinctOutcomes() throws Exception {
+        long conversationId = conversations.create(owner.getId());
+        long turnId = conversations.begin(owner.getId(), conversationId, "保存正文", "OFF", "{}");
+        AgentWikiChoiceProjection projection = new AgentWikiChoiceProjection(choices, owner, conversationId, turnId);
+        AgentWikiCreationService.FolderResult realFolder = creation.createFolder(owner.getId(), Long.toString(spaceId), "任务");
+        AgentWikiCreationService.DocumentResult realDoc = creation.createDocument(owner.getId(), Long.toString(spaceId), realFolder.folderId, "First", "正文");
+        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"create_wiki_document\",\"result\":" + JSON.writeValueAsString(realDoc) + "}"));
+        projection.project("wiki_tool_event", JSON.readTree("{\"name\":\"write_wiki_document\",\"result\":{\"status\":\"unknown\"}}"));
+        conversations.complete(owner.getId(), conversationId, turnId, projection.displayAnswer(), "[]", "{}", projection.interactionJson());
+        java.util.Map<String, Object> assistant = conversations.messages(owner.getId(), conversationId).stream()
+                .filter(item -> "assistant".equals(item.get("role"))).findFirst().orElseThrow();
+        String history = String.valueOf(assistant);
+        assertTrue(history.contains("First")); assertTrue(history.contains("另一次写入结果未知"));
+        assertTrue(history.contains("wiki_write_result")); assertFalse(history.contains("未保存"));
+        assertFalse(history.contains("987654321098765433")); assertFalse(history.contains("spaceId"));
     }
 }

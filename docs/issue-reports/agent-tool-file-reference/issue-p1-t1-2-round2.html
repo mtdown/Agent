@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>1.2 第2轮输入与观察</title><style>body{font:16px sans-serif;margin:2rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #aaa;vertical-align:top;padding:1rem;width:50%}pre{white-space:pre-wrap}</style><h1>1.2 第2轮输入与观察对照</h1><p>受控假网关、真实 Agent 注册表与 Cloud 校验器；无网络和数据库。未运行基线。</p><table><tr><th>实际代码或输入与观察</th><th>预期和失败证据</th></tr><tr><td><b>ATFR-P1-T1.2-R2-001</b><pre>步骤 code_version: 1.0
+Agent 接受；发送值 1.0
+Cloud: A fixed positive code version is required</pre></td><td>声明 integer 接受数学整数 1.0，后续 Skill 校验应能处理；实际被拒绝。<details><summary>相关代码</summary><pre>AgentToolRegistry.java:165 — integer 使用 decimalValue().stripTrailingZeros().scale() &lt;= 0
+AgentSkillDefinitionValidator.java:79 — !version.isInt() 时拒绝</pre></details></td></tr><tr><td><b>ATFR-P1-T1.2-R2-002</b><pre>输入 min: 1.00000000000000001, max: 1
+网关收到 min: 1.0, max: 1
+Cloud 接受收到的值</pre></td><td>保留原输入的数值，避免改变边界及大小关系。<details><summary>相关代码</summary><pre>SkillDraftAuthoring.java:16 — new ObjectMapper()
+SkillDraftAuthoring.java:73-88 — readTree 后重组并序列化</pre></details></td></tr></table><p>完整输入、模拟限制与命令见 <a href="issue-p1-t1-2-round2.md">记录</a>及<a href="evidence-p1-t1-2-round2-probe-output.txt">原始输出</a>。</p></html>

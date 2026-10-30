@@ -189,3 +189,11 @@ docker compose exec mysql mysql -uroot -p"$DB_PASSWORD" picture \
 2. 改 `deploy/docker-compose.yml` 的 ports 为 `"80:80"` 并追加 `"443:443"`
 3. 在服务器上执行 `certbot --nginx` 申请免费证书（自动续期）
 4. `cd /opt/cloudwiki && bash deploy.sh`
+
+### 个人文本文件分段上传
+
+Cloud 的 `/api/agent/personal-file-uploads` 使用当前登录会话，每次请求重新鉴权。POST JSON `{ "path": "notes/a.txt", "mode": "create|overwrite|append", "size": 123 }` 创建会话，size 是本次上传的 UTF-8 字节数（0 至 50 MiB）。响应的 `uploadId` 是临时令牌；PUT `/{uploadId}/segments?offset=0` 以 `application/octet-stream` 按字节偏移顺序发送非空分段，每段最多 1 MiB。不得重发或跳段；客户端收到失败或断线时应取消并重新开始。POST `/{uploadId}/commit` 仅在字节完整且 UTF-8 合法时原子提交，覆盖和追加以创建会话时的文件版本检查冲突，最终文件最多 50 MiB。DELETE `/{uploadId}` 取消。不要将磁盘路径作为 API 参数；path 是用户空间内相对路径。令牌不能跨用户使用。空文件可直接提交。
+
+分段请求不依赖 multipart。现有 Nginx `client_max_body_size 30m` 和 Spring multipart 30MB 都足以容纳 1 MiB 分段；其他代理须允许至少 1 MiB 的请求体。服务以 8 KiB 缓冲区流式接收和提交，上传临时目录默认 `tmp/agent-upload-sessions`，可通过 Spring 配置 `agent.upload-temp-root` 设置到仅服务进程可访问、具备足够空间的本地目录。会话在单进程内保存，闲置一小时自动清理，进程启动时清除该专用目录的遗留上传文件；禁止多个实例共用临时目录。并发会话没有总量配额，运营时须监控临时磁盘空间。持久卷 `agent-user-files` 保留原有文件，部署期间不要删除该卷。
+
+回滚时停用新上传入口并恢复旧 Cloud 版本；保留个人文件卷，停止服务后可清理上述专用临时目录中的 `upload-*.tmp`。旧版本可能无法读取超过其原有上限的文件，回滚前须确认业务影响。

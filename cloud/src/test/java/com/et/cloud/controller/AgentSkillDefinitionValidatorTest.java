@@ -34,6 +34,22 @@ class AgentSkillDefinitionValidatorTest {
                 (id, version, entrypoint) -> true));
     }
 
+    @Test void comparesHighPrecisionBoundsWithoutRounding() {
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(
+                validDefinition().replace("\"min\":1,\"max\":5", "\"min\":1.00000000000000001,\"max\":1"),
+                (id, version, entrypoint) -> true));
+        var result = validator.validate(validDefinition().replace("\"count\":\"$count\"",
+                "\"count\":\"$count\",\"fraction\":1.00000000000000001,\"tiny\":1e-30,\"large\":123456789012345678901234567890"),
+                (id, version, entrypoint) -> true);
+        var args = result.path("steps").get(0).path("args");
+        assertTrue(args.path("fraction").decimalValue().compareTo(new java.math.BigDecimal("1.00000000000000001")) == 0);
+        assertTrue(args.path("tiny").decimalValue().compareTo(new java.math.BigDecimal("1e-30")) == 0);
+        assertTrue(args.path("large").bigIntegerValue().toString().equals("123456789012345678901234567890"));
+        assertDoesNotThrow(() -> validator.validate(
+                validDefinition().replace("\"min\":1,\"max\":5", "\"min\":1,\"max\":1.00000000000000001"),
+                (id, version, entrypoint) -> true));
+    }
+
     @Test
     void rejectsUnknownFields() {
         assertThrows(IllegalArgumentException.class, () -> validator.validate(

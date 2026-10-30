@@ -1,0 +1,25 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>第5轮证据对照</title><style>body{font:16px sans-serif;margin:2em}table{border-collapse:collapse;width:100%;table-layout:fixed}td,th{border:1px solid #aaa;padding:1em;vertical-align:top}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f4f4;padding:1em}</style><h1>第5轮受控探针与 C1 证据不足</h1><table><tr><th>实际代码或输入与观察</th><th>预期与证据</th></tr><tr><td><b>ATFR-AUDIT-001</b><p>输入：40101 读取错误；模型提供说明。</p><pre>toolResult={&quot;code&quot;:40101,&quot;message&quot;:&quot;request rejected&quot;}
+modelFinalText=Read failed. Please check access.; emitted=[]; events=1; choice=null
+</pre><details><summary>AgentLoop.java 代码</summary><pre>153:             check(started, cancelled);
+154:             if (turn.usage == null) usageAvailable = false;
+155:             else { input += turn.usage.promptTokens; output += turn.usage.completionTokens; }
+156:             if (turn.toolCalls == null || turn.toolCalls.isEmpty()) {
+157:                 if (guardWikiText &amp;&amp; wikiEvents.isEmpty())
+158:                     for (String bufferedChunk : bufferedChunks) delta.accept(bufferedChunk);
+159:                 return new Result(usageAvailable ? new Usage(input, output) : null, firstAnswerMs[0],
+160:                         elapsed(started), null, wikiEvents);
+198:                 if (call.name.equals(&quot;plan_wiki_destination&quot;) || call.name.equals(&quot;list_writable_wiki_locations&quot;)
+199:                         || call.name.equals(&quot;create_wiki_folder&quot;) || call.name.equals(&quot;create_wiki_document&quot;)
+200:                         || call.name.equals(&quot;write_wiki_document&quot;))
+201:                     wikiEvents.add(new ToolEvent(call.name, result));</pre></details></td><td>预期：错误说明输出。实际输出为空；假模型及假工具探针复现，非浏览器端到端测试。<a href="evidence-p1-t1-1-round5-read-error-probe.java">原始输入</a> / <a href="evidence-p1-t1-1-round5-read-error-output.txt">原始输出</a></td></tr><tr><td><b>ATFR-P1-T1.1-R5-C1</b><details><summary>实际 SQL 与 SSE 断言</summary><pre>107:    assertTrue(stream.contains(&quot;甲文档&quot;)); assertTrue(stream.contains(&quot;乙文档&quot;)); assertTrue(stream.contains(&quot;结果未知&quot;));
+108:    assertTrue(stream.contains(&quot;wiki_write_results&quot;)); assertFalse(stream.contains(first.documentId)); assertFalse(stream.contains(second.documentId));
+109:    var assistant=conversations.messages(owner.getId(),conversation).stream().filter(r-&gt;&quot;assistant&quot;.equals(r.get(&quot;role&quot;))).findFirst().orElseThrow();
+110:    String history=String.valueOf(assistant); assertTrue(history.contains(&quot;甲文档&quot;)); assertTrue(history.contains(&quot;乙文档&quot;)); assertTrue(history.contains(&quot;结果未知&quot;)); assertFalse(history.contains(&quot;请选择写入空间&quot;));
+111:    var results=(java.util.List&lt;?&gt;)((java.util.Map&lt;?,?&gt;)assistant.get(&quot;interaction&quot;)).get(&quot;results&quot;);
+112:    assertEquals(5,results.size());
+113:    var cardA=(java.util.Map&lt;?,?&gt;)results.get(2); var cardB=(java.util.Map&lt;?,?&gt;)results.get(3);
+114:    assertEquals(&quot;甲文档&quot;,cardA.get(&quot;documentTitle&quot;)); assertEquals(a.name,cardA.get(&quot;folderName&quot;));
+115:    assertEquals(&quot;乙文档&quot;,cardB.get(&quot;documentTitle&quot;)); assertEquals(b.name,cardB.get(&quot;folderName&quot;));
+116:    assertEquals(&quot;unknown&quot;,((java.util.Map&lt;?,?&gt;)results.get(4)).get(&quot;status&quot;));
+117:    assertEquals(&quot;甲内容&quot;,choices.preview(owner,conversation,Long.parseLong(String.valueOf(assistant.get(&quot;turnId&quot;))),String.valueOf(cardA.get(&quot;openToken&quot;))).get(&quot;content&quot;));
+118:    assertEquals(&quot;乙内容&quot;,choices.preview(owner,conversation,Long.parseLong(String.valueOf(assistant.get(&quot;turnId&quot;))),String.valueOf(cardB.get(&quot;openToken&quot;))).get(&quot;content&quot;));</pre></details></td><td>预期：实时逐卡核对标题、所属文件夹和可打开 token。实际：SSE 断言标题出现；逐卡对应关系在历史结果及预览中断言，实时对应关系未逐项断言。测试命令退出 0；结论是证据不足，不是断言失败。</td></tr></table><p><a href="issue-p1-t1-1-round5-evidence.md">完整记录</a></p></html>

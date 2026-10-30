@@ -76,6 +76,14 @@ export interface AgentWikiResult {
   folderName: string
   documentTitle: string
   openToken: string
+  results?: AgentWikiResults['results']
+}
+export interface AgentWikiResults {
+  kind: 'wiki_write_results'
+  turnId: string
+  unknown: number
+  failed: number
+  results: Array<AgentWikiResult | { kind: 'wiki_folder_result'; turnId: string; spaceLabel: string; folderName: string } | { kind: 'wiki_unavailable_result'; turnId: string } | { kind: 'wiki_operation_result'; operation: 'create_wiki_folder' | 'create_wiki_document' | 'write_wiki_document'; status: 'failed' | 'blocked' | 'unknown' | 'unavailable' }>
 }
 export interface AgentWikiPartialResult {
   kind: 'wiki_partial_result'
@@ -120,10 +128,17 @@ export interface RagAskDone {
   firstTokenMs?: number | null
   /** Agent preview: time to first answer-body delta */
   firstAnswerMs?: number | null
+  toolTraces?: AgentToolTrace[]
   /** LLM 流式调用总耗时 */
   llmMs?: number
   /** 检索子步骤耗时明细 */
   steps?: RagSearchTimings | null
+}
+
+export interface AgentToolTrace {
+  name: string
+  status: 'success' | 'failed' | 'blocked' | 'unknown'
+  durationMs: number
 }
 
 export interface RagAskMeta {
@@ -140,7 +155,7 @@ export interface RagAskHandlers {
   onDone?: (done: RagAskDone) => void
   onError?: (message: string) => void
   onWikiChoice?: (choice: AgentWikiChoice) => void
-  onWikiResult?: (result: AgentWikiResult | AgentWikiPartialResult) => void
+  onWikiResult?: (result: AgentWikiResult | AgentWikiPartialResult | AgentWikiResults) => void
 }
 
 /** 与后端 BaseResponse 对齐的本地类型（typings.d.ts 未覆盖 RAG 接口） */
@@ -259,7 +274,21 @@ export interface AgentStoredMessage {
   status: 'PENDING' | 'DONE' | 'FAILED'
   citationsJson?: string | null
   statsJson?: string | null
-  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | null
+  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | AgentWikiResults | null
+  personalFileReferences?: { token: string }[]
+}
+export interface PersonalFileReference { token: string; name: string; start: number | string; end: number | string }
+export interface PersonalFileSegment { text: string; start: number | string; referenceStart: number | string; referenceEnd: number | string; previous: string | null; next: string | null }
+export async function getPersonalFileReferences(conversation: string, message: string) {
+  const result = await request<{ code: number; data: PersonalFileReference[] }>(`/api/agent/conversations/${encodeURIComponent(conversation)}/messages/${encodeURIComponent(message)}/personal-file-references`, { method: 'GET' })
+  if (result.data.code !== 0 || !Array.isArray(result.data.data)) throw new Error('Reference unavailable')
+  return result
+}
+export async function getPersonalFileSegment(conversation: string, message: string, token: string, cursor?: string) {
+  const params = new URLSearchParams({ token }); if (cursor) params.set('cursor', cursor)
+  const result = await request<{ code: number; data: PersonalFileSegment }>(`/api/agent/conversations/${encodeURIComponent(conversation)}/messages/${encodeURIComponent(message)}/personal-file-reference/preview?${params}`, { method: 'GET' })
+  if (result.data.code !== 0 || !result.data.data || typeof result.data.data.text !== 'string') throw new Error('Preview unavailable')
+  return result
 }
 export async function listAgentConversations() {
   return request<{ data: AgentConversation[] }>('/api/agent/conversations', { method: 'GET' })
@@ -323,7 +352,7 @@ function handleFrame(frame: string, handlers: RagAskHandlers) {
       handlers.onWikiChoice?.(payload as AgentWikiChoice)
       break
     case 'wiki_result':
-      handlers.onWikiResult?.(payload as AgentWikiResult | AgentWikiPartialResult)
+      handlers.onWikiResult?.(payload as AgentWikiResult | AgentWikiPartialResult | AgentWikiResults)
       break
     default:
       break

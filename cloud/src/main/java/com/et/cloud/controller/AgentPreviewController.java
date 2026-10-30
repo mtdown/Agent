@@ -29,13 +29,20 @@ public class AgentPreviewController {
     private final WikiSpaceService spaces;
     private final AgentSkillCatalog skillCatalog;
     private final AgentWikiChoiceService choices;
+    private final AgentPersonalFileReferences fileReferences;
 
     @Autowired
     public AgentPreviewController(UserService users, AgentPreviewProxy proxy, AgentConversationStore store,
                                   RagSearchService search, WikiSpaceService spaces, AgentSkillCatalog skillCatalog,
-                                  AgentWikiChoiceService choices) {
+                                  AgentWikiChoiceService choices, AgentPersonalFileReferences fileReferences) {
         this.users = users; this.proxy = proxy; this.store = store; this.search = search; this.spaces = spaces;
-        this.skillCatalog = skillCatalog; this.choices = choices;
+        this.skillCatalog = skillCatalog; this.choices = choices; this.fileReferences = fileReferences;
+    }
+
+    AgentPreviewController(UserService users, AgentPreviewProxy proxy, AgentConversationStore store,
+                           RagSearchService search, WikiSpaceService spaces, AgentSkillCatalog skillCatalog,
+                           AgentWikiChoiceService choices) {
+        this(users, proxy, store, search, spaces, skillCatalog, choices, null);
     }
 
     /** Kept for the existing direct controller tests. Spring uses the injected constructor above. */
@@ -67,6 +74,30 @@ public class AgentPreviewController {
     @GetMapping("/conversations/{id}")
     public BaseResponse<List<Map<String, Object>>> messages(@PathVariable String id, HttpServletRequest request) {
         return ResultUtils.success(store.messages(users.getLoginUser(request).getId(), Long.parseLong(id)));
+    }
+
+    @GetMapping("/conversations/{id}/messages/{messageId}/personal-file-reference")
+    public BaseResponse<Map<String,Object>> personalFileReference(@PathVariable String id, @PathVariable String messageId,
+                                                                  @RequestParam String token, HttpServletRequest request) {
+        if (!id.matches("[1-9][0-9]{0,18}") || !messageId.matches("[1-9][0-9]{0,18}"))
+            throw new IllegalArgumentException("Invalid personal file reference");
+        return ResultUtils.success(fileReferences.resolve(users.getLoginUser(request).getId(), Long.parseLong(id),
+                Long.parseLong(messageId), token));
+    }
+
+    @GetMapping("/conversations/{id}/messages/{messageId}/personal-file-references")
+    public BaseResponse<List<Map<String,Object>>> personalFileReferenceInfo(@PathVariable String id, @PathVariable String messageId,
+                                                                            HttpServletRequest request) {
+        if (!id.matches("[1-9][0-9]{0,18}") || !messageId.matches("[1-9][0-9]{0,18}"))
+            throw new IllegalArgumentException("Invalid personal file reference");
+        return ResultUtils.success(fileReferences.previewInfo(users.getLoginUser(request).getId(), Long.parseLong(id), Long.parseLong(messageId)));
+    }
+    @GetMapping("/conversations/{id}/messages/{messageId}/personal-file-reference/preview")
+    public BaseResponse<Map<String,Object>> personalFilePreview(@PathVariable String id, @PathVariable String messageId,
+            @RequestParam String token, @RequestParam(required = false) String cursor, HttpServletRequest request) {
+        if (!id.matches("[1-9][0-9]{0,18}") || !messageId.matches("[1-9][0-9]{0,18}"))
+            throw new IllegalArgumentException("Invalid personal file reference");
+        return ResultUtils.success(fileReferences.preview(users.getLoginUser(request).getId(), Long.parseLong(id), Long.parseLong(messageId), token, cursor));
     }
 
     @GetMapping("/conversations/{id}/wiki-documents/{turnId}/preview")
@@ -210,15 +241,18 @@ public class AgentPreviewController {
         if (selectedSpaceId != null) payload.put("selectedSpaceId", selectedSpaceId);
         AgentWikiChoiceProjection projection = choices == null ? null :
                 new AgentWikiChoiceProjection(choices, user, conversationId, turnId);
+        AgentPersonalFileReferences.Collector fileCollector = fileReferences == null ? null : fileReferences.collect(user.getId());
         java.util.function.BiConsumer<Boolean, String[]> completed = (success, output) -> {
             if (success) {
                 String interaction = output.length > 2 ? output[2] : null;
-                String answer = interaction == null ? output[0] : "请选择写入空间";
-                store.complete(user.getId(), conversationId, turnId, answer, citationsJson, output[1], interaction);
+                String answer = output[0];
+                store.complete(user.getId(), conversationId, turnId, answer, citationsJson,
+                        fileCollector == null ? output[1] : fileCollector.stats(output[1]), interaction);
             } else store.fail(user.getId(), conversationId, turnId);
         };
-        return projection == null ? proxy.stream(payload, meta, completed) :
+        if (fileCollector == null) return projection == null ? proxy.stream(payload, meta, completed) :
                 proxy.stream(payload, meta, completed, projection);
+        return proxy.stream(payload, meta, completed, projection, fileCollector::accept);
     }
 
     private static String json(Object value) {

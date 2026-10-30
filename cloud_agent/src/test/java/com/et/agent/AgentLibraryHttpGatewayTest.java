@@ -158,4 +158,213 @@ class AgentLibraryHttpGatewayTest {
             server.stop(0);
         }
     }
+
+    @Test void businessErrorsReachToolModelWithTheirCodes() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicInteger code = new java.util.concurrent.atomic.AtomicInteger();
+        server.createContext("/api/internal/agent/files", exchange -> {
+            byte[] response = ("{\"code\":" + code.get() + ",\"data\":null,\"message\":\"请求被拒绝\"}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            for (int value : new int[]{40000, 40101, 40400}) {
+                code.set(value);
+                String result = runFileTool(gateway, "read_file", "{\"path\":\"notes/a.txt\"}");
+                com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result);
+                assertEquals(value, json.path("code").asInt());
+                assertEquals("请求被拒绝", json.path("message").asText());
+            }
+        } finally { server.stop(0); }
+    }
+
+    private static String runFileTool(AgentLibraryHttpGateway gateway, String name, String args) {
+        java.util.concurrent.atomic.AtomicInteger turns = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicReference<String> result = new AtomicReference<>();
+        AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {
+            if (turns.getAndIncrement() == 0) return new AgentLoop.Turn(java.util.Collections.singletonList(new AgentLoop.ToolCall("1", name, args)), null);
+            result.set(history.get(history.size() - 1).content);
+            return new AgentLoop.Turn(java.util.Collections.emptyList(), null);
+        }, AgentToolRegistry.bind("7", gateway), 3, 60000, 2000);
+        loop.run("test", chunk -> {}, () -> false);
+        return result.get();
+    }
+
+    @Test void responseTimeoutDistinguishesWriteAndReadWithoutRetry() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.ExecutorService serverThreads = java.util.concurrent.Executors.newCachedThreadPool();
+        java.util.concurrent.ExecutorService callers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger writes = new java.util.concurrent.atomic.AtomicInteger();
+        server.setExecutor(serverThreads);
+        server.createContext("/api/internal/agent/files", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            if ("POST".equals(exchange.getRequestMethod())) writes.incrementAndGet(); else reads.incrementAndGet();
+            try { Thread.sleep(2000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            exchange.close();
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret", java.time.Duration.ofMillis(300));
+            java.util.concurrent.Future<String> write = callers.submit(() -> runFileTool(gateway, "write_file", "{\"path\":\"a.txt\",\"content\":\"text\",\"mode\":\"create\"}"));
+            java.util.concurrent.Future<String> read = callers.submit(() -> runFileTool(gateway, "read_file", "{\"path\":\"a.txt\"}"));
+            com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode writeResult = json.readTree(write.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            com.fasterxml.jackson.databind.JsonNode readResult = json.readTree(read.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals("unknown", writeResult.path("status").asText());
+            assertFalse(writeResult.has("saved"));
+            assertEquals(50001, writeResult.path("code").asInt());
+            assertNotEquals("unknown", readResult.path("status").asText());
+            assertEquals(1, reads.get());
+            assertEquals(1, writes.get());
+        } finally { server.stop(0); callers.shutdownNow(); serverThreads.shutdownNow(); }
+    }
+
+    @Test void modelCannotRepeatWriteAfterUnknownEvenWithChangedArgumentsButCanRead() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.ExecutorService threads = java.util.concurrent.Executors.newCachedThreadPool();
+        java.util.concurrent.atomic.AtomicInteger writes = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
+        server.setExecutor(threads);
+        server.createContext("/api/internal/agent/files", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            if ("POST".equals(exchange.getRequestMethod())) {
+                writes.incrementAndGet();
+                try { Thread.sleep(1500); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                exchange.close();
+            } else {
+                reads.incrementAndGet();
+                byte[] data = "{\"code\":0,\"data\":{\"content\":\"ok\"}}".getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, data.length);
+                try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(data); }
+            }
+        });
+        server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret", java.time.Duration.ofMillis(400));
+            java.util.concurrent.atomic.AtomicInteger turns = new java.util.concurrent.atomic.AtomicInteger();
+            AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {
+                int n = turns.getAndIncrement();
+                if (n == 0) return new AgentLoop.Turn(java.util.Collections.singletonList(new AgentLoop.ToolCall("1", "write_file", "{\"path\":\"a.txt\",\"content\":\"text\",\"mode\":\"create\"}")), null);
+                if (n == 1) {
+                    assertTrue(history.get(history.size() - 1).content.contains("\"status\":\"unknown\""));
+                    return new AgentLoop.Turn(java.util.Arrays.asList(new AgentLoop.ToolCall("2", "write_file", "{\"path\":\"b.txt\",\"content\":\"text\",\"mode\":\"create\"}"), new AgentLoop.ToolCall("3", "read_file", "{\"path\":\"a.txt\"}")), null);
+                }
+                assertTrue(history.stream().anyMatch(m -> "2".equals(m.toolCallId) && m.content.contains("unknown")));
+                assertTrue(history.stream().anyMatch(m -> "3".equals(m.toolCallId) && m.content.contains("ok")));
+                return new AgentLoop.Turn(java.util.Collections.emptyList(), null);
+            }, AgentToolRegistry.bind("7", gateway), 4, 10000, 3000);
+            loop.run("test", chunk -> {}, () -> false);
+            assertEquals(1, writes.get()); assertEquals(1, reads.get());
+        } finally { server.stop(0); threads.shutdownNow(); }
+    }
+
+    @Test void cloudErrorDoesNotExposeInternalSecretsPathsOrIds() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/internal/agent/files", exchange -> {
+            byte[] response = "{\"code\":40101,\"data\":null,\"message\":\"secret-token /srv/private 9007199254740995\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        }); server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            String result = runFileTool(gateway, "read_file", "{\"path\":\"a.txt\"}");
+            assertEquals(40101, new com.fasterxml.jackson.databind.ObjectMapper().readTree(result).path("code").asInt());
+            assertFalse(result.contains("secret-token")); assertFalse(result.contains("/srv/private")); assertFalse(result.contains("9007199254740995"));
+        } finally { server.stop(0); }
+    }
+
+    @Test void uncertainResponsesAfterWriteBlockModelRetry() throws Exception {
+        for (String mode : new String[]{"disconnect", "corrupt", "http", "missing", "nullData", "serverError", "invalidCode"}) {
+            HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            java.util.concurrent.atomic.AtomicInteger received = new java.util.concurrent.atomic.AtomicInteger();
+            server.createContext("/api/internal/agent/files", exchange -> {
+                exchange.getRequestBody().readAllBytes(); received.incrementAndGet();
+                if (!"disconnect".equals(mode)) {
+                    String body = "corrupt".equals(mode) ? "{invalid" : "missing".equals(mode) ? "{\"code\":0}" : "nullData".equals(mode) ? "{\"code\":0,\"data\":null}" : "serverError".equals(mode) ? "{\"code\":50001,\"data\":null}" : "invalidCode".equals(mode) ? "{\"code\":\"oops\"}" : "error";
+                    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders("http".equals(mode) ? 503 : 200, bytes.length);
+                    try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(bytes); }
+                } else exchange.close();
+            }); server.start();
+            try {
+                AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret", java.time.Duration.ofSeconds(2));
+                java.util.concurrent.atomic.AtomicInteger turns = new java.util.concurrent.atomic.AtomicInteger();
+                AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {
+                    int n = turns.getAndIncrement();
+                    if (n == 1) {
+                        com.fasterxml.jackson.databind.JsonNode first;
+                        try { first = new com.fasterxml.jackson.databind.ObjectMapper().readTree(history.get(history.size()-1).content); } catch (java.io.IOException e) { throw new AssertionError(e); }
+                        assertEquals("unknown", first.path("status").asText(), mode);
+                        assertFalse(first.has("saved"), mode);
+                    }
+                    if (n < 2) return new AgentLoop.Turn(java.util.Collections.singletonList(new AgentLoop.ToolCall(""+n, "write_file", "{\"path\":\"a.txt\",\"content\":\"x\",\"mode\":\"create\"}")), null);
+                    assertTrue(history.get(history.size()-1).content.contains("blocked"), mode);
+                    return new AgentLoop.Turn(java.util.Collections.emptyList(), null);
+                }, AgentToolRegistry.bind("7", gateway), 4, 10000, 3000);
+                loop.run("test", chunk -> {}, () -> false);
+                assertEquals(1, received.get(), mode);
+            } finally { server.stop(0); }
+        }
+    }
+
+    @Test void explicitBusinessRejectionIsNotUnknown() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/internal/agent/files", exchange -> {
+            byte[] response = "{\"code\":40000,\"data\":null,\"message\":\"请求被拒绝\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        }); server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            com.fasterxml.jackson.databind.JsonNode result = new com.fasterxml.jackson.databind.ObjectMapper().readTree(runFileTool(gateway, "write_file", "{\"path\":\"a.txt\",\"content\":\"x\",\"mode\":\"create\"}"));
+            assertEquals(40000, result.path("code").asInt());
+            assertFalse(result.path("saved").asBoolean(true));
+            assertFalse(result.has("status"));
+        } finally { server.stop(0); }
+    }
+    @Test void segmentAndSearchToolsUseAuthenticatedUserBoundHttp() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> request = new AtomicReference<>();
+        server.createContext("/api/internal/agent/files", exchange -> {
+            request.set(exchange.getRequestURI() + " " + exchange.getRequestHeaders().getFirst("X-Agent-Key"));
+            byte[] response = "{\"code\":0,\"data\":{\"text\":\"中文\",\"next\":\"token\"}}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(response); }
+        }); server.start();
+        try {
+            AgentLibraryHttpGateway gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            var tools = AgentToolRegistry.bind("7", gateway);
+            assertTrue(tools.get("read_file_segment").execute("{\"path\":\"a.txt\"}").contains("中文"));
+            assertTrue(request.get().contains("/files/segment?path=a.txt&userId=7 secret"));
+            tools.get("search_file").execute("{\"path\":\"a.txt\",\"query\":\"中文\",\"cursor\":\"token\"}");
+            assertTrue(request.get().contains("/files/search?path=a.txt&query="));
+            assertTrue(request.get().contains("cursor=token&userId=7 secret"));
+            assertThrows(IllegalArgumentException.class, () -> tools.get("search_file").execute("{\"path\":\"a.txt\",\"query\":\"x\",\"userId\":\"8\"}"));
+        } finally { server.stop(0); }
+    }
+
+    @Test void typicalSegmentsContinueWithinDefaultLoopBudget() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/internal/agent/files/segment", exchange -> {
+            String text = "abc中文".repeat(200);
+            String body = "{\"code\":0,\"data\":{\"text\":\"" + text + "\",\"next\":\"token\"}}";
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8); exchange.sendResponseHeaders(200, bytes.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) { out.write(bytes); }
+        }); server.start();
+        try {
+            var gateway = new AgentLibraryHttpGateway("http://127.0.0.1:" + server.getAddress().getPort(), "secret");
+            var turns = new java.util.concurrent.atomic.AtomicInteger();
+            AgentLoop loop = new AgentLoop((history, delta, cancelled) -> {
+                int n = turns.getAndIncrement();
+                if (n < 2) return new AgentLoop.Turn(java.util.Collections.singletonList(new AgentLoop.ToolCall("" + n, "read_file_segment", n == 0 ? "{\"path\":\"a.txt\"}" : "{\"path\":\"a.txt\",\"cursor\":\"token\"}")), null);
+                return new AgentLoop.Turn(java.util.Collections.emptyList(), null);
+            }, AgentToolRegistry.bind("7", gateway), 4, 10000, 16000);
+            loop.run("test", chunk -> {}, () -> false);
+            assertEquals(3, turns.get());
+        } finally { server.stop(0); }
+    }
+
 }
