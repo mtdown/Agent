@@ -24,6 +24,24 @@ class AgentToolRegistryTest {
         assertTrue(tools.containsKey("write_wiki_document"));
     }
 
+    @Test void everyDeclarationHasExplicitDomainAndAccess() {
+        Map<String, AgentToolRegistry.Domain> domains = Map.ofEntries(
+                Map.entry("get_skill", AgentToolRegistry.Domain.SKILL), Map.entry("create_skill", AgentToolRegistry.Domain.SKILL),
+                Map.entry("create_code", AgentToolRegistry.Domain.CODE), Map.entry("write_file", AgentToolRegistry.Domain.FILE),
+                Map.entry("read_file", AgentToolRegistry.Domain.FILE), Map.entry("read_file_segment", AgentToolRegistry.Domain.FILE),
+                Map.entry("search_file", AgentToolRegistry.Domain.FILE), Map.entry("write_wiki_document", AgentToolRegistry.Domain.WIKI),
+                Map.entry("create_wiki_folder", AgentToolRegistry.Domain.WIKI), Map.entry("create_wiki_document", AgentToolRegistry.Domain.WIKI),
+                Map.entry("list_writable_wiki_locations", AgentToolRegistry.Domain.WIKI), Map.entry("plan_wiki_destination", AgentToolRegistry.Domain.WIKI));
+        java.util.Set<String> writes = java.util.Set.of("create_skill", "create_code", "write_file", "write_wiki_document", "create_wiki_folder", "create_wiki_document");
+        assertEquals(domains.keySet(), AgentToolRegistry.names());
+        domains.forEach((name, domain) -> {
+            assertEquals(domain, AgentToolRegistry.domain(name), name);
+            assertEquals(writes.contains(name) ? AgentToolRegistry.Access.WRITE : AgentToolRegistry.Access.READ,
+                    AgentToolRegistry.access(name), name);
+        });
+        assertThrows(IllegalArgumentException.class, () -> AgentToolRegistry.access("unregistered"));
+    }
+
     @Test void unknownToolCannotBeDeclared() {
         assertThrows(IllegalArgumentException.class, () -> AgentToolRegistry.declaration("shell"));
     }

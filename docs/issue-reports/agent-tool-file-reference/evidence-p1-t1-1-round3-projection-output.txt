@@ -1,0 +1,4 @@
+CASE1 answer=已在Personal的文件夹「Folder B」创建文档「Document A」。另一次写入结果未知，请先核查目标位置。
+CASE1 card={kind=wiki_write_result, turnId=12, spaceLabel=Personal, folderName=Folder A, documentTitle=Document A, openToken=[redacted]}
+CASE2 answer=已在Personal的文件夹「Folder A」创建文档「Document B」。
+CASE2 card={kind=wiki_write_result, turnId=12, spaceLabel=Personal, folderName=Folder A, documentTitle=Document B, openToken=[redacted]}

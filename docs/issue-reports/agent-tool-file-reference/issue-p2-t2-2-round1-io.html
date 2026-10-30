@@ -1,0 +1,47 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>2.2 摘要 I/O 代码对照</title><style>body{font-family:sans-serif;margin:2em} .cols{display:grid;grid-template-columns:1fr 1fr;gap:1em}section{border:1px solid #aaa;padding:1em}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>ATFR-P2-T2.2-R1-IO：摘要 I/O 事实对照</h1><div class="cols"><section><h2>实际代码</h2><p>AgentPersonalFileStore.java，快照行号；实际探针 50 MiB、51 段。</p><details open><summary>摘要与调用片段</summary><pre>137:     private static String digest(Path target) throws IOException {
+138:         try {
+139:             MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);
+140:             try (InputStream in = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
+141:                 byte[] buffer = new byte[8192]; int n;
+142:                 while ((n = in.read(buffer)) != -1) digest.update(buffer, 0, n);
+143:             }
+144:             digest.update(Files.getLastModifiedTime(target, LinkOption.NOFOLLOW_LINKS).toString().getBytes(StandardCharsets.UTF_8));
+145:             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest());
+146:         } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+147:     }
+148: 
+
+150:         private final OutputStream out; private long count;
+151:         BoundedOutputStream(OutputStream out) { this.out = out; }
+152:         @Override public void write(int b) throws IOException { check(1); out.write(b); }
+153:         @Override public void write(byte[] b, int off, int len) throws IOException { check(len); out.write(b, off, len); }
+154:         private void check(int length) { if (count + length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;File content exceeds 50 MiB&quot;); count += length; }
+155:         @Override public void close() throws IOException { out.close(); }
+156:         @Override public void flush() throws IOException { out.flush(); }
+157:     }
+158: 
+159:     public String read(long userId, String relative) {
+160:         Path target = resolve(userId, relative, false);
+
+229:         if (maxBytes &lt; 4 || maxBytes &gt; 1024 * 1024) throw new IllegalArgumentException(&quot;Invalid segment limit&quot;);
+230:         return locked(user, relative, path -&gt; {
+231:             String version = digest(path);
+232:             try (SeekableByteChannel ch = Files.newByteChannel(path, Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
+233:                 long size = ch.size(), start = position(cursor, user, relative, version, null, size);
+234:                 byte[] bytes = readBytes(ch, start, (int) Math.min(maxBytes, size - start));
+235:                 int end = bytes.length;
+
+257:         try {
+258:             ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
+259:                     .onUnmappableCharacter(CodingErrorAction.REPORT).encode(java.nio.CharBuffer.wrap(query));
+260:             if (encoded.remaining() &gt; 1024) throw new IllegalArgumentException(&quot;Search query too long&quot;);
+261:             pattern = new byte[encoded.remaining()]; encoded.get(pattern);
+262:         } catch (CharacterCodingException e) { throw new IllegalArgumentException(&quot;Invalid search query&quot;, e); }
+263:         return locked(user, relative, path -&gt; {
+264:             String version = digest(path);
+265:             try (SeekableByteChannel ch = Files.newByteChannel(path, Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
+266:                 long size = ch.size(), start = position(cursor, user, relative, version, query, size);
+267:                 int candidates = (int) Math.min(scanBytes, size - start);
+268:                 byte[] bytes = readBytes(ch, start, (int) Math.min((long) candidates + pattern.length - 1, size - start));
+269:                 List&lt;Long&gt; matches = new ArrayList&lt;&gt;(); long nextPos = start + candidates;
+270:                 for (int i = 0; i &lt; candidates &amp;&amp; i + pattern.length &lt;= bytes.length; i++) {</pre></details></section><section><h2>验收与观察</h2><p>固定验收要求文件分段、有限候选扫描和版本变更拒绝。测试通过；每次计算摘要另有整文件流式读取。51 次 × 50 MiB = 2550 MiB（约 2.49 GiB）逻辑摘要读取，非物理磁盘实测。负责人暂缓完整资源优化，该成本不计固定项 FAIL。</p><p>完整命令、实测及限制见 <a href="issue-p2-t2-2-round1.md">独立验收报告</a>。</p></section></div></html>

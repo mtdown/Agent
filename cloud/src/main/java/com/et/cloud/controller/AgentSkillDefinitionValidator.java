@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
 /** Validates the versioned, executable part of a Skill before it is saved or enabled. */
 @Component
 public final class AgentSkillDefinitionValidator {
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     private static final Pattern IDENTIFIER = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]{0,79}");
     private static final Pattern DECIMAL_ID = Pattern.compile("[1-9][0-9]{0,18}");
 

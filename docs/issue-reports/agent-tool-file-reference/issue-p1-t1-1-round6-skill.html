@@ -1,0 +1,53 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>第6轮 Skill 补证</title><style>body{font-family:sans-serif;margin:2em} table{width:100%;table-layout:fixed;border-collapse:collapse}td,th{border:1px solid #aaa;padding:1em;vertical-align:top}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>第6轮 Skill 补证</h1><p>受控假工具探针；无真实写入。详见同目录 Markdown 及原始证据。</p><table><tr><th>实际输入与代码</th><th>预期、观察与限制</th></tr><tr><td><details open><summary>输入及相关代码</summary><pre>模拟 get_skill 返回：用户自定义步骤 args.spaceId=&quot;123456789&quot;
+模型从 history 读取并调用 write_wiki_document。
+
+AgentLoop.java:177-180, 210, 277-301
+177:                     if (writeOutcomeUnknown &amp;&amp; isWriteTool(call.name)) {
+178:                         com.fasterxml.jackson.databind.node.ObjectNode blocked = JSON.createObjectNode();
+179:                         blocked.put(&quot;code&quot;, 50001);
+180:                         blocked.put(&quot;status&quot;, &quot;blocked&quot;);
+210:                     }
+277:                     for (String secret:sensitiveValues) if (!secret.isEmpty()) text=text.replace(secret,&quot;[隐藏]&quot;);
+278:                     object.put(key,text);
+279:                 } else encodeNode(value);
+280:             }
+281:         }
+282:         String decodeArguments(String text) {
+283:             try {
+284:                 com.fasterxml.jackson.databind.JsonNode node=JSON.readTree(text); decodeNode(node);
+285:                 return JSON.writeValueAsString(node);
+286:             } catch (IllegalArgumentException e) { throw e; }
+287:             catch (Exception e) { throw new IllegalArgumentException(&quot;Invalid Wiki tool arguments&quot;); }
+288:         }
+289:         private void decodeNode(com.fasterxml.jackson.databind.JsonNode node) {
+290:             if (node.isArray()) { node.forEach(this::decodeNode); return; }
+291:             if (!node.isObject()) return;
+292:             com.fasterxml.jackson.databind.node.ObjectNode object=(com.fasterxml.jackson.databind.node.ObjectNode)node;
+293:             List&lt;String&gt; fields=new ArrayList&lt;&gt;(); object.fieldNames().forEachRemaining(fields::add);
+294:             for(String key:fields) {
+295:                 com.fasterxml.jackson.databind.JsonNode value=object.get(key);
+296:                 if (identifierField(key) &amp;&amp; !value.isNull()) {
+297:                     String id=toId.get(value.asText());
+298:                     if (id == null) throw new IllegalArgumentException(&quot;Invalid or expired Wiki location reference&quot;);
+299:                     object.put(key,id);
+300:                 } else decodeNode(value);
+301:             }
+
+AgentSkillDefinitionValidator.java:86-94
+86:                     break;
+87:                 case &quot;tool&quot;:
+88:                     fields(step, &quot;step&quot;, &quot;type&quot;, &quot;tool&quot;, &quot;args&quot;);
+89:                     if (!Set.of(&quot;get_skill&quot;, &quot;create_skill&quot;, &quot;create_code&quot;, &quot;write_file&quot;, &quot;read_file&quot;,
+90:                             &quot;write_wiki_document&quot;, &quot;list_writable_wiki_locations&quot;, &quot;create_wiki_folder&quot;,
+91:                             &quot;create_wiki_document&quot;, &quot;plan_wiki_destination&quot;).contains(text(step, &quot;tool&quot;, 1, 80)))
+92:                         throw invalid(&quot;Invalid tool name&quot;);
+93:                     object(step.get(&quot;args&quot;), &quot;tool arguments&quot;);
+94:                     break;</pre></details></td><td><pre>ATFR-P1-T1.1-R6-001
+预期：定义中固定数字参数可进入写工具。
+实际：Invalid or expired Wiki location reference；假写工具执行次数 0。
+
+ATFR-P1-T1.1-R6-S1
+模型 history 可见用户自定义输入原值；这不是 Wiki 查询结果，不能声称结果泄漏。未验证真实授权、持久化及内建 Skill，安全检查证据不足。
+
+探针完整命令与输出：evidence-p1-t1-1-round6-skill.txt
+SHA-256 3539829171D3331DE7D4F6AF5520D8EBA2B4E0ABBB12DF9EFF1DD37108F29C72</pre></td></tr></table></html>

@@ -56,7 +56,7 @@ test('dev scripts stay ASCII-only so PowerShell 5.1 cannot misdecode them', () =
 
 test('start script auto-cleans occupied dev ports before starting', () => {
   assert.match(startSource, /function Clear-DevPort/)
-  assert.match(startSource, /foreach \(\$p in @\(\$backendPort, \$frontPort\)\)/)
+  assert.match(startSource, /foreach \(\$p in @\(\$backendPort, \$agentPort, \$frontPort\)\)/)
   assert.match(startSource, /Port \$Port in use by/)
   assert.match(startSource, /Stop-Process -Id \$procId -Force/)
   assert.match(startSource, /still occupied after cleanup/)

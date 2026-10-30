@@ -1,0 +1,595 @@
+diff --git a/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileStore.java b/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileStore.java
+index 33f9c49..fca21ce 100644
+--- a/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileStore.java
++++ b/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileStore.java
+@@ -5,6 +5,18 @@ import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.stereotype.Component;
+ 
+ import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.io.Reader;
++import java.io.StringReader;
++import java.io.OutputStreamWriter;
++import java.io.Writer;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.util.Base64;
++import java.nio.file.attribute.FileTime;
++import java.util.concurrent.ConcurrentHashMap;
++import java.nio.file.StandardCopyOption;
+ import java.nio.ByteBuffer;
+ import java.nio.channels.SeekableByteChannel;
+ import java.nio.charset.StandardCharsets;
+@@ -14,19 +26,29 @@ import java.nio.file.LinkOption;
+ import java.nio.file.Path;
+ import java.nio.file.StandardOpenOption;
+ import java.util.Set;
++import java.util.List;
++import java.util.ArrayList;
++import java.nio.charset.CharacterCodingException;
++import java.nio.charset.CodingErrorAction;
+ 
+ /** UTF-8 files scoped to one user's persistent Cloud workspace. */
+ @Component
+-public final class AgentPersonalFileStore {
+-    private static final int MAX_BYTES = 1_048_576;
++public final class AgentPersonalFileStore implements PersonalFileStorage {
++    private static final int MAX_BYTES = 50 * 1024 * 1024;
++    private static final int MAX_LEGACY_READ_BYTES = 1_048_576;
++    private static final ConcurrentHashMap<Path, LockRef> LOCKS = new ConcurrentHashMap<>();
++    private static final class LockRef { int users; }
+     private final Path root;
++    private final Committer committer;
++    interface Committer { void commit(Path source, Path target) throws IOException; }
+ 
+     @Autowired
+     public AgentPersonalFileStore(@Value("${agent.workspace-root:tmp/agent-user-files}") String root) {
+         this(Path.of(root));
+     }
+ 
+-    AgentPersonalFileStore(Path root) { this.root = root.toAbsolutePath().normalize(); }
++    AgentPersonalFileStore(Path root) { this(root, (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)); }
++    AgentPersonalFileStore(Path root, Committer committer) { this.root = root.toAbsolutePath().normalize(); this.committer = committer; }
+ 
+     public static final class WriteResult {
+         public final String path;
+@@ -38,43 +60,111 @@ public final class AgentPersonalFileStore {
+         }
+     }
+ 
+-    public synchronized WriteResult write(long userId, String relative, String content, String mode) {
+-        if (content == null || !Set.of("create", "overwrite", "append").contains(mode))
++    public WriteResult write(long userId, String relative, String content, String mode) {
++        if (content == null) throw new IllegalArgumentException("Invalid file content");
++        return write(userId, relative, new StringReader(content), mode, null);
++    }
++
++    /** Internal conditional write; a null expected version retains the legacy behavior. */
++    public WriteResult write(long userId, String relative, Reader content, String mode, String expectedVersion) {
++        if (content == null || mode == null || !Set.of("create", "overwrite", "append").contains(mode))
+             throw new IllegalArgumentException("Invalid file content or write mode");
+-        byte[] input = content.getBytes(StandardCharsets.UTF_8);
+-        if (input.length > MAX_BYTES) throw new IllegalArgumentException("File content exceeds 1 MiB");
++        Path key = root.resolve(Long.toString(userId)).resolve(relative == null ? "" : relative).normalize();
++        LockRef lock = LOCKS.compute(key, (k, old) -> { LockRef ref = old == null ? new LockRef() : old; ref.users++; return ref; });
++        try {
++            synchronized (lock) { return writeLocked(userId, relative, content, mode, expectedVersion); }
++        } finally {
++            LOCKS.compute(key, (k, ref) -> { ref.users--; return ref.users == 0 ? null : ref; });
++        }
++    }
++
++    void validatePath(long userId, String relative) { resolve(userId, relative, false); }
++
++    public String version(long userId, String relative) {
++        Path target = resolve(userId, relative, false);
++        LockRef lock = LOCKS.compute(target, (k, old) -> { LockRef ref = old == null ? new LockRef() : old; ref.users++; return ref; });
++        try {
++            synchronized (lock) { return digest(target); }
++        } catch (IOException e) { throw new IllegalStateException("Personal file version failed", e); }
++        finally { LOCKS.compute(target, (k, ref) -> { ref.users--; return ref.users == 0 ? null : ref; }); }
++    }
++
++    private WriteResult writeLocked(long userId, String relative, Reader content, String mode, String expectedVersion) {
+         Path target = resolve(userId, relative, true);
++        Path temporary = null;
+         try {
+-            if ("create".equals(mode)) {
+-                Files.write(target, input, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
+-                        LinkOption.NOFOLLOW_LINKS);
+-            } else {
+-                if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))
+-                    throw new IllegalArgumentException("File does not exist: " + relative);
+-                if ("append".equals(mode) && Files.size(target) + input.length > MAX_BYTES)
+-                    throw new IllegalArgumentException("File content exceeds 1 MiB");
+-                Files.write(target, input, StandardOpenOption.WRITE,
+-                        "append".equals(mode) ? StandardOpenOption.APPEND : StandardOpenOption.TRUNCATE_EXISTING,
+-                        LinkOption.NOFOLLOW_LINKS);
++            boolean exists = Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS);
++            if ("create".equals(mode) && Files.exists(target, LinkOption.NOFOLLOW_LINKS))
++                throw new IllegalArgumentException("File already exists: " + relative);
++            if (!"create".equals(mode) && !exists)
++                throw new IllegalArgumentException("File does not exist: " + relative);
++            if (expectedVersion != null && (!exists || !expectedVersion.equals(digest(target))))
++                throw new IllegalStateException("Personal file version conflict");
++            temporary = Files.createTempFile(target.getParent(), ".agent-write-", ".tmp");
++            try (OutputStream raw = Files.newOutputStream(temporary); OutputStream bounded = new BoundedOutputStream(raw)) {
++                if ("append".equals(mode)) {
++                    try (InputStream old = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) { old.transferTo(bounded); }
++                }
++                Writer writer = new OutputStreamWriter(bounded, StandardCharsets.UTF_8);
++                char[] chars = new char[8192];
++                int n;
++                while ((n = content.read(chars)) != -1) writer.write(chars, 0, n);
++                writer.close();
++            }
++            int bytes = (int) Files.size(temporary);
++            if (exists) {
++                FileTime oldTime = Files.getLastModifiedTime(target, LinkOption.NOFOLLOW_LINKS);
++                long desired;
++                try { desired = Math.max(System.currentTimeMillis(), Math.addExact(oldTime.toMillis(), 2000)); }
++                catch (ArithmeticException e) { throw new IOException("File version time exhausted", e); }
++                Files.setLastModifiedTime(temporary, FileTime.fromMillis(desired));
++                if (Files.getLastModifiedTime(temporary, LinkOption.NOFOLLOW_LINKS).compareTo(oldTime) <= 0)
++                    throw new IOException("File system cannot advance version time");
+             }
+-            String actual = read(userId, relative);
+-            boolean verified = "append".equals(mode) ? actual.endsWith(content) : actual.equals(content);
+-            if (!verified) throw new IllegalStateException("Written file could not be verified");
+-            return new WriteResult(relative, actual.getBytes(StandardCharsets.UTF_8).length, true);
+-        } catch (FileAlreadyExistsException e) {
+-            throw new IllegalArgumentException("File already exists: " + relative, e);
++            // Recheck path before committing; atomic replacement is required, never fall back to a direct write.
++            resolve(userId, relative, false);
++            committer.commit(temporary, target);
++            temporary = null;
++            return new WriteResult(relative, bytes, true);
+         } catch (IOException e) {
+             throw new IllegalStateException("Personal file write failed", e);
++        } finally {
++            if (temporary != null) {
++                try { Files.deleteIfExists(temporary); }
++                catch (IOException e) { throw new IllegalStateException("Personal file temporary cleanup failed", e); }
++            }
+         }
+     }
+ 
++    private static String digest(Path target) throws IOException {
++        try {
++            MessageDigest digest = MessageDigest.getInstance("SHA-256");
++            try (InputStream in = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
++                byte[] buffer = new byte[8192]; int n;
++                while ((n = in.read(buffer)) != -1) digest.update(buffer, 0, n);
++            }
++            digest.update(Files.getLastModifiedTime(target, LinkOption.NOFOLLOW_LINKS).toString().getBytes(StandardCharsets.UTF_8));
++            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest());
++        } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
++    }
++
++    private static final class BoundedOutputStream extends OutputStream {
++        private final OutputStream out; private long count;
++        BoundedOutputStream(OutputStream out) { this.out = out; }
++        @Override public void write(int b) throws IOException { check(1); out.write(b); }
++        @Override public void write(byte[] b, int off, int len) throws IOException { check(len); out.write(b, off, len); }
++        private void check(int length) { if (count + length > MAX_BYTES) throw new IllegalArgumentException("File content exceeds 50 MiB"); count += length; }
++        @Override public void close() throws IOException { out.close(); }
++        @Override public void flush() throws IOException { out.flush(); }
++    }
++
+     public String read(long userId, String relative) {
+         Path target = resolve(userId, relative, false);
+         if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))
+             throw new IllegalArgumentException("File does not exist: " + relative);
+         try (SeekableByteChannel channel = Files.newByteChannel(target,
+                 Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
+-            if (channel.size() > MAX_BYTES) throw new IllegalArgumentException("File content exceeds 1 MiB");
++            if (channel.size() > MAX_LEGACY_READ_BYTES) throw new IllegalArgumentException("File content exceeds 1 MiB");
+             ByteBuffer buffer = ByteBuffer.allocate((int) channel.size());
+             while (buffer.hasRemaining() && channel.read(buffer) >= 0) { }
+             return StandardCharsets.UTF_8.decode((ByteBuffer) buffer.flip()).toString();
+@@ -83,6 +173,154 @@ public final class AgentPersonalFileStore {
+         }
+     }
+ 
++    // Opaque in-process continuation: the caller cannot alter its position or binding.
++    public static final class Cursor {
++        private final long user, position;
++        private final String path, version, query;
++        private Cursor(long user, String path, String version, long position, String query) {
++            this.user = user; this.path = path; this.version = version; this.position = position; this.query = query;
++        }
++    }
++    // Authenticated, stateless continuation; the key is domain-separated from the service credential.
++    static String encodeCursor(Cursor cursor, String secret) {
++        if (cursor == null) return null;
++        try {
++            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++            java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++            out.writeLong(cursor.user); out.writeUTF(cursor.path); out.writeUTF(cursor.version);
++            out.writeLong(cursor.position); out.writeBoolean(cursor.query != null);
++            if (cursor.query != null) out.writeUTF(cursor.query);
++            byte[] data = bytes.toByteArray();
++            byte[] mac = cursorMac(secret, data);
++            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(data) + "." +
++                    java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mac);
++        } catch (java.io.IOException e) { throw new IllegalArgumentException("Invalid personal file cursor"); }
++    }
++    static Cursor decodeCursor(String token, String secret) {
++        if (token == null) return null;
++        try {
++            if (token.length() > 8192) throw new IllegalArgumentException();
++            String[] parts = token.split("\\.", -1);
++            if (parts.length != 2) throw new IllegalArgumentException();
++            byte[] data = java.util.Base64.getUrlDecoder().decode(parts[0]);
++            byte[] mac = java.util.Base64.getUrlDecoder().decode(parts[1]);
++            if (!java.security.MessageDigest.isEqual(mac, cursorMac(secret, data))) throw new IllegalArgumentException();
++            java.io.DataInputStream in = new java.io.DataInputStream(new java.io.ByteArrayInputStream(data));
++            long user = in.readLong(); String path = in.readUTF(), version = in.readUTF(); long pos = in.readLong();
++            String query = in.readBoolean() ? in.readUTF() : null;
++            if (in.available() != 0) throw new IllegalArgumentException();
++            return new Cursor(user, path, version, pos, query);
++        } catch (Exception e) { throw new IllegalArgumentException("Invalid personal file cursor"); }
++    }
++    private static byte[] cursorMac(String secret, byte[] data) {
++        try {
++            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
++            mac.init(new javax.crypto.spec.SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
++            mac.update("agent-personal-file-cursor-v1\0".getBytes(StandardCharsets.UTF_8));
++            return mac.doFinal(data);
++        } catch (java.security.GeneralSecurityException e) { throw new IllegalStateException("Cursor authentication unavailable"); }
++    }
++    public static final class Segment {
++        public final String text, version;
++        public final long start;
++        public final Cursor next;
++        private Segment(String text, String version, long start, Cursor next) {
++            this.text = text; this.version = version; this.start = start; this.next = next;
++        }
++    }
++    public static final class SearchResult {
++        public final List<Long> offsets;
++        public final String version;
++        public final Cursor next;
++        private SearchResult(List<Long> offsets, String version, Cursor next) {
++            this.offsets = List.copyOf(offsets); this.version = version; this.next = next;
++        }
++    }
++    private interface LockedOperation<T> { T run(Path path) throws IOException; }
++    private <T> T locked(long user, String relative, LockedOperation<T> operation) {
++        Path key = root.resolve(Long.toString(user)).resolve(relative == null ? "" : relative).normalize();
++        LockRef lock = LOCKS.compute(key, (k, old) -> { LockRef ref = old == null ? new LockRef() : old; ref.users++; return ref; });
++        try {
++            synchronized (lock) {
++                Path target = resolve(user, relative, false);
++                if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) throw new IllegalArgumentException("File does not exist");
++                return operation.run(target);
++            }
++        } catch (IOException e) { throw new IllegalStateException("Personal file read failed", e); }
++        finally { LOCKS.compute(key, (k, ref) -> { ref.users--; return ref.users == 0 ? null : ref; }); }
++    }
++    private static long position(Cursor c, long user, String path, String version, String query, long size) {
++        if (c == null) return 0;
++        if (c.user != user || !c.path.equals(path) || !java.util.Objects.equals(c.query, query)
++                || c.position < 0) throw new IllegalArgumentException("Invalid personal file cursor");
++        if (!c.version.equals(version)) throw new IllegalStateException("Personal file version conflict");
++        if (c.position > size) throw new IllegalArgumentException("Invalid personal file cursor");
++        return c.position;
++    }
++    private static byte[] readBytes(SeekableByteChannel channel, long position, int count) throws IOException {
++        ByteBuffer buf = ByteBuffer.allocate(count); channel.position(position);
++        while (buf.hasRemaining() && channel.read(buf) != -1) { }
++        return java.util.Arrays.copyOf(buf.array(), buf.position());
++    }
++    private static String decode(byte[] bytes, int length) throws CharacterCodingException {
++        return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
++                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes, 0, length)).toString();
++    }
++    @Override public Segment segment(long user, String relative, Cursor cursor, int maxBytes) {
++        if (maxBytes < 4 || maxBytes > 1024 * 1024) throw new IllegalArgumentException("Invalid segment limit");
++        return locked(user, relative, path -> {
++            String version = digest(path);
++            try (SeekableByteChannel ch = Files.newByteChannel(path, Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
++                long size = ch.size(), start = position(cursor, user, relative, version, null, size);
++                byte[] bytes = readBytes(ch, start, (int) Math.min(maxBytes, size - start));
++                int end = bytes.length;
++                // Remove a partial trailing code point, retaining only complete UTF-8 bytes.
++                if (start + end < size && end > 0) {
++                    int lead = end - 1;
++                    while (lead >= 0 && (bytes[lead] & 0xc0) == 0x80) lead--;
++                    if (lead >= 0) {
++                        int b = bytes[lead] & 0xff;
++                        int width = b < 0x80 ? 1 : b >= 0xc2 && b <= 0xdf ? 2 : b >= 0xe0 && b <= 0xef ? 3 : b >= 0xf0 && b <= 0xf4 ? 4 : 1;
++                        if (end - lead < width) end = lead;
++                    }
++                }
++                String text = decode(bytes, end);
++                long nextPos = start + end;
++                Cursor next = nextPos < size ? new Cursor(user, relative, version, nextPos, null) : null;
++                return new Segment(text, version, start, next);
++            }
++        });
++    }
++    @Override public SearchResult search(long user, String relative, String query, Cursor cursor, int scanBytes, int maxResults) {
++        if (query == null || query.isEmpty() || scanBytes < 1 || scanBytes > 65536 || maxResults < 1 || maxResults > 100)
++            throw new IllegalArgumentException("Invalid search parameters");
++        final byte[] pattern;
++        try {
++            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
++                    .onUnmappableCharacter(CodingErrorAction.REPORT).encode(java.nio.CharBuffer.wrap(query));
++            if (encoded.remaining() > 1024) throw new IllegalArgumentException("Search query too long");
++            pattern = new byte[encoded.remaining()]; encoded.get(pattern);
++        } catch (CharacterCodingException e) { throw new IllegalArgumentException("Invalid search query", e); }
++        return locked(user, relative, path -> {
++            String version = digest(path);
++            try (SeekableByteChannel ch = Files.newByteChannel(path, Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
++                long size = ch.size(), start = position(cursor, user, relative, version, query, size);
++                int candidates = (int) Math.min(scanBytes, size - start);
++                byte[] bytes = readBytes(ch, start, (int) Math.min((long) candidates + pattern.length - 1, size - start));
++                List<Long> matches = new ArrayList<>(); long nextPos = start + candidates;
++                for (int i = 0; i < candidates && i + pattern.length <= bytes.length; i++) {
++                    int j = 0; while (j < pattern.length && bytes[i+j] == pattern[j]) j++;
++                    if (j == pattern.length) {
++                        matches.add(start + i);
++                        if (matches.size() == maxResults) { nextPos = start + i + 1; break; }
++                    }
++                }
++                Cursor next = nextPos < size ? new Cursor(user, relative, version, nextPos, query) : null;
++                return new SearchResult(matches, version, next);
++            }
++        });
++    }
++
+     private Path resolve(long userId, String relative, boolean createParents) {
+         if (userId < 1 || relative == null || relative.isBlank() || relative.length() > 512
+                 || relative.startsWith("/") || relative.contains("\\") || relative.contains(":")
+@@ -96,20 +334,33 @@ public final class AgentPersonalFileStore {
+         Path target = user.resolve(relative).normalize();
+         if (!target.startsWith(user)) throw new IllegalArgumentException("Path escapes personal space");
+         try {
++            if (Files.isSymbolicLink(root)) throw new IllegalArgumentException("Symbolic links are not allowed");
+             if (createParents) Files.createDirectories(user);
+             Path current = user;
+-            if (Files.isSymbolicLink(current)) throw new IllegalArgumentException("Symbolic links are not allowed");
++            rejectRedirect(current);
+             for (int i = 0; i < parts.length - 1; i++) {
+                 current = current.resolve(parts[i]);
+-                if (Files.isSymbolicLink(current)) throw new IllegalArgumentException("Symbolic links are not allowed");
+-                if (createParents && !Files.exists(current, LinkOption.NOFOLLOW_LINKS)) Files.createDirectory(current);
++                rejectRedirect(current);
++                if (createParents && !Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
++                    try { Files.createDirectory(current); } catch (FileAlreadyExistsException ignored) { /* another file created the parent */ }
++                }
++                rejectRedirect(current);
+                 if (Files.exists(current, LinkOption.NOFOLLOW_LINKS) && !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS))
+                     throw new IllegalArgumentException("Parent path is not a directory");
+             }
+-            if (Files.isSymbolicLink(target)) throw new IllegalArgumentException("Symbolic links are not allowed");
++            rejectRedirect(target);
+             return target;
+         } catch (IOException e) {
+             throw new IllegalStateException("Personal file path failed", e);
+         }
+     }
++    /** Reject links and directory junctions whose resolved location differs from the direct child path. */
++    private static void rejectRedirect(Path path) throws IOException {
++        if (Files.isSymbolicLink(path)) throw new IllegalArgumentException("Symbolic links are not allowed");
++        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
++            Path parentReal = path.getParent().toRealPath();
++            if (!path.toRealPath().equals(parentReal.resolve(path.getFileName())))
++                throw new IllegalArgumentException("Redirected paths are not allowed");
++        }
++    }
+ }
+diff --git a/deploy/README.md b/deploy/README.md
+index 18a86d8..657ea64 100644
+--- a/deploy/README.md
++++ b/deploy/README.md
+@@ -189,3 +189,11 @@ docker compose exec mysql mysql -uroot -p"$DB_PASSWORD" picture \
+ 2. 改 `deploy/docker-compose.yml` 的 ports 为 `"80:80"` 并追加 `"443:443"`
+ 3. 在服务器上执行 `certbot --nginx` 申请免费证书（自动续期）
+ 4. `cd /opt/cloudwiki && bash deploy.sh`
++
++### 个人文本文件分段上传
++
++Cloud 的 `/api/agent/personal-file-uploads` 使用当前登录会话，每次请求重新鉴权。POST JSON `{ "path": "notes/a.txt", "mode": "create|overwrite|append", "size": 123 }` 创建会话，size 是本次上传的 UTF-8 字节数（0 至 50 MiB）。响应的 `uploadId` 是临时令牌；PUT `/{uploadId}/segments?offset=0` 以 `application/octet-stream` 按字节偏移顺序发送非空分段，每段最多 1 MiB。不得重发或跳段；客户端收到失败或断线时应取消并重新开始。POST `/{uploadId}/commit` 仅在字节完整且 UTF-8 合法时原子提交，覆盖和追加以创建会话时的文件版本检查冲突，最终文件最多 50 MiB。DELETE `/{uploadId}` 取消。不要将磁盘路径作为 API 参数；path 是用户空间内相对路径。令牌不能跨用户使用。空文件可直接提交。
++
++分段请求不依赖 multipart。现有 Nginx `client_max_body_size 30m` 和 Spring multipart 30MB 都足以容纳 1 MiB 分段；其他代理须允许至少 1 MiB 的请求体。服务以 8 KiB 缓冲区流式接收和提交，上传临时目录默认 `tmp/agent-upload-sessions`，可通过 Spring 配置 `agent.upload-temp-root` 设置到仅服务进程可访问、具备足够空间的本地目录。会话在单进程内保存，闲置一小时自动清理，进程启动时清除该专用目录的遗留上传文件；禁止多个实例共用临时目录。并发会话没有总量配额，运营时须监控临时磁盘空间。持久卷 `agent-user-files` 保留原有文件，部署期间不要删除该卷。
++
++回滚时停用新上传入口并恢复旧 Cloud 版本；保留个人文件卷，停止服务后可清理上述专用临时目录中的 `upload-*.tmp`。旧版本可能无法读取超过其原有上限的文件，回滚前须确认业务影响。
+diff --git a/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUpload.java b/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUpload.java
+new file mode 100644
+index 0000000..569e8d5
+--- /dev/null
++++ b/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUpload.java
+@@ -0,0 +1,79 @@
++package com.et.cloud.controller;
++
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Service;
++import javax.annotation.PreDestroy;
++import java.io.*;
++import java.nio.charset.*;
++import java.nio.file.*;
++import java.time.Clock;
++import java.util.*;
++import java.util.concurrent.*;
++
++/** Process-local upload sessions. Temporary content never becomes visible as a personal file. */
++@Service
++class AgentPersonalFileUpload {
++ static final long MAX = 50L * 1024 * 1024;
++ static final int PART = 1024 * 1024;
++ static final long TTL = 60L * 60 * 1000;
++ private final AgentPersonalFileStore store;
++ private final Path dir;
++ private final Clock clock;
++ private final ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<>();
++ private final ScheduledExecutorService cleaner = Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "personal-upload-cleaner"); t.setDaemon(true); return t; });
++ static class Session {
++  final long user, size; final String path, mode, version; final Path temp;
++  long offset, touched; boolean closed;
++  Session(long user, long size, String path, String mode, String version, Path temp, long now) { this.user=user; this.size=size; this.path=path; this.mode=mode; this.version=version; this.temp=temp; this.touched=now; }
++ }
++ @org.springframework.beans.factory.annotation.Autowired
++ AgentPersonalFileUpload(AgentPersonalFileStore store, @Value("${agent.upload-temp-root:tmp/agent-upload-sessions}") String dir) { this(store, Path.of(dir)); }
++ AgentPersonalFileUpload(AgentPersonalFileStore store, Path dir) { this(store, dir, Clock.systemUTC()); }
++ AgentPersonalFileUpload(AgentPersonalFileStore store, Path dir, Clock clock) {
++  this.store=store; this.dir=dir.toAbsolutePath().normalize(); this.clock=clock;
++  try { Files.createDirectories(this.dir); if (Files.isSymbolicLink(this.dir)) throw new IOException();
++   try (DirectoryStream<Path> files = Files.newDirectoryStream(this.dir, "upload-*.tmp")) { for (Path p : files) Files.deleteIfExists(p); }
++  } catch (IOException e) { throw new IllegalStateException("Upload storage unavailable"); }
++  cleaner.scheduleWithFixedDelay(this::expire, 1, 1, TimeUnit.MINUTES);
++ }
++ String begin(long user, String path, String mode, long size) {
++  if (user < 1 || size < 0 || size > MAX || !Set.of("create", "overwrite", "append").contains(mode)) throw new IllegalArgumentException("Invalid upload");
++  // The store validates the path and captures the exact version for non-create writes.
++  String version = "create".equals(mode) ? null : store.version(user, path);
++  if ("create".equals(mode)) store.validatePath(user, path);
++  try { Path temp=Files.createTempFile(dir, "upload-", ".tmp"); String id=UUID.randomUUID().toString();
++   sessions.put(id, new Session(user,size,path,mode,version,temp,clock.millis())); return id;
++  } catch (IOException e) { throw new IllegalStateException("Upload storage unavailable"); }
++ }
++ private Session session(long user, String id) {
++  Session s = id == null ? null : sessions.get(id);
++  if (s == null || s.user != user) throw new IllegalArgumentException("Upload unavailable");
++  return s;
++ }
++ void part(long user, String id, long offset, InputStream input) {
++  Session s=session(user,id); synchronized(s) {
++   check(s,id); if (offset != s.offset || input == null || s.offset >= s.size) throw new IllegalArgumentException("Invalid upload segment");
++   long count=0;
++   try (OutputStream out=Files.newOutputStream(s.temp, StandardOpenOption.APPEND)) {
++    byte[] buffer=new byte[8192]; int n;
++    while ((n=input.read(buffer)) != -1) { if (n == 0) continue; count+=n; if (count > PART || count > s.size-s.offset) throw new IllegalArgumentException("Invalid upload segment"); out.write(buffer,0,n); }
++    if (count == 0) throw new IllegalArgumentException("Invalid upload segment");
++    s.offset+=count; s.touched=clock.millis();
++   } catch (IOException | RuntimeException e) { discard(id,s); throw new IllegalArgumentException("Upload segment failed"); }
++  }
++ }
++ AgentPersonalFileStore.WriteResult commit(long user, String id) {
++  Session s=session(user,id); synchronized(s) {
++   check(s,id); if (s.offset != s.size) { discard(id,s); throw new IllegalArgumentException("Incomplete upload"); }
++   try (Reader in = new InputStreamReader(Files.newInputStream(s.temp), StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT))) {
++    return store.write(user,s.path,in,s.mode,s.version);
++   } catch (IOException e) { throw new IllegalArgumentException("Invalid upload content"); }
++   finally { discard(id,s); }
++  }
++ }
++ void cancel(long user,String id) { Session s=session(user,id); synchronized(s) { check(s,id); discard(id,s); } }
++ private void check(Session s,String id) { if (s.closed || clock.millis()-s.touched >= TTL) { discard(id,s); throw new IllegalArgumentException("Upload unavailable"); } }
++ private void discard(String id,Session s) { s.closed=true; try { Files.deleteIfExists(s.temp); sessions.remove(id,s); } catch (IOException e) { throw new IllegalStateException("Upload cleanup failed"); } }
++ void expire() { long now=clock.millis(); sessions.forEach((id,s) -> { synchronized(s) { if (s.closed || now-s.touched >= TTL) { try { discard(id,s); } catch (RuntimeException ignored) { /* retry at shutdown or startup */ } } } }); }
++ @PreDestroy void close() { cleaner.shutdownNow(); sessions.forEach((id,s) -> { synchronized(s) { discard(id,s); } }); }
++}
+diff --git a/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUploadController.java b/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUploadController.java
+new file mode 100644
+index 0000000..45a3e47
+--- /dev/null
++++ b/cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUploadController.java
+@@ -0,0 +1,29 @@
++package com.et.cloud.controller;
++import com.et.cloud.commen.BaseResponse;
++import com.et.cloud.commen.ResultUtils;
++import com.et.cloud.service.UserService;
++import org.springframework.web.bind.annotation.*;
++import javax.servlet.http.HttpServletRequest;
++import java.io.IOException;
++import java.util.Map;
++@RestController
++@RequestMapping("/agent/personal-file-uploads")
++public class AgentPersonalFileUploadController {
++ private final UserService users; private final AgentPersonalFileUpload uploads;
++ public AgentPersonalFileUploadController(UserService users, AgentPersonalFileUpload uploads) { this.users=users; this.uploads=uploads; }
++ public static class Begin { public String path; public String mode; public long size; }
++ @PostMapping public BaseResponse<Map<String,String>> begin(@RequestBody Begin body, HttpServletRequest request) {
++  long user=users.getLoginUser(request).getId();
++  if (body == null) throw new IllegalArgumentException("Invalid upload");
++  return ResultUtils.success(Map.of("uploadId",uploads.begin(user,body.path,body.mode,body.size)));
++ }
++ @PutMapping(value="/{id}/segments", consumes="application/octet-stream") public BaseResponse<Boolean> part(@PathVariable String id, @RequestParam long offset, HttpServletRequest request) throws IOException {
++  long user=users.getLoginUser(request).getId(); uploads.part(user,id,offset,request.getInputStream()); return ResultUtils.success(true);
++ }
++ @PostMapping("/{id}/commit") public BaseResponse<Map<String,Object>> commit(@PathVariable String id,HttpServletRequest request) {
++  long user=users.getLoginUser(request).getId(); AgentPersonalFileStore.WriteResult result=uploads.commit(user,id); return ResultUtils.success(Map.of("bytes",result.bytes,"verified",result.verified));
++ }
++ @DeleteMapping("/{id}") public BaseResponse<Boolean> cancel(@PathVariable String id,HttpServletRequest request) {
++  long user=users.getLoginUser(request).getId(); uploads.cancel(user,id); return ResultUtils.success(true);
++ }
++}
+diff --git a/cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileUploadTest.java b/cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileUploadTest.java
+new file mode 100644
+index 0000000..0669a29
+--- /dev/null
++++ b/cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileUploadTest.java
+@@ -0,0 +1,70 @@
++package com.et.cloud.controller;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.io.TempDir;
++import java.io.*;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.*;
++import java.time.*;
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.Mockito.*;
++class AgentPersonalFileUploadTest {
++ @TempDir Path root;
++ static InputStream bytes(String s) { return new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8)); }
++ @Test void modesIsolationAndOrder() throws Exception {
++  AgentPersonalFileStore store=new AgentPersonalFileStore(root.resolve("files"));
++  AgentPersonalFileUpload upload=new AgentPersonalFileUpload(store,root.resolve("uploads"));
++  String id=upload.begin(7,"a","create",3); final String initial=id;
++  assertThrows(IllegalArgumentException.class,()->upload.part(8,initial,0,bytes("x")));
++  upload.part(7,id,0,bytes("abc"));
++  assertThrows(IllegalArgumentException.class,()->upload.part(7,initial,0,bytes("x")));
++  assertThrows(IllegalArgumentException.class,()->upload.commit(8,initial));
++  upload.commit(7,id); assertEquals("abc",store.read(7,"a"));
++  id=upload.begin(7,"a","overwrite",3); upload.part(7,id,0,bytes("中")); upload.commit(7,id);
++  id=upload.begin(7,"a","append",1); upload.part(7,id,0,bytes("!")); upload.commit(7,id);
++  assertEquals("中!",store.read(7,"a")); upload.close();
++ }
++ @Test void invalidIncompleteConflictDisconnectAndCancelPreserveOriginal() throws Exception {
++  AgentPersonalFileStore store=new AgentPersonalFileStore(root.resolve("files")); store.write(7,"a","original","create");
++  Path dir=root.resolve("uploads"); AgentPersonalFileUpload upload=new AgentPersonalFileUpload(store,dir);
++  assertThrows(IllegalArgumentException.class,()->upload.begin(7,"../escape","create",1));
++  assertThrows(IllegalArgumentException.class,()->upload.begin(7,"a","overwrite",AgentPersonalFileUpload.MAX+1));
++  String invalid=upload.begin(7,"a","overwrite",2); upload.part(7,invalid,0,new ByteArrayInputStream(new byte[]{(byte)0xc3,0x28}));
++  assertThrows(RuntimeException.class,()->upload.commit(7,invalid));
++  String incomplete=upload.begin(7,"a","overwrite",2); upload.part(7,incomplete,0,bytes("x")); assertThrows(IllegalArgumentException.class,()->upload.commit(7,incomplete));
++  String conflict=upload.begin(7,"a","overwrite",1); upload.part(7,conflict,0,bytes("x")); store.write(7,"a","changed","overwrite");
++  assertThrows(IllegalStateException.class,()->upload.commit(7,conflict)); assertEquals("changed",store.read(7,"a"));
++  String cancel=upload.begin(7,"a","overwrite",1); upload.cancel(7,cancel);
++  String broken=upload.begin(7,"a","overwrite",1); InputStream fail=new InputStream(){ public int read() throws IOException { throw new IOException("disconnect"); }};
++  assertThrows(IllegalArgumentException.class,()->upload.part(7,broken,0,fail));
++  try (java.util.stream.Stream<Path> paths=Files.list(dir)) { assertEquals(0,paths.count()); } upload.close();
++ }
++ @Test void commitsFullFiftyMiBInBoundedParts() throws Exception {
++  AgentPersonalFileStore store=new AgentPersonalFileStore(root.resolve("files")); AgentPersonalFileUpload upload=new AgentPersonalFileUpload(store,root.resolve("uploads"));
++  String id=upload.begin(7,"large","create",AgentPersonalFileUpload.MAX); byte[] block=new byte[AgentPersonalFileUpload.PART]; java.util.Arrays.fill(block,(byte)'x');
++  for(int i=0;i<50;i++) upload.part(7,id,(long)i*block.length,new ByteArrayInputStream(block));
++  assertEquals(AgentPersonalFileUpload.MAX,upload.commit(7,id).bytes);
++  try(InputStream in=Files.newInputStream(root.resolve("files/7/large"))) { byte[] got=new byte[8192]; long total=0; int n; while((n=in.read(got))!=-1) { for(int i=0;i<n;i++) assertEquals('x',got[i]); total+=n; } assertEquals(AgentPersonalFileUpload.MAX,total); } upload.close();
++ }
++ @Test void expiredSessionIsRemoved() throws Exception {
++  class MutableClock extends Clock { long now; public ZoneId getZone(){return ZoneOffset.UTC;} public Clock withZone(ZoneId z){return this;} public Instant instant(){return Instant.ofEpochMilli(now);} }
++  MutableClock clock=new MutableClock(); Path dir=root.resolve("uploads"); AgentPersonalFileUpload upload=new AgentPersonalFileUpload(new AgentPersonalFileStore(root.resolve("files")),dir,clock);
++  String id=upload.begin(1,"x","create",1); clock.now=AgentPersonalFileUpload.TTL; upload.expire();
++  assertThrows(IllegalArgumentException.class,()->upload.commit(1,id)); try(java.util.stream.Stream<Path> p=Files.list(dir)){assertEquals(0,p.count());} upload.close();
++ }
++ @Test void oversizedSegmentAndCommitFailureLeaveOriginalAndRemoveTemporaryFiles() throws Exception {
++  Path files=root.resolve("files"), dir=root.resolve("uploads"); AgentPersonalFileStore normal=new AgentPersonalFileStore(files); normal.write(3,"a","original","create");
++  AgentPersonalFileStore failing=new AgentPersonalFileStore(files,(source,target)->{throw new IOException("injected");});
++  AgentPersonalFileUpload upload=new AgentPersonalFileUpload(failing,dir);
++  String oversized=upload.begin(3,"a","overwrite",AgentPersonalFileUpload.PART+1);
++  assertThrows(IllegalArgumentException.class,()->upload.part(3,oversized,0,new ByteArrayInputStream(new byte[AgentPersonalFileUpload.PART+1])));
++  String commit=upload.begin(3,"a","overwrite",1); upload.part(3,commit,0,bytes("x")); assertThrows(IllegalStateException.class,()->upload.commit(3,commit));
++  assertEquals("original",normal.read(3,"a")); try(java.util.stream.Stream<Path> p=Files.list(dir)){assertEquals(0,p.count());} upload.close();
++ }
++ @Test void controllerChecksLoginOnEveryOperation() throws Exception {
++  com.et.cloud.service.UserService users=mock(com.et.cloud.service.UserService.class); javax.servlet.http.HttpServletRequest request=mock(javax.servlet.http.HttpServletRequest.class);
++  AgentPersonalFileUpload upload=new AgentPersonalFileUpload(new AgentPersonalFileStore(root.resolve("files")),root.resolve("uploads"));
++  AgentPersonalFileUploadController c=new AgentPersonalFileUploadController(users,upload); when(users.getLoginUser(request)).thenThrow(new IllegalStateException("login"));
++  assertThrows(IllegalStateException.class,()->c.begin(new AgentPersonalFileUploadController.Begin(),request));
++  assertThrows(IllegalStateException.class,()->c.part("x",0,request)); assertThrows(IllegalStateException.class,()->c.commit("x",request)); assertThrows(IllegalStateException.class,()->c.cancel("x",request)); verify(users,times(4)).getLoginUser(request); upload.close();
++ }
++}

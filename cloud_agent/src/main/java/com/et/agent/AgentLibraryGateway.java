@@ -7,6 +7,8 @@ public interface AgentLibraryGateway {
     String createCode(String userId, String definition);
     String writeFile(String userId, String path, String content, String mode);
     String readFile(String userId, String path);
+    default String readFileSegment(String userId, String path, String cursor) { throw new UnsupportedOperationException(); }
+    default String searchFile(String userId, String path, String query, String cursor) { throw new UnsupportedOperationException(); }
     String writeWikiDocument(String userId, String spaceId, String title, String content);
 
     default String createWikiFolder(String userId, String spaceId, String taskName) {

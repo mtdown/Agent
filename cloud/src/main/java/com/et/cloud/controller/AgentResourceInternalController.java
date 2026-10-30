@@ -68,12 +68,69 @@ public final class AgentResourceInternalController {
     }
 
     @GetMapping("/files")
-    public BaseResponse<Map<String, String>> readFile(
+    public BaseResponse<Map<String, Object>> readFile(
             @RequestHeader(value = "X-Agent-Key", required = false) String key,
             @RequestParam String userId, @RequestParam String path) {
         long user = requireUser(key, userId);
-        try { return ResultUtils.success(Map.of("path", path, "content", files.read(user, path))); }
-        catch (IllegalArgumentException e) { throw new BusinessException(ErrorCode.PARAMS_ERROR, e.getMessage()); }
+        try {
+            String content = files.read(user, path);
+            if (com.fasterxml.jackson.core.io.JsonStringEncoder.getInstance().quoteAsString(content).length > 8000) return ResultUtils.success(Map.of("path", path, "message", "File is large; use read_file_segment for bounded reading."));
+            AgentPersonalFileStore.Segment segment = files.segment(user, path, null, 1024 * 1024);
+            if (segment.next != null || !segment.text.equals(content))
+                throw new IllegalStateException("Personal file version conflict");
+            return ResultUtils.success(Map.of("path", path, "content", content, "referenceEvidence",
+                    java.util.List.of(AgentPersonalFileEvidence.issue(secret, user, path, segment.version, 0,
+                            segment.text.getBytes(StandardCharsets.UTF_8).length))));
+        } catch (IllegalArgumentException e) {
+            if ("File content exceeds 1 MiB".equals(e.getMessage()))
+                return ResultUtils.success(Map.of("path", path, "message", "File is large; use read_file_segment for bounded reading."));
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "Invalid personal file request");
+        }
+    }
+
+    @GetMapping("/files/segment")
+    public BaseResponse<Map<String, Object>> readSegment(
+            @RequestHeader(value = "X-Agent-Key", required = false) String key,
+            @RequestParam String userId, @RequestParam String path,
+            @RequestParam(required = false) String cursor) {
+        long user = requireUser(key, userId);
+        try {
+            AgentPersonalFileStore.Segment result = files.segment(user, path, AgentPersonalFileStore.decodeCursor(cursor, secret), 1024);
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("text", result.text); data.put("version", result.version); data.put("start", result.start);
+            data.put("referenceEvidence", java.util.List.of(AgentPersonalFileEvidence.issue(secret, user, path,
+                    result.version, result.start, result.start + result.text.getBytes(StandardCharsets.UTF_8).length)));
+            data.put("next", AgentPersonalFileStore.encodeCursor(result.next, secret));
+            return ResultUtils.success(data);
+        } catch (IllegalArgumentException e) { throw new BusinessException(ErrorCode.PARAMS_ERROR, "Invalid personal file request"); }
+        catch (IllegalStateException e) { throw fileFailure(e); }
+    }
+
+    @GetMapping("/files/search")
+    public BaseResponse<Map<String, Object>> searchFile(
+            @RequestHeader(value = "X-Agent-Key", required = false) String key,
+            @RequestParam String userId, @RequestParam String path, @RequestParam String query,
+            @RequestParam(required = false) String cursor) {
+        long user = requireUser(key, userId);
+        try {
+            AgentPersonalFileStore.SearchResult result = files.search(user, path, query, AgentPersonalFileStore.decodeCursor(cursor, secret), 4096, 20);
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("offsets", result.offsets); data.put("version", result.version);
+            java.util.List<String> evidence = new java.util.ArrayList<>();
+            long queryBytes = query.getBytes(StandardCharsets.UTF_8).length;
+            for (long offset : result.offsets)
+                evidence.add(AgentPersonalFileEvidence.issue(secret, user, path, result.version, offset, offset + queryBytes));
+            data.put("referenceEvidence", evidence);
+            data.put("next", AgentPersonalFileStore.encodeCursor(result.next, secret));
+            return ResultUtils.success(data);
+        } catch (IllegalArgumentException e) { throw new BusinessException(ErrorCode.PARAMS_ERROR, "Invalid personal file request"); }
+        catch (IllegalStateException e) { throw fileFailure(e); }
+    }
+
+    private BusinessException fileFailure(IllegalStateException e) {
+        if ("Personal file version conflict".equals(e.getMessage()))
+            return new BusinessException(ErrorCode.PARAMS_ERROR, "Personal file version conflict");
+        return new BusinessException(ErrorCode.OPERATION_ERROR, "Personal file operation failed");
     }
 
     @PostMapping("/wiki-documents")

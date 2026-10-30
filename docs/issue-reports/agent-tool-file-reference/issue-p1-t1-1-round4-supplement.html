@@ -1,0 +1,46 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>第4轮补证对照</title><style>body{font:16px sans-serif;line-height:1.6;margin:2rem}table{border-collapse:collapse;width:100%;table-layout:fixed}td,th{border:1px solid #888;padding:1rem;vertical-align:top;overflow-wrap:anywhere}th{background:#eee}pre{white-space:pre-wrap}</style><h1>第4轮补证对照</h1><p>ATFR-P1-T1.1-R4-001 / 002；实际投影，未运行浏览器。详见 <a href="issue-p1-t1-1-round4-supplement.md">报告</a> 和 <a href="evidence-p1-t1-1-round4-supplement-probe.java">完整探针</a>。</p><table><thead><tr><th>实际输入与观察</th><th>比较依据与证据</th></tr></thead><tbody><tr><td>文件夹成功事件；无文档事件。实际 kind=wiki_partial_result；答复“文档尚未保存”，模板“文档未保存”。</td><td>事件未包含文档保存操作；核对提示是否准确描述已执行操作。</td></tr><tr><td>create_wiki_document saved=false；write_wiki_document status=blocked。内部 operations 保留两条；公开 results=[]、failed=2，答复两次“另有写入未成功”。</td><td>对照内部两条操作记录：公开结果不含工具名或逐项状态；是否需要展示由负责人决定。</td></tr></tbody></table><details><summary>受控探针输入及断言</summary><pre>package com.et.cloud.controller;
+import com.et.cloud.model.entity.User;
+import com.et.cloud.service.impl.AgentWikiCreationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.transaction.AfterTransaction;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.NONE) @ActiveProfiles(&quot;local&quot;) @Transactional
+class Round4SupplementProbeTest {
+ @Autowired JdbcTemplate jdbc; @Autowired AgentWikiChoiceService choices; @Autowired AgentWikiCreationService creation; @Autowired AgentConversationStore conversations;
+ final String account=&quot;r4-probe-&quot;+UUID.randomUUID(); final ObjectMapper json=new ObjectMapper();
+ void event(AgentWikiChoiceProjection p,String name,Object result) throws Exception {p.project(&quot;wiki_tool_event&quot;,json.readTree(&quot;{\&quot;name\&quot;:\&quot;&quot;+name+&quot;\&quot;,\&quot;result\&quot;:&quot;+json.writeValueAsString(result)+&quot;}&quot;));}
+ @Test void verifyPairingAndObservations() throws Exception {
+  jdbc.update(&quot;INSERT INTO user(userAccount,userPassword,userRole,isDelete) VALUES(?,?,?,0)&quot;,account,&quot;test-only&quot;,&quot;user&quot;);
+  User u=new User(); u.setId(jdbc.queryForObject(&quot;SELECT LAST_INSERT_ID()&quot;,Long.class));
+  jdbc.update(&quot;INSERT INTO wiki_space(type,name,ownerUserId,isDelete) VALUES(0,?,?,0)&quot;,&quot;Probe&quot;,u.getId()); String space=jdbc.queryForObject(&quot;SELECT LAST_INSERT_ID()&quot;,String.class);
+  var a=creation.createFolder(u.getId(),space,&quot;FolderAlpha&quot;); var b=creation.createFolder(u.getId(),space,&quot;FolderBeta&quot;);
+  for(boolean same:new boolean[]{false,true}) {
+   var d1=creation.createDocument(u.getId(),space,a.folderId,same?&quot;SameOne&quot;:&quot;CrossOne&quot;, &quot;BodyOne&quot;);
+   var d2=creation.createDocument(u.getId(),space,same?a.folderId:b.folderId,same?&quot;SameTwo&quot;:&quot;CrossTwo&quot;, &quot;BodyTwo&quot;);
+   long c=conversations.create(u.getId()); long t=conversations.begin(u.getId(),c,&quot;probe&quot;,&quot;OFF&quot;,&quot;{}&quot;);
+   var p=new AgentWikiChoiceProjection(choices,u,c,t); event(p,&quot;create_wiki_folder&quot;,a); event(p,&quot;create_wiki_folder&quot;,b); event(p,&quot;create_wiki_document&quot;,d1); event(p,&quot;create_wiki_document&quot;,d2);
+   String internal=p.interactionJson(); var live=p.displayInteraction(internal);
+   conversations.complete(u.getId(),c,t,p.displayAnswer(),&quot;[]&quot;,&quot;{}&quot;,internal);
+   var row=conversations.messages(u.getId(),c).stream().filter(x-&gt;&quot;assistant&quot;.equals(x.get(&quot;role&quot;))).findFirst().orElseThrow(); var history=(Map&lt;?,?&gt;)row.get(&quot;interaction&quot;);
+   for(var display:List.of(live,history)) {
+    var results=(List&lt;?&gt;)display.get(&quot;results&quot;); assertEquals(4,results.size());
+    for(int i=0;i&lt;2;i++) {var item=(Map&lt;?,?&gt;)results.get(i); String title=i==0?(same?&quot;SameOne&quot;:&quot;CrossOne&quot;):(same?&quot;SameTwo&quot;:&quot;CrossTwo&quot;); String folder=i==0||same?a.name:b.name; String body=i==0?&quot;BodyOne&quot;:&quot;BodyTwo&quot;;
+     assertEquals(title,item.get(&quot;documentTitle&quot;)); assertEquals(folder,item.get(&quot;folderName&quot;)); String token=(String)item.get(&quot;openToken&quot;); assertNotNull(token); assertFalse(token.isBlank()); assertEquals(body,choices.preview(u,c,t,token).get(&quot;content&quot;));
+     System.out.println(&quot;PAIR &quot; +(same?&quot;same&quot;:&quot;cross&quot;)+&quot; &quot;+title+&quot; -&gt; &quot;+folder+&quot; -&gt; token -&gt; &quot;+body);
+    }
+    String shown=String.valueOf(display); assertFalse(shown.contains(d1.documentId)); assertFalse(shown.contains(d2.documentId));
+   }
+  }
+  var p=new AgentWikiChoiceProjection(choices,u,1,2); event(p,&quot;create_wiki_folder&quot;,a); System.out.println(&quot;FOLDER_ONLY=&quot;+p.displayAnswer()+&quot; DISPLAY=&quot;+p.displayInteraction(p.interactionJson()));
+  var f=new AgentWikiChoiceProjection(choices,u,1,2); event(f,&quot;create_wiki_document&quot;,Map.of(&quot;saved&quot;,false)); event(f,&quot;write_wiki_document&quot;,Map.of(&quot;status&quot;,&quot;blocked&quot;)); System.out.println(&quot;FAIL_INTERNAL=&quot;+f.interactionJson()); System.out.println(&quot;FAIL_PUBLIC=&quot;+f.displayInteraction(f.interactionJson())+&quot; ANSWER=&quot;+f.displayAnswer());
+ }
+ @AfterTransaction void rollbackVerified(){assertEquals(0,jdbc.queryForObject(&quot;SELECT COUNT(*) FROM user WHERE userAccount=?&quot;,Integer.class,account)); System.out.println(&quot;ROLLBACK VERIFIED account count=0&quot;);}
+}
+</pre></details></html>

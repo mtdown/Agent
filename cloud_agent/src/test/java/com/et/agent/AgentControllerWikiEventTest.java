@@ -36,15 +36,21 @@ class AgentControllerWikiEventTest {
             @Override public AgentLoop.Turn stream(List<AgentLoop.Message> history, Set<String> names,
                                                    java.util.function.Consumer<String> delta,
                                                    java.util.function.BooleanSupplier cancelled) {
-                switch (turn.getAndIncrement()) {
-                    case 0: return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("1", "create_wiki_folder",
-                            "{\"spaceId\":\"11\",\"taskName\":\"任务\"}")), null);
-                    case 1: return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("2", "create_wiki_document",
-                            "{\"spaceId\":\"11\",\"folderId\":\"21\",\"content\":\"正文\"}")), null);
-                    default:
-                        delta.accept("已保存 documentId: 31");
-                        return new AgentLoop.Turn(List.of(), null);
-                }
+                try {
+                    var json=new com.fasterxml.jackson.databind.ObjectMapper();
+                    switch (turn.getAndIncrement()) {
+                        case 0: return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("0", "list_writable_wiki_locations", "{}")), null);
+                        case 1: {
+                            String space=json.readTree(history.get(history.size()-1).content).path("spaces").get(0).path("id").asText();
+                            return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("1", "create_wiki_folder",json.writeValueAsString(Map.of("spaceId",space,"taskName","任务")))),null);
+                        }
+                        case 2: {
+                            var folder=json.readTree(history.get(history.size()-1).content);
+                            return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("2", "create_wiki_document",json.writeValueAsString(Map.of("spaceId",folder.path("spaceId").asText(),"folderId",folder.path("folderId").asText(),"content","正文")))),null);
+                        }
+                        default: delta.accept("已保存"); return new AgentLoop.Turn(List.of(), null);
+                    }
+                } catch(Exception e) {throw new RuntimeException(e);}
             }
         };
         AgentController controller = new AgentController(new AgentLoop(model, Map.of(), 6, 10_000, 10_000),
@@ -54,7 +60,8 @@ class AgentControllerWikiEventTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         controller.stream("secret", ask).writeTo(out);
         String frames = out.toString(StandardCharsets.UTF_8.name());
-        assertEquals(2, frames.split("event: wiki_tool_event", -1).length - 1);
+        assertEquals(3, frames.split("event: wiki_tool_event", -1).length - 1);
+        assertTrue(frames.contains("\"documentId\":\"31\""));
         assertFalse(frames.contains("event: delta"));
         assertTrue(frames.contains("event: done"));
     }

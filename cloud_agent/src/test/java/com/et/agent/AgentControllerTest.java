@@ -89,7 +89,11 @@ class AgentControllerTest {
                     assertTrue(history.stream().anyMatch(message -> "tool".equals(message.role)
                             && message.content.contains("9007199254740994")));
                     return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("c2", "create_skill",
-                            "{\"definition\":{\"name\":\"Example\"}}")), null);
+                            "{\"definition\":{\"name\":\"Example\",\"summary\":\"Example\","
+                            + "\"when_to_use\":\"When asked\",\"when_not_to_use\":\"Otherwise\","
+                            + "\"parameters\":[],\"steps\":[{\"type\":\"response\",\"template\":\"Hello\"}],"
+                            + "\"expected_results\":[\"Hello\"],\"failure_policy\":\"stop\","
+                            + "\"examples\":[{\"input\":{},\"expected\":\"Hello\"}]}}")), null);
                 }
                 assertTrue(history.stream().anyMatch(message -> "tool".equals(message.role)
                         && message.content.contains("9007199254740993")));

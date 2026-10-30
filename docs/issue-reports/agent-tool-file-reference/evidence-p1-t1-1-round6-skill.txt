@@ -1,0 +1,48 @@
+Workspace: C:\Users\origin\IdeaProjects\Agent
+Commands from workspace:
+$dir = Join-Path $env:TEMP agent-skill-probe-r6-10129
+$j = "$env:USERPROFILE\.m2\repository\com\fasterxml\jackson\core"
+$deps = "$j\jackson-databind\2.15.3\jackson-databind-2.15.3.jar;$j\jackson-core\2.15.3\jackson-core-2.15.3.jar;$j\jackson-annotations\2.15.3\jackson-annotations-2.15.3.jar"
+javac -encoding UTF-8 -cp "cloud_agent/target/classes;$deps" -d $dir "$dir\SkillProbe.java"
+java -cp "$dir;cloud_agent/target/classes;$deps" SkillProbe
+javac -encoding UTF-8 -cp "cloud/target/classes;$deps" -d $dir "$dir\ValidateProbe.java"
+java -cp "$dir;cloud/target/classes;$deps" ValidateProbe
+SkillProbe.java:
+import com.et.agent.AgentLoop;
+import com.fasterxml.jackson.databind.*;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+public class SkillProbe {
+ public static void main(String[] a) throws Exception {
+  ObjectMapper json=new ObjectMapper(); AtomicInteger turn=new AtomicInteger(), writes=new AtomicInteger();
+  String definition="{\"name\":\"Custom wiki\",\"summary\":\"Save\",\"when_to_use\":\"Save\",\"when_not_to_use\":\"Other\",\"parameters\":[],\"steps\":[{\"type\":\"tool\",\"tool\":\"write_wiki_document\",\"args\":{\"spaceId\":\"123456789\",\"taskName\":\"Task\",\"title\":\"Title\",\"content\":\"Body\"}}],\"expected_results\":[\"Saved\"],\"failure_policy\":\"stop\",\"examples\":[{\"input\":{},\"expected\":\"Saved\"}]}";
+  System.out.println("INPUT_USER_DEFINED_SKILL="+definition);
+  Map<String,AgentLoop.Tool> tools=new HashMap<>();
+  tools.put("get_skill", args->{System.out.println("GET_SKILL_ARGS="+args); return "{\"id\":\"1\",\"version\":1,\"definition\":"+definition+"}";});
+  tools.put("write_wiki_document", args->{writes.incrementAndGet(); System.out.println("FAKE_WRITE_EXECUTED="+args); return "{\"saved\":true}";});
+  AgentLoop.Model model=(history,delta,cancelled)->{int n=turn.getAndIncrement(); try {
+   if(n==0) return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("1","get_skill","{\"id\":\"1\",\"version\":1}")),null);
+   AgentLoop.Message last=history.get(history.size()-1); System.out.println("MODEL_HISTORY_TOOL_RESULT_"+n+"="+last.content);
+   if(n==1) { JsonNode step=json.readTree(last.content).path("definition").path("steps").get(0); System.out.println("MODEL_SEES_RAW_SPACE_ID="+step.path("args").path("spaceId").asText().equals("123456789")); return new AgentLoop.Turn(List.of(new AgentLoop.ToolCall("2",step.path("tool").asText(),step.path("args").toString())),null); }
+   return new AgentLoop.Turn(Collections.emptyList(),null);
+  } catch(Exception e) {throw new RuntimeException(e);} };
+  AgentLoop loop=new AgentLoop(model,tools,4,10000,10000); AgentLoop.Result result=loop.run("Use my authorized custom skill",x->{},()->false);
+  System.out.println("FAKE_WRITE_COUNT="+writes.get()); System.out.println("WIKI_EVENT="+result.wikiEvents.get(0).result);
+ }
+}
+ValidateProbe.java:
+import com.et.cloud.controller.AgentSkillDefinitionValidator;
+public class ValidateProbe {
+ public static void main(String[] args) { String d="{\"name\":\"Custom wiki\",\"summary\":\"Save\",\"when_to_use\":\"Save\",\"when_not_to_use\":\"Other\",\"parameters\":[],\"steps\":[{\"type\":\"tool\",\"tool\":\"write_wiki_document\",\"args\":{\"spaceId\":\"123456789\",\"taskName\":\"Task\",\"title\":\"Title\",\"content\":\"Body\"}}],\"expected_results\":[\"Saved\"],\"failure_policy\":\"stop\",\"examples\":[{\"input\":{},\"expected\":\"Saved\"}]}"; System.out.println("VALIDATOR_ACCEPTS="+(new AgentSkillDefinitionValidator().validate(d,(id,v,e)->false)!=null)); }
+}
+Outputs:
+INPUT_USER_DEFINED_SKILL={"name":"Custom wiki","summary":"Save","when_to_use":"Save","when_not_to_use":"Other","parameters":[],"steps":[{"type":"tool","tool":"write_wiki_document","args":{"spaceId":"123456789","taskName":"Task","title":"Title","content":"Body"}}],"expected_results":["Saved"],"failure_policy":"stop","examples":[{"input":{},"expected":"Saved"}]}
+GET_SKILL_ARGS={"id":"1","version":1}
+MODEL_HISTORY_TOOL_RESULT_1={"id":"1","version":1,"definition":{"name":"Custom wiki","summary":"Save","when_to_use":"Save","when_not_to_use":"Other","parameters":[],"steps":[{"type":"tool","tool":"write_wiki_document","args":{"spaceId":"123456789","taskName":"Task","title":"Title","content":"Body"}}],"expected_results":["Saved"],"failure_policy":"stop","examples":[{"input":{},"expected":"Saved"}]}}
+MODEL_SEES_RAW_SPACE_ID=true
+MODEL_HISTORY_TOOL_RESULT_2={"saved":false,"error":"Invalid or expired Wiki location reference"}
+FAKE_WRITE_COUNT=0
+WIKI_EVENT={"saved":false,"error":"Invalid or expired Wiki location reference"}
+SkillProbe exit=0
+VALIDATOR_ACCEPTS=true
+ValidateProbe exit=0

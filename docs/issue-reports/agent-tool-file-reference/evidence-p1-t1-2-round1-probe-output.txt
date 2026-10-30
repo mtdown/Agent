@@ -1,0 +1,8 @@
+Gateway is an in-memory proxy; no actual write or network access.
+case=root-array input=[]
+exception=java.lang.IllegalArgumentException message=Invalid tool arguments
+fake_gateway_calls=0
+case=trailing-invalid-json input={"path":"x","content":"x","mode":"create"} trailing
+tool_result={"saved":true}
+loop=completed
+fake_gateway_calls=1

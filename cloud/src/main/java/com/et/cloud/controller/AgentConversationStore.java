@@ -22,6 +22,10 @@ import java.util.Objects;
 /** All conversation lookups are owner-scoped, including updates and deletes. */
 @Service
 public class AgentConversationStore {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AgentWikiChoiceService choices;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.et.cloud.service.UserService users;
     private final DataSource dataSource;
     private final JdbcTemplate jdbc;
     private final AgentConversationMapper conversations;
@@ -79,14 +83,42 @@ public class AgentConversationStore {
 
     public List<Map<String, Object>> messages(long ownerId, long conversationId) {
         requireOwner(ownerId, conversationId);
-        List<Map<String, Object>> result = messages.listByConversation(conversationId);
-        for (Map<String, Object> row : result) {
-            Object internal = row.remove("interactionJson");
-            Object consumed = row.remove("choiceConsumed");
-            if (internal != null) {
-                boolean wasConsumed = consumed instanceof Number && ((Number) consumed).intValue() != 0;
-                row.put("interaction", AgentWikiChoiceService.safeDisplay(String.valueOf(internal), wasConsumed));
+        return projectRows(ownerId, messages.listByConversation(conversationId), true);
+    }
+
+    List<Map<String, Object>> messagesRaw(long ownerId, long conversationId) {
+        requireOwner(ownerId, conversationId);
+        return messages.listByConversation(conversationId);
+    }
+
+    private List<Map<String,Object>> projectRows(long ownerId, List<Map<String,Object>> originals, boolean includeInteraction) {
+        List<Map<String,Object>> result=new java.util.ArrayList<>();
+        List<String> inputs=new java.util.ArrayList<>(); List<Boolean> consumed=new java.util.ArrayList<>();
+        for (Map<String,Object> original: originals) {
+            Map<String,Object> row=new java.util.LinkedHashMap<>(original); result.add(row);
+            AgentPersonalFileReferences.project(row);
+            Object raw=row.remove("interactionJson"), used=row.remove("choiceConsumed");
+            if(raw!=null){inputs.add(String.valueOf(raw)); consumed.add(used instanceof Number && ((Number)used).intValue()!=0);}
+        }
+        List<Map<String,Object>> displays = null;
+        if (choices != null && !inputs.isEmpty()) {
+            com.et.cloud.model.entity.User owner=users == null ? null : users.getById(ownerId);
+            if(owner==null){owner=new com.et.cloud.model.entity.User(); owner.setId(ownerId);}
+            displays=choices.currentDisplays(owner,inputs,consumed);
+        }
+        int index=0;
+        for(int i=0;i<originals.size();i++) {
+            Object raw=originals.get(i).get("interactionJson"); if(raw==null) continue;
+            Map<String,Object> row=result.get(i);
+            Map<String,Object> display=displays == null ? AgentWikiChoiceService.safeDisplay(String.valueOf(raw),consumed.get(index)) : displays.get(index);
+            if(includeInteraction) row.put("interaction",display);
+            if(choices!=null && !"destination_choice".equals(display.get("kind"))) {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(String.valueOf(raw));
+                    row.put("content",AgentWikiChoiceService.answerFor(display,state.path("unknown").asInt(),state.path("failed").asInt()));
+                } catch(java.io.IOException e){throw new IllegalStateException("Invalid stored Agent interaction",e);}
             }
+            index++;
         }
         return result;
     }
@@ -133,7 +165,7 @@ public class AgentConversationStore {
 
     public List<Map<String, Object>> recentCompleted(long ownerId, long conversationId) {
         requireOwner(ownerId, conversationId);
-        return messages.recentCompleted(conversationId);
+        return projectRows(ownerId, messages.recentCompleted(conversationId), false);
     }
 
     public void complete(long ownerId, long conversationId, long turnId, String answer, String citationsJson, String statsJson) {

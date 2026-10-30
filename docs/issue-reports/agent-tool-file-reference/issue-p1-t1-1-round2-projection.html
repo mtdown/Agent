@@ -1,0 +1,305 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>ATFR-P1-T1.1-R2-002</title><style>body{font:16px sans-serif;margin:2em} table{width:100%;table-layout:fixed;border-collapse:collapse}td,th{border:1px solid #aaa;vertical-align:top;padding:1em}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>ATFR-P1-T1.1-R2-002：成功文档与后续未知结果同时进入用户可见投影</h1><table><tr><th>实际代码、输入和观察</th><th>预期与证据</th></tr><tr><td><p>受控 SSE 先发送 create_wiki_document 成功（First），再发送 write_wiki_document status=unknown，最后 done。</p><p>流中先输出“写入结果未知，请先核查目标位置”，随后输出 wiki_write_result，documentTitle 为 First；完成回调同时包含未知文本和 wiki_write_result 交互。探针未运行浏览器，也未持久化数据库。</p><details><summary>相关文件全文（路径见正文）</summary><pre>cloud/src/main/java/com/et/cloud/controller/AgentWikiChoiceProjection.java:
+package com.et.cloud.controller;
+
+import com.et.cloud.model.entity.User;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.security.SecureRandom;
+import java.util.Base64;
+
+/** Converts internal Agent Wiki events to safe browser events for one turn. */
+public final class AgentWikiChoiceProjection implements AgentPreviewProxy.WikiEvents {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private final AgentWikiChoiceService choices;
+    private final User owner;
+    private final long conversationId, turnId;
+    private String interactionJson;
+    private String interactionKind;
+    private String spaceId, spaceLabel, folderId, folderName, documentTitle;
+    private boolean wikiWriteAttempted;
+    private boolean wikiWriteUnknown;
+
+    public AgentWikiChoiceProjection(AgentWikiChoiceService choices, User owner, long conversationId, long turnId) {
+        this.choices = choices;
+        this.owner = owner;
+        this.conversationId = conversationId;
+        this.turnId = turnId;
+    }
+
+    @Override public AgentPreviewProxy.PublicEvent project(String event, JsonNode data) {
+        if (&quot;wiki_choice_request&quot;.equals(event)) {
+            if (interactionJson != null) throw new IllegalStateException(&quot;Duplicate Wiki destination choice&quot;);
+            AgentWikiChoiceService.Prepared prepared = choices.prepare(owner, conversationId, turnId, data);
+            interactionJson = prepared.internalJson;
+            interactionKind = &quot;destination_choice&quot;;
+            return new AgentPreviewProxy.PublicEvent(&quot;wiki_choice&quot;, prepared.display);
+        }
+        if (!&quot;wiki_tool_event&quot;.equals(event)) return null;
+        String name = data.path(&quot;name&quot;).asText(&quot;&quot;);
+        if (!&quot;create_wiki_folder&quot;.equals(name) &amp;&amp; !&quot;create_wiki_document&quot;.equals(name)
+                &amp;&amp; !&quot;write_wiki_document&quot;.equals(name)) return null;
+        wikiWriteAttempted = true;
+        JsonNode result = data.path(&quot;result&quot;);
+        if (&quot;unknown&quot;.equals(result.path(&quot;status&quot;).asText())) {
+            wikiWriteUnknown = true;
+            return null;
+        }
+        if (result.path(&quot;saved&quot;).isBoolean() &amp;&amp; !result.path(&quot;saved&quot;).asBoolean()) return null;
+        String spaceId = result.path(&quot;spaceId&quot;).asText(&quot;&quot;);
+        if (!spaceId.matches(&quot;[1-9][0-9]{0,18}&quot;)) return null;
+        String label = choices.displayLabelFor(owner, spaceId);
+        if (&quot;create_wiki_folder&quot;.equals(name)) {
+            String id = result.path(&quot;folderId&quot;).asText(&quot;&quot;);
+            String displayName = result.path(&quot;name&quot;).asText(&quot;&quot;).trim();
+            if (id.matches(&quot;[1-9][0-9]{0,18}&quot;) &amp;&amp; !displayName.isEmpty()) {
+                this.spaceId = spaceId;
+                spaceLabel = label;
+                folderId = id;
+                folderName = displayName;
+            }
+        } else {
+            String id = result.path(&quot;documentId&quot;).asText(&quot;&quot;);
+            String resultFolderId = result.path(&quot;folderId&quot;).asText(&quot;&quot;);
+            String resultFolderName = result.path(&quot;folderName&quot;).asText(&quot;&quot;).trim();
+            String title = result.path(&quot;title&quot;).asText(&quot;&quot;).trim();
+            boolean validFolder = folderId == null
+                    ? resultFolderId.matches(&quot;[1-9][0-9]{0,18}&quot;) &amp;&amp; !resultFolderName.isEmpty()
+                    : folderId.equals(resultFolderId);
+            if (id.matches(&quot;[1-9][0-9]{0,18}&quot;) &amp;&amp; !title.isEmpty() &amp;&amp; validFolder) {
+                this.spaceId = spaceId;
+                spaceLabel = label;
+                if (folderId == null) {
+                    folderId = resultFolderId;
+                    folderName = resultFolderName;
+                }
+                documentTitle = title;
+                byte[] random = new byte[32];
+                RANDOM.nextBytes(random);
+                ObjectNode state = JSON.createObjectNode();
+                state.put(&quot;kind&quot;, &quot;wiki_write_result&quot;);
+                state.put(&quot;ownerId&quot;, owner.getId().toString());
+                state.put(&quot;conversationId&quot;, Long.toString(conversationId));
+                state.put(&quot;turnId&quot;, Long.toString(turnId));
+                state.put(&quot;spaceId&quot;, spaceId);
+                state.put(&quot;documentId&quot;, id);
+                state.put(&quot;spaceLabel&quot;, spaceLabel);
+                state.put(&quot;folderName&quot;, folderName);
+                state.put(&quot;documentTitle&quot;, documentTitle);
+                state.put(&quot;openToken&quot;, Base64.getUrlEncoder().withoutPadding().encodeToString(random));
+                interactionJson = state.toString();
+                interactionKind = &quot;wiki_write_result&quot;;
+            }
+        }
+        return null;
+    }
+
+    @Override public String interactionJson() {
+        if (wikiWriteUnknown &amp;&amp; documentTitle == null &amp;&amp; folderId != null) return null;
+        if (interactionJson == null &amp;&amp; folderId != null &amp;&amp; documentTitle == null) {
+            ObjectNode state = JSON.createObjectNode();
+            state.put(&quot;kind&quot;, &quot;wiki_partial_result&quot;);
+            state.put(&quot;ownerId&quot;, owner.getId().toString());
+            state.put(&quot;conversationId&quot;, Long.toString(conversationId));
+            state.put(&quot;turnId&quot;, Long.toString(turnId));
+            state.put(&quot;spaceId&quot;, spaceId);
+            state.put(&quot;folderId&quot;, folderId);
+            state.put(&quot;spaceLabel&quot;, spaceLabel);
+            state.put(&quot;folderName&quot;, folderName);
+            interactionJson = state.toString();
+            interactionKind = &quot;wiki_partial_result&quot;;
+        }
+        return interactionJson;
+    }
+
+    @Override public String displayAnswer() {
+        if (&quot;destination_choice&quot;.equals(interactionKind)) return &quot;请选择写入空间&quot;;
+        if (wikiWriteUnknown) return (folderName == null ? &quot;&quot; : &quot;已在&quot; + spaceLabel + &quot;创建文件夹「&quot; + folderName + &quot;」。&quot;)
+                + &quot;写入结果未知，请先核查目标位置。&quot;;
+        if (documentTitle != null) return &quot;已在&quot; + spaceLabel +
+                (folderName == null ? &quot;&quot; : &quot;的文件夹「&quot; + folderName + &quot;」&quot;) + &quot;创建文档「&quot; + documentTitle + &quot;」。&quot;;
+        if (folderName != null) return &quot;已在&quot; + spaceLabel + &quot;创建文件夹「&quot; + folderName + &quot;」，文档尚未保存。&quot;;
+        return wikiWriteAttempted ? &quot;文档未保存，请检查请求后重试。&quot; : null;
+    }
+}
+
+
+cloud/src/main/java/com/et/cloud/controller/AgentPreviewProxy.java:
+package com.et.cloud.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.function.BiConsumer;
+
+/** Copies private Agent SSE bytes promptly and closes upstream on browser disconnect. */
+@Component
+public class AgentPreviewProxy {
+    /** The browser only receives the result of projecting internal Wiki events. */
+    public interface WikiEvents {
+        PublicEvent project(String event, JsonNode data);
+        String interactionJson();
+        default String displayAnswer() { return null; }
+    }
+    public static final class PublicEvent {
+        public final String name;
+        public final Object data;
+        public PublicEvent(String name, Object data) { this.name = name; this.data = data; }
+    }
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final String baseUrl, internalKey;
+    public AgentPreviewProxy(@Value(&quot;${agent.base-url:http://127.0.0.1:8124}&quot;) String baseUrl,
+                             @Value(&quot;${agent.internal-key:}&quot;) String internalKey) {
+        this.baseUrl = baseUrl; this.internalKey = internalKey;
+    }
+    public StreamingResponseBody stream(String query) {
+        return stream(java.util.Collections.singletonMap(&quot;query&quot;, query), null, null);
+    }
+    public StreamingResponseBody stream(Map&lt;String, Object&gt; payload, Map&lt;String, Object&gt; meta,
+                                        BiConsumer&lt;Boolean, String[]&gt; completed) {
+        return stream(payload, meta, completed, null);
+    }
+    public StreamingResponseBody stream(Map&lt;String, Object&gt; payload, Map&lt;String, Object&gt; meta,
+                                        BiConsumer&lt;Boolean, String[]&gt; completed, WikiEvents wikiEvents) {
+        long startedAt = System.nanoTime();
+        return out -&gt; {
+            StringBuilder answer = new StringBuilder();
+            String[] finalStats = {null};
+            boolean success = false;
+            if (internalKey == null || internalKey.isEmpty()) {
+                sendError(out, &quot;Agent service credential is not configured&quot;);
+                if (completed != null) completed.accept(false, new String[]{&quot;&quot;, null});
+                return;
+            }
+            try {
+                if (meta != null) writeFrame(out, &quot;event: meta\ndata: &quot; + JSON.writeValueAsString(meta) + &quot;\n\n&quot;);
+                byte[] requestBody = JSON.writeValueAsBytes(payload);
+                HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + &quot;/internal/agent/stream&quot;))
+                        .timeout(Duration.ofMinutes(3))
+                        .header(&quot;X-Agent-Key&quot;, internalKey)
+                        .header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody)).build();
+                HttpResponse&lt;InputStream&gt; response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                try (InputStream source = response.body();
+                     BufferedReader reader = new BufferedReader(new InputStreamReader(source, StandardCharsets.UTF_8))) {
+                    if (response.statusCode() != 200) {
+                        sendError(out, &quot;Agent service returned HTTP &quot; + response.statusCode()); return;
+                    }
+                    StringBuilder frame = new StringBuilder();
+                    String event = null;
+                    Long firstAnswerMs = null;
+                    String line;
+                    while (!Thread.currentThread().isInterrupted() &amp;&amp; (line = reader.readLine()) != null) {
+                        if (!line.isEmpty()) {
+                            frame.append(line).append(&#x27;\n&#x27;);
+                            if (line.startsWith(&quot;event:&quot;)) event = line.substring(6).trim();
+                            continue;
+                        }
+                        if (frame.length() == 0) continue;
+                        if (&quot;delta&quot;.equals(event) &amp;&amp; firstAnswerMs == null) {
+                            firstAnswerMs = elapsedMs(startedAt);
+                        }
+                        if (&quot;done&quot;.equals(event)) {
+                            String safeAnswer = wikiEvents == null ? null : wikiEvents.displayAnswer();
+                            if (safeAnswer != null) {
+                                answer.setLength(0);
+                                answer.append(safeAnswer);
+                                writeFrame(out, &quot;event: delta\ndata: &quot; + JSON.writeValueAsString(
+                                        java.util.Collections.singletonMap(&quot;content&quot;, safeAnswer)) + &quot;\n\n&quot;);
+                            }
+                            String internalInteraction = wikiEvents == null ? null : wikiEvents.interactionJson();
+                            if (internalInteraction != null) {
+                                Map&lt;String, Object&gt; display = AgentWikiChoiceService.safeDisplay(internalInteraction, false);
+                                if (&quot;wiki_write_result&quot;.equals(display.get(&quot;kind&quot;))
+                                        || &quot;wiki_partial_result&quot;.equals(display.get(&quot;kind&quot;)))
+                                    writeFrame(out, &quot;event: wiki_result\ndata: &quot; + JSON.writeValueAsString(display) + &quot;\n\n&quot;);
+                            }
+                            String data = null;
+                            for (String part : frame.toString().split(&quot;\n&quot;)) {
+                                if (part.startsWith(&quot;data:&quot;)) data = part.substring(5).trim();
+                            }
+                            ObjectNode done = (ObjectNode) JSON.readTree(data);
+                            if (firstAnswerMs == null) done.putNull(&quot;firstAnswerMs&quot;);
+                            else done.put(&quot;firstAnswerMs&quot;, firstAnswerMs);
+                            done.put(&quot;totalMs&quot;, elapsedMs(startedAt));
+                            finalStats[0] = JSON.writeValueAsString(done);
+                            success = true;
+                            writeFrame(out, &quot;event: done\ndata: &quot; + JSON.writeValueAsString(done) + &quot;\n\n&quot;);
+                        } else if (event != null &amp;&amp; event.startsWith(&quot;wiki_&quot;)) {
+                            // Internal Agent tool data contains real IDs. Never forward that frame.
+                            if (wikiEvents != null) {
+                                String data = null;
+                                for (String part : frame.toString().split(&quot;\n&quot;))
+                                    if (part.startsWith(&quot;data:&quot;)) data = part.substring(5).trim();
+                                if (data == null) throw new IllegalStateException(&quot;Wiki event has no data&quot;);
+                                PublicEvent projected = wikiEvents.project(event, JSON.readTree(data));
+                                if (projected != null)
+                                    writeFrame(out, &quot;event: &quot; + projected.name + &quot;\ndata: &quot;
+                                            + JSON.writeValueAsString(projected.data) + &quot;\n\n&quot;);
+                            }
+                        } else {
+                            if (&quot;delta&quot;.equals(event)) {
+                                for (String part : frame.toString().split(&quot;\n&quot;)) if (part.startsWith(&quot;data:&quot;)) {
+                                    com.fasterxml.jackson.databind.JsonNode node = JSON.readTree(part.substring(5).trim());
+                                    if (node.has(&quot;content&quot;)) answer.append(node.get(&quot;content&quot;).asText());
+                                }
+                            }
+                            writeFrame(out, frame.toString() + &#x27;\n&#x27;);
+                        }
+                        frame.setLength(0);
+                        event = null;
+                    }
+                }
+            } catch (java.io.IOException e) {
+                // A browser disconnect makes write/flush fail; closing source above cancels the upstream read.
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                sendError(out, &quot;Agent service unavailable&quot;);
+            } finally {
+                if (completed != null) completed.accept(success, new String[]{answer.toString(), finalStats[0],
+                        wikiEvents == null ? null : wikiEvents.interactionJson()});
+            }
+        };
+    }
+    private static long elapsedMs(long startedAt) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+    }
+    private static void writeFrame(java.io.OutputStream out, String frame) throws java.io.IOException {
+        out.write(frame.getBytes(StandardCharsets.UTF_8));
+        out.flush();
+    }
+    private static void sendError(java.io.OutputStream out, String message) throws java.io.IOException {
+        String frame = &quot;event: error\ndata: &quot; + JSON.writeValueAsString(java.util.Collections.singletonMap(&quot;message&quot;, message)) + &quot;\n\n&quot;;
+        writeFrame(out, frame);
+    }
+}
+</pre></details></td><td><p>页面应能明确区分先前成功文档和后续未知写入。</p><p>同一消息同时呈现已成功文档卡及未知提示；实际展示的含义需结合前端和上下文判定。</p><details open><summary>探针输出</summary><pre>completed=true
+STREAM:
+event: delta
+data: {&quot;content&quot;:&quot;已在Personal创建文件夹「Task」。写入结果未知，请先核查目标位置。&quot;}
+
+event: wiki_result
+data: {&quot;kind&quot;:&quot;wiki_write_result&quot;,&quot;turnId&quot;:&quot;12&quot;,&quot;spaceLabel&quot;:&quot;Personal&quot;,&quot;folderName&quot;:&quot;Task&quot;,&quot;documentTitle&quot;:&quot;First&quot;,&quot;openToken&quot;:&quot;[REDACTED]&quot;}
+
+event: done
+data: {&quot;firstAnswerMs&quot;:null,&quot;totalMs&quot;:74}
+
+
+HISTORY CONTENT: 已在Personal创建文件夹「Task」。写入结果未知，请先核查目标位置。
+HISTORY INTERACTION KIND: wiki_write_result
+</pre></details></td></tr></table></html>

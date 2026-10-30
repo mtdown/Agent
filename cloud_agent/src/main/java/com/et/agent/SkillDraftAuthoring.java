@@ -13,7 +13,8 @@ import java.util.Set;
 
 /** Built-in Skill authoring guide and the structured tool contract used to fill it. */
 final class SkillDraftAuthoring {
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     private static final String[] FIELDS = {"name", "summary", "when_to_use", "when_not_to_use",
             "parameters", "steps", "expected_results", "failure_policy", "examples"};
     static final String INSTRUCTIONS = "Built-in Skill authoring: when the user requests a Skill or a completed task is repeatable, " +
@@ -83,6 +84,18 @@ final class SkillDraftAuthoring {
         checkArrayObjects(definition.path("steps"), "definition.steps", "type", "template", "tool", "args",
                 "code_item_id", "code_version", "entrypoint");
         checkArrayObjects(definition.path("examples"), "definition.examples", "input", "expected");
+        for (JsonNode step : definition.path("steps")) {
+            if (!"code".equals(step.path("type").asText()) || !step.has("code_version")) continue;
+            JsonNode version = step.path("code_version");
+            try {
+                if (!version.isNumber()) throw new ArithmeticException();
+                int exact = version.decimalValue().intValueExact();
+                if (exact < 1) throw new ArithmeticException();
+                ((ObjectNode) step).put("code_version", exact);
+            } catch (ArithmeticException invalid) {
+                throw new IllegalArgumentException("Invalid code version");
+            }
+        }
         ObjectNode assembled = JSON.createObjectNode();
         for (String field : FIELDS) if (definition.has(field)) assembled.set(field, definition.get(field));
         return assembled.toString();

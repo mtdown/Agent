@@ -1,0 +1,6 @@
+PASS valid version=1.0 precise bounds and free objects
+PASS valid version=1e0 precise bounds and free objects
+PASS inverted precise bounds rejected by Cloud
+PASS invalid version=1.1 no gateway
+PASS invalid version=2147483648 no gateway
+PASS invalid version=1.00000000000000001 no gateway

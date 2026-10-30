@@ -1,0 +1,5 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>ATFR-AUDIT-004 静态审查</title><style>body{font:16px sans-serif;margin:2em;line-height:1.5} .grid{display:grid;grid-template-columns:1fr 1fr;gap:1em} section{border:1px solid #aaa;padding:1em}pre{white-space:pre-wrap}</style></head><body><h1>ATFR-AUDIT-004：Wiki 写事件后的最终正文</h1><p>状态：待评估。只读静态观察；未运行针对性探针，未证明此轮新增，也未动态复现影响。</p><div class="grid"><section><h2>实际代码和观察</h2><p>cloud_agent/src/main/java/com/et/agent/AgentLoop.java:150、168–170。Wiki 文本保护时缓冲模型片段；最终无工具调用时，仅在没有 Wiki 写事件的条件下发送缓冲片段。</p><details><summary>相关代码</summary><pre>if (guardWikiText) bufferedChunks.add(chunk);
+else delta.accept(chunk);
+...
+if (guardWikiText &amp;&amp; wikiEvents.stream().noneMatch(event -&gt; isWikiWrite(event.name)))
+    for (String bufferedChunk : bufferedChunks) delta.accept(bufferedChunk);</pre></details></section><section><h2>待评估行为和证据边界</h2><p>出现 Wiki 写事件后，用户可见 Wiki 结果由固定投影摘要提供；模型最终正文可能不展示。是否符合产品预期及实际影响仍待评估。没有针对该风险的动态复现或基线比较。</p></section></div></body></html>
