@@ -15,9 +15,10 @@ public class AgentApplication {
                          @Value("${agent.model.name}") String model,
                          @Value("${agent.timeout-ms}") long timeoutMs,
                          @Value("${agent.max-turns}") int maxTurns,
-                         @Value("${agent.max-tool-result-chars}") int maxResultChars) {
+                         @Value("${agent.max-tool-result-chars}") int maxResultChars,
+                         @Value("${agent.web.api-key:}") String webKey) {
         return new AgentLoop(new OpenAiStreamModel(baseUrl, apiKey, model, timeoutMs),
-                Collections.emptyMap(), maxTurns, timeoutMs, maxResultChars);
+                Collections.emptyMap(), maxTurns, timeoutMs, maxResultChars).withWeb(new DeepSeekWebResearch(webKey));
     }
 
 }

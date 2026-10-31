@@ -11,6 +11,8 @@ agent:
   timeout-ms: ${AGENT_TIMEOUT_MS:120000}
   max-turns: ${AGENT_MAX_TURNS:6}
   max-tool-result-chars: ${AGENT_MAX_TOOL_RESULT_CHARS:16000}
+  web:
+    api-key: ${DEEPSEEK_WEB_API_KEY:}
   model:
     base-url: ${RAG_LLM_BASE_URL:https://api.deepseek.com}
     api-key: ${RAG_LLM_API_KEY:}

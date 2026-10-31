@@ -19,7 +19,7 @@ public final class AgentToolRegistry {
     @FunctionalInterface
     private interface Binder { AgentLoop.Tool bind(String userId, AgentLibraryGateway gateway); }
 
-    enum Domain { SKILL, CODE, FILE, WIKI }
+    enum Domain { SKILL, CODE, FILE, WIKI, WEB }
     enum Access { READ, WRITE }
 
     private static final class Spec {
@@ -155,8 +155,8 @@ public final class AgentToolRegistry {
             throw new IllegalStateException("Duplicate Agent tool: " + name);
     }
 
-    static Domain domain(String name) { return requireSpec(name).domain; }
-    static Access access(String name) { return requireSpec(name).access; }
+    static Domain domain(String name) { return isWeb(name) ? Domain.WEB : requireSpec(name).domain; }
+    static Access access(String name) { return isWeb(name) ? Access.READ : requireSpec(name).access; }
     private static Spec requireSpec(String name) {
         Spec spec = SPECS.get(name);
         if (spec == null) throw new IllegalArgumentException("Unknown Agent tool");
@@ -238,7 +238,18 @@ public final class AgentToolRegistry {
         return tools;
     }
 
+    private static boolean isWeb(String name) { return "web_search".equals(name) || "web_fetch".equals(name); }
+
     public static ObjectNode declaration(String name) {
+        if (isWeb(name)) {
+            boolean search = "web_search".equals(name);
+            ObjectNode tool = JSON.createObjectNode().put("type", "function");
+            ObjectNode function = tool.putObject("function");
+            function.put("name", name);
+            function.put("description", search ? "Search the web when current information is needed." : "Fetch a webpage when summaries are insufficient or the user supplies a URL.");
+            function.set("parameters", fields(new String[]{search ? "query" : "url"}, new String[]{"string"}));
+            return tool;
+        }
         Spec spec = SPECS.get(name);
         if (spec == null) throw new IllegalArgumentException("Unknown Agent tool: " + name);
         ObjectNode tool = JSON.createObjectNode().put("type", "function");
