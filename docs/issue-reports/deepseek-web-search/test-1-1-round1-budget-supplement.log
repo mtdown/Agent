@@ -1,0 +1,12 @@
+PASS round 1 fetch 1 status=ok requests=1
+PASS round 1 fetch 2 status=ok requests=2
+PASS round 1 fetch 3 status=ok requests=3
+PASS round 1 fourth fetch error=budget_exhausted requests=3
+PASS search separate budget status=no_results search=1 fetch=3
+PASS round 2 resets fetch status=ok cumulative=4
+PASS round 3 first fetch error=upstream_failure attempts=2
+PASS round 3 second fetch error=upstream_failure cumulative attempts=3
+PASS round 3 exhausted after retry attempts=3
+PASS round 3 search independently retries twice search cumulative=3
+ALL ASSERTIONS PASSED
+javac exit=0; java exit=0

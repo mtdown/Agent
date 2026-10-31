@@ -23,4 +23,4 @@ A4. 回归：运行 cloud_agent 全量单元测试；核对配置文档包含独
     verify：`mvn -f cloud_agent/pom.xml test`
     预期：退出码 0、全部测试通过；diff 与配置文档符合范围。
 
-第 1 轮独立验收 A1–A4 PASS：`docs/issue-reports/deepseek-web-search/test-1-1-round1.md` 及其日志；无问题编号。主规格与 delta 一致，新规格严格校验通过，`openspec validate --specs` 32 项通过；其他既有规格存在三项 Purpose 占位警告。问题当前状态以本机问题库为准。回滚：移除 `DEEPSEEK_WEB_API_KEY` 停用功能；需要完全回滚时撤销本变更提交，不涉及数据迁移。
+第 1 轮独立验收原报告：`docs/issue-reports/deepseek-web-search/test-1-1-round1.md` 及其日志。总管复核发现 A2 中 Fetch 三次预算上限的直接证据不足，先前据原报告判定 PASS 并归档上传为流程失误。原报告保留；同实例对相同实现快照补证 PASS，证据见 `docs/issue-reports/deepseek-web-search/test-1-1-round1-budget-supplement.md` 及其日志，补齐 Fetch 上限、重试计数和预算隔离断言。无问题编号。主规格与 delta 一致，新规格严格校验通过，`openspec validate --specs` 32 项通过；其他既有规格存在三项 Purpose 占位警告。问题当前状态以本机问题库为准。回滚：移除 `DEEPSEEK_WEB_API_KEY` 停用功能；需要完全回滚时撤销本变更提交，不涉及数据迁移。
