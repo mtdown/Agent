@@ -5,14 +5,14 @@ description: Archive a manager-confirmed completed OpenSpec change after indepen
 
 # Archive a completed change
 
-Use the change and task branch confirmed by the manager. Do not select another change or store independently. Follow the project role rules; archiving is performed only after all stages and independent acceptance are complete. If identity, ownership, store, authorization, or results are unclear, stop and report to the manager.
+Use the change and task branch confirmed by the manager. Do not select another change or store independently. Follow the project role rules; archiving is performed only after all stages have independent acceptance or an explicitly authorized evidence-insufficiency exception, and other delivery blockers are resolved. Preserve the actual test result and approval. If identity, ownership, store, authorization, or results are unclear, stop and report to the manager.
 
 If a store is selected, discover its ID with `openspec store list --json` and keep `--store "<id>"` on every applicable OpenSpec command throughout. Otherwise use the nearest local OpenSpec root. Resolve paths from the selected store's status, not from a hardcoded repository path.
 
 ## Check prerequisites
 
 1. Confirm the change, selected store, task branch, and authority to sync and archive. An explicitly authorized complete workflow needs no repeated confirmation for ordinary operations. Stop at a user-specified pause, when the action exceeds authorization, or when a decision is required; do not infer consent.
-2. Run `openspec status --change "<name>" --json` with the selected store flag. Read `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, and artifact statuses. All required artifacts must be `done` or explicitly `skipped`; otherwise stop. Read the actual tasks file and confirm every task is complete. A missing or incomplete tasks file, incomplete stage, or missing independent PASS evidence blocks archive.
+2. Run `openspec status --change "<name>" --json` with the selected store flag. Read `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, and artifact statuses. All required artifacts must be `done` or explicitly `skipped`; otherwise stop. Read the actual tasks file and confirm every task is complete. A missing or incomplete tasks file, incomplete stage, or missing independent PASS evidence without a recorded explicit approval for the evidence-insufficiency exception blocks archive. FAIL or BLOCKED is not automatically covered by that exception.
 3. Validate the change with `openspec validate "<name>" --strict` using the same store. Stop on failure. If available, `openspec instructions archive --change "<name>" --json` may provide advisory context; a failed or unsupported advisory lookup does not override the required checks. Apply relevant context only when consistent with confirmed paths, authorization and checks.
 
 ## Sync and verify before moving

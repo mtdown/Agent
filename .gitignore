@@ -46,6 +46,8 @@ eval/.env
 .env.dev
 
 ### Local runtime and diagnostics ###
+.local/issue-tracker/
+scripts/__pycache__/
 .workbuddy/
 tmp/
 *.inspect.ndjson
