@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { assertSameProxy, cleanupOwned, configureProxy, createOwned, proxySnapshot, reportFailure, reportRetainedDirectory, withProxyDiagnostics } from './proxyLifecycle.mjs';
 
 // 真实容器回归：复现 2026-10-16 的线上事故。
 // 场景：后端容器被部署替换（IP 变化），Nginx 容器保持运行（未重启/未重建），
@@ -17,8 +18,9 @@ const run = (...args) => new Promise((done, reject) => {
   child.stderr.on('data', (chunk) => { stderr += chunk; });
   child.on('error', reject);
   child.on('close', (code) => (code === 0
-    ? done(stdout.trim())
-    : reject(Object.assign(new Error(`docker ${args.join(' ')} exited ${code}`), { stdout, stderr }))));
+    ? done((args[0] === 'logs' ? stdout + stderr : stdout).trim())
+    : reject(Object.assign(new Error(`docker ${args.join(' ')} exited ${code}`), { stdout, stderr, exitCode: code,
+      operation: args.includes('-t') ? 'nginx-check' : args.includes('reload') ? 'nginx-reload' : 'regression' }))));
 });
 const docker = run;
 // 允许非零退出（探测期间后端可能还没起来）
@@ -32,6 +34,9 @@ const backendB = `${id}-b`;
 const filler = `${id}-filler`;
 const proxy = `${id}-proxy`;
 const temporary = join(tmpdir(), id);
+const registry = [];
+let proxyId;
+let temporaryCreated = false;
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
 
 // 后端用 $request_uri 回显：既能区分打到的是 A 还是 B，
@@ -59,41 +64,44 @@ try {
   await docker('info', '--format', '{{.ServerVersion}}');
 } catch (error) {
   console.error('容器回归测试需要可用的 Docker daemon，当前连不上。');
-  console.error(`  原因：${error.message}`);
+  console.error('  Docker daemon 未就绪或不可访问。');
   console.error('  本地：请先启动 Docker Desktop。');
   console.error('  CI：请确认 runner 镜像自带 Docker（ubuntu-24.04 镜像自带）。');
   process.exit(1);
 }
 
-try {
-  rmSync(temporary, { recursive: true, force: true });
-  mkdirSync(temporary, { recursive: true });
+await withProxyDiagnostics({ docker, proxy: () => proxyId, canDiagnose: () => registry.some(item => item.kind === 'container' && item.id === proxyId), work: async () => {
+  mkdirSync(temporary);
+  temporaryCreated = true;
   const configA = join(temporary, 'backend-a.conf');
   const configB = join(temporary, 'backend-b.conf');
   writeFileSync(configA, serverConfig('A'));
   writeFileSync(configB, serverConfig('B'));
-  await docker('network', 'create', network);
-  await docker('run', '-d', '--name', backendA, '--network', network, '--network-alias', 'backend',
-    '--mount', `type=bind,source=${configA},target=/etc/nginx/conf.d/default.conf,readonly`, 'nginx:1.27-alpine');
-  await docker('run', '-d', '--name', proxy, '--network', network, 'nginx:1.27-alpine');
+  const label = `proxy-regression-owner=${id}`;
+  const create = (kind, name, createArgs) => createOwned({ docker, kind, name, owner: id, registry, createArgs });
+  await create('network', network, ['network', 'create', '--label', label, network]);
+  const aId = await create('container', backendA, ['run', '-d', '--name', backendA, '--label', label, '--network', network, '--network-alias', 'backend',
+    '--mount', `type=bind,source=${configA},target=/etc/nginx/conf.d/default.conf,readonly`, 'nginx:1.27-alpine']);
+  try {
+    proxyId = await create('container', proxy, ['run', '-d', '--name', proxy, '--label', label, '--network', network, 'nginx:1.27-alpine']);
+  } catch (error) {
+    proxyId = registry.find(item => item.kind === 'container' && item.id !== aId)?.id;
+    throw error;
+  }
 
   // 交付方式刻意模拟线上：nginx.conf 是 bind mount 的文件，替换后必须 reload 才生效。
-  await docker('cp', resolve('deploy/nginx.conf'), `${proxy}:/etc/nginx/conf.d/default.conf`);
-  await assert.doesNotReject(
-    () => docker('exec', proxy, 'nginx', '-t'),
-    'the shipped proxy configuration must pass nginx -t',
-  );
-  await docker('exec', proxy, 'nginx', '-s', 'reload');
+  await configureProxy({ docker, proxy: proxyId, config: resolve('deploy/nginx.conf') });
+  const beforeReplacement = await proxySnapshot(docker, proxyId);
 
   const initial = await waitFor('A:/api/ping');
-  assert.equal(initial, 'A:/api/ping',
-    `proxy must reach backend A and preserve the /api path; proxy logs: ${await tryRun('logs', proxy)}`);
+  if (initial !== 'A:/api/ping') throw Object.assign(new Error('proxy cannot reach backend A with preserved path'), { operation: 'request' });
 
   // 换后端：先删 A，再用 filler 占住刚释放的 IP，逼 B 拿到一个不同的地址。
-  await docker('rm', '-f', backendA);
-  await docker('run', '-d', '--name', filler, '--network', network, 'nginx:1.27-alpine');
-  await docker('run', '-d', '--name', backendB, '--network', network, '--network-alias', 'backend',
-    '--mount', `type=bind,source=${configB},target=/etc/nginx/conf.d/default.conf,readonly`, 'nginx:1.27-alpine');
+  await docker('rm', '-f', aId);
+  registry.splice(registry.findIndex(item => item.id === aId), 1);
+  await create('container', filler, ['run', '-d', '--name', filler, '--label', label, '--network', network, 'nginx:1.27-alpine']);
+  await create('container', backendB, ['run', '-d', '--name', backendB, '--label', label, '--network', network, '--network-alias', 'backend',
+    '--mount', `type=bind,source=${configB},target=/etc/nginx/conf.d/default.conf,readonly`, 'nginx:1.27-alpine']);
 
   const staleAddress = await docker('inspect', '-f', '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}', filler);
   const newAddress = await docker('inspect', '-f', '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}', backendB);
@@ -103,13 +111,10 @@ try {
 
   // 关键断言：全程没有重启、没有 reload Nginx 容器。
   const result = await waitFor('B:/api/ping');
-  assert.equal(result, 'B:/api/ping',
-    `proxy must follow the backend to ${newAddress} without a restart (stale ${staleAddress}); proxy logs: ${await tryRun('logs', proxy)}`);
+  if (result !== 'B:/api/ping') throw Object.assign(new Error('proxy cannot reach backend B with preserved path'), { operation: 'request' });
+  assertSameProxy(beforeReplacement, await proxySnapshot(docker, proxyId));
   console.log(`Backend replacement proxy test: passed (backend ${staleAddress} -> ${newAddress}, proxy never restarted)`);
-} finally {
-  for (const name of [proxy, backendB, filler, backendA]) {
-    await tryRun('rm', '-f', name);
-  }
-  await tryRun('network', 'rm', network);
-  rmSync(temporary, { recursive: true, force: true });
-}
+}, cleanup: async () => {
+  try { await cleanupOwned({ docker, registry }); }
+  finally { reportRetainedDirectory({ directory: temporary, created: temporaryCreated }); }
+} }).catch(error => { reportFailure(error); process.exitCode = 1; });
