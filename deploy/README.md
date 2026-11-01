@@ -65,6 +65,7 @@ Settings → Secrets and variables → Actions：
 | `RAG_EMBEDDING_API_KEY` | DashScope（embedding + rerank 共用） |
 | `RAG_LLM_API_KEY` | 回答生成模型 |
 | `AGENT_INTERNAL_KEY` | 可选；后端和 Agent 的共享内部密钥。未填时 CI 每次部署生成随机值，不会写入日志或仓库 |
+| `DEEPSEEK_WEB_API_KEY` | 可选；Agent 联网搜索/抓取的**独立**密钥（不复用 `RAG_LLM_API_KEY`）。**留空则 `web_search` / `web_fetch` 两个工具不注册，Agent 会回答"我无法联网搜索"**，其余工具照常可用；CI 只告警不阻断 |
 | `DOC_USERNAME` / `DOC_PASSWORD` | knife4j 接口文档口令（密码必填） |
 
 后端与 Agent 的快速模型默认使用 `deepseek-flash`；部署 Compose 也固定传入该模型名。

@@ -76,11 +76,18 @@ jobs:
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           RAG_EMBEDDING_API_KEY: ${{ secrets.RAG_EMBEDDING_API_KEY }}
           RAG_LLM_API_KEY: ${{ secrets.RAG_LLM_API_KEY }}
+          # 可选：Agent 联网搜索/抓取专用密钥。留空不阻断部署，只是联网工具停用。
+          DEEPSEEK_WEB_API_KEY: ${{ secrets.DEEPSEEK_WEB_API_KEY }}
           AGENT_INTERNAL_KEY: ${{ secrets.AGENT_INTERNAL_KEY }}
           DOC_USERNAME: ${{ secrets.DOC_USERNAME }}
           DOC_PASSWORD: ${{ secrets.DOC_PASSWORD }}
         run: |
           [ -n "$RAG_LLM_API_KEY" ] || { echo "::error::Secret RAG_LLM_API_KEY is required for Agent"; exit 1; }
+          # DEEPSEEK_WEB_API_KEY 故意不做必填校验：为空时 Agent 只是没有联网工具，
+          # 其余能力全部可用，不应该让整个部署失败。
+          if [ -z "$DEEPSEEK_WEB_API_KEY" ]; then
+            echo "::warning::Secret DEEPSEEK_WEB_API_KEY 为空：Agent 的 web_search / web_fetch 将不注册（表现为无法联网）"
+          fi
           if [ -z "$AGENT_INTERNAL_KEY" ]; then
             AGENT_INTERNAL_KEY="$(openssl rand -hex 32)"
           fi
