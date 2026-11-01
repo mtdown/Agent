@@ -82,33 +82,39 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         List<BatchImportItemResult> results = new ArrayList<>(urls.size());
         for (String url : urls) {
             try {
-                FetchedPage page = webPageFetcher.fetch(url);
-                String markdown = WebPageMarkdownCleaner.toMarkdown(page.getHtml());
-                if (StrUtil.isBlank(markdown)) {
-                    throw new BusinessException(ErrorCode.PARAMS_ERROR, "未能从页面提取有效文本内容");
-                }
-                ArticleMetadataExtractor.ParsedMarkdown parsed =
-                        ArticleMetadataExtractor.parseMarkdownFrontMatter(markdown);
-                markdown = parsed.getContent();
-                Map<String, String> articleMetadata = ArticleMetadataExtractor.extract(page.getHtml(),
-                        StrUtil.blankToDefault(page.getFinalUrl(), url));
-                parsed.getMetadata().forEach(articleMetadata::putIfAbsent);
-                ImportedWikiDocument imported = new ImportedWikiDocument();
-                imported.setTitle(resolveUrlTitle(page, articleMetadata.get("articleTitle")));
-                imported.setContent(markdown);
-                imported.setContentFormat("markdown");
-                imported.setSourceType("URL");
-                imported.setSourceUrl(StrUtil.blankToDefault(articleMetadata.get("sourceUrl"),
-                        StrUtil.blankToDefault(page.getFinalUrl(), url)));
-                imported.setMetadataJson(buildUrlMetadata(page, url, imported.getSourceUrl(), articleMetadata));
-                Long documentId = saveImported(imported, wikiSpace, folderId, loginUser);
-                results.add(BatchImportItemResult.success(url, documentId, imported.getTitle()));
+                ImportedWikiDocument imported = prepareUrl(url);
+                SaveOutcome saved = saveImported(imported, wikiSpace, folderId, loginUser);
+                results.add(successResult(url, saved, imported.getTitle()));
             } catch (Exception e) {
                 log.warn("batch url import failed for {}", url, e);
                 results.add(BatchImportItemResult.failed(url, failureMessage(e)));
             }
         }
         return results;
+    }
+
+    /** Shared fetch, safety checks and conversion for both public and Agent imports. */
+    ImportedWikiDocument prepareUrl(String url) throws IOException {
+        FetchedPage page = webPageFetcher.fetch(url);
+        String markdown = WebPageMarkdownCleaner.toMarkdown(page.getHtml());
+        if (StrUtil.isBlank(markdown)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "未能从页面提取有效文本内容");
+        }
+        ArticleMetadataExtractor.ParsedMarkdown parsed =
+                ArticleMetadataExtractor.parseMarkdownFrontMatter(markdown);
+        markdown = parsed.getContent();
+        Map<String, String> articleMetadata = ArticleMetadataExtractor.extract(page.getHtml(),
+                StrUtil.blankToDefault(page.getFinalUrl(), url));
+        parsed.getMetadata().forEach(articleMetadata::putIfAbsent);
+        ImportedWikiDocument imported = new ImportedWikiDocument();
+        imported.setTitle(resolveUrlTitle(page, articleMetadata.get("articleTitle")));
+        imported.setContent(markdown);
+        imported.setContentFormat("markdown");
+        imported.setSourceType("URL");
+        imported.setSourceUrl(StrUtil.blankToDefault(articleMetadata.get("sourceUrl"),
+                StrUtil.blankToDefault(page.getFinalUrl(), url)));
+        imported.setMetadataJson(buildUrlMetadata(page, url, imported.getSourceUrl(), articleMetadata));
+        return imported;
     }
 
     @Override
@@ -126,8 +132,8 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
             String input = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
             try {
                 ImportedWikiDocument imported = wikiDocumentImportService.parse(file, null);
-                Long documentId = saveImported(imported, wikiSpace, targetFolderId, loginUser);
-                results.add(BatchImportItemResult.success(input, documentId, imported.getTitle()));
+                SaveOutcome saved = saveImported(imported, wikiSpace, targetFolderId, loginUser);
+                results.add(successResult(input, saved, imported.getTitle()));
             } catch (Exception e) {
                 log.warn("batch file import failed for {}", input, e);
                 results.add(BatchImportItemResult.failed(input, failureMessage(e)));
@@ -149,8 +155,8 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         int entries = JsonDocumentSplitter.split(readBytes(file), imported -> {
             String input = entryInput(imported);
             try {
-                Long documentId = saveImported(imported, wikiSpace, targetFolderId, loginUser);
-                results.add(BatchImportItemResult.success(input, documentId, imported.getTitle()));
+                SaveOutcome saved = saveImported(imported, wikiSpace, targetFolderId, loginUser);
+                results.add(successResult(input, saved, imported.getTitle()));
             } catch (Exception e) {
                 log.warn("batch json import failed for {}", input, e);
                 results.add(BatchImportItemResult.failed(input, failureMessage(e)));
@@ -160,7 +166,34 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         return results;
     }
 
-    private Long saveImported(ImportedWikiDocument imported, WikiSpace wikiSpace, Long folderId, User loginUser) {
+    private static final class SaveOutcome {
+        final Long id; final boolean cacheWarning;
+        SaveOutcome(Long id, boolean cacheWarning) { this.id=id; this.cacheWarning=cacheWarning; }
+    }
+    private BatchImportItemResult successResult(String input, SaveOutcome saved, String title) {
+        BatchImportItemResult result=BatchImportItemResult.success(input,saved.id,title);
+        if (saved.cacheWarning) result.setMessage("文档已保存，缓存刷新失败");
+        return result;
+    }
+
+    private SaveOutcome saveImported(ImportedWikiDocument imported, WikiSpace wikiSpace, Long folderId, User loginUser) {
+        DocumentWiki documentWiki = buildDocument(imported, wikiSpace, folderId, loginUser);
+        boolean saved = documentWikiService.save(documentWiki);
+        ThrowUtils.throwIf(!saved, ErrorCode.OPERATION_ERROR, "保存文档失败");
+        boolean warning=false;
+        try { wikiCacheManager.clearSpace(wikiSpace.getId()); }
+        catch (RuntimeException first) {
+            log.warn("Wiki import cache clear failed: {}",first.getClass().getSimpleName());
+            try { wikiCacheManager.clearSpace(wikiSpace.getId()); }
+            catch (RuntimeException second) {
+                log.warn("Wiki import cache clear retry failed: {}",second.getClass().getSimpleName());
+                warning=true;
+            }
+        }
+        return new SaveOutcome(documentWiki.getId(),warning);
+    }
+
+    DocumentWiki buildDocument(ImportedWikiDocument imported, WikiSpace wikiSpace, Long folderId, User loginUser) {
         DocumentWiki documentWiki = new DocumentWiki();
         documentWiki.setTitle(imported.getTitle());
         documentWiki.setContent(imported.getContent());
@@ -176,10 +209,7 @@ public class WikiBatchImportServiceImpl implements WikiBatchImportService {
         documentWiki.setViewCount(0L);
         documentWiki.setEditTime(new Date());
         documentWikiService.validDocumentWiki(documentWiki);
-        boolean saved = documentWikiService.save(documentWiki);
-        ThrowUtils.throwIf(!saved, ErrorCode.OPERATION_ERROR, "保存文档失败");
-        wikiCacheManager.clearSpace(wikiSpace.getId());
-        return documentWiki.getId();
+        return documentWiki;
     }
 
     /**

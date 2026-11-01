@@ -148,6 +148,24 @@
                   <span v-if="msg.interaction.consumed">已选择</span>
                   <span v-else-if="Date.now() >= msg.interaction.expiresAt">选项已过期，请重新提出写入请求</span>
                 </div>
+                <div v-if="msg.interaction?.kind === 'import_confirmation'" class="import-confirmation">
+                  <strong>确认导入网页</strong>
+                  <div>空间：{{ msg.interaction.spaceLabel }}</div>
+                  <div v-if="!msg.interaction.folderSegments?.length">目录：空间根目录</div>
+                  <div v-else>目录层级：
+                    <span v-for="(segment, index) in msg.interaction.folderSegments" :key="index" class="import-folder-segment">{{ segment }}</span>
+                  </div>
+                  <div>待导入链接：</div>
+                  <ul><li v-for="(url, index) in msg.interaction.urls" :key="index" class="import-url">{{ url }}</li></ul>
+                  <template v-if="confirmationStatus(msg) === 'pending'">
+                    <div>确认前不会写入 Wiki。</div>
+                    <a-button type="primary" :disabled="streaming" @click="submitImportConfirmation(msg, 'confirm')">确认导入</a-button>
+                    <a-button :disabled="streaming" @click="submitImportConfirmation(msg, 'cancel')">取消</a-button>
+                  </template>
+                  <div v-else-if="confirmationStatus(msg) === 'cancelled'">已取消，未导入。</div>
+                  <div v-else-if="confirmationStatus(msg) === 'expired'">确认已过期，请重新提出请求。</div>
+                  <div v-else>导入或取消结果尚未确认，请刷新会话核查，不要重复提交。</div>
+                </div>
                 <div v-if="msg.interaction?.kind === 'wiki_write_result' && !msg.interaction.results" class="wiki-choice-options">
                   <a-button @click="openWikiResult(msg.interaction)">查看文档：{{ msg.interaction.documentTitle }}</a-button>
                 </div>
@@ -157,10 +175,14 @@
                 </div>
                 <div v-if="(msg.interaction?.kind === 'wiki_write_results' || msg.interaction?.kind === 'wiki_write_result') && msg.interaction.results" class="wiki-choice-options">
                   <template v-for="(result, index) in msg.interaction.results" :key="index">
-                    <a-button v-if="result.kind === 'wiki_write_result' && result.openToken" @click="openWikiResult(result)">查看文档：{{ result.documentTitle }}</a-button>
-                    <span v-else-if="result.kind === 'wiki_write_result'">{{ result.documentTitle }}：路径不可用</span>
+                    <template v-if="result.kind === 'wiki_write_result'">
+                      <a-button v-if="result.openToken" @click="openWikiResult(result)">查看文档：{{ result.documentTitle }}</a-button>
+                      <span v-else>{{ result.documentTitle }}：路径不可用</span>
+                      <span v-if="result.sourceUrl" class="import-url">来源：{{ result.sourceUrl }}</span>
+                      <span v-if="result.warning">{{ result.warning }}</span>
+                    </template>
                     <span v-else-if="result.kind === 'wiki_folder_result'">已创建：{{ result.spaceLabel }} / {{ result.folderName }}</span>
-                    <span v-else-if="result.kind === 'wiki_operation_result'">{{ result.operation === 'create_wiki_folder' ? '创建文件夹' : result.operation === 'create_wiki_document' ? '创建文档' : '创建文件夹和文档' }}：{{ result.status === 'unknown' ? '结果未知，请先核查目标位置' : result.status === 'blocked' ? '操作被阻止' : result.status === 'failed' ? '操作失败' : '结果当前不可用' }}</span>
+                    <span v-else-if="result.kind === 'wiki_operation_result'" class="import-url">{{ result.sourceUrl ? '来源：' + result.sourceUrl + '。' : '' }}{{ result.operation === 'import_wiki_urls' ? '网页导入' : result.operation === 'create_wiki_folder' ? '创建文件夹' : result.operation === 'create_wiki_document' ? '创建文档' : '创建文件夹和文档' }}：{{ result.status === 'unknown' ? '结果未知，请先核查目标位置' : result.status === 'blocked' ? '操作被阻止' : result.status === 'failed' ? '操作失败' : result.status === 'not_executed' ? '未执行' : '结果当前不可用' }}</span>
                     <span v-else>结果当前不可用</span>
                   </template>
                 </div>
@@ -397,7 +419,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import {
   ApiOutlined,
   CloseOutlined,
@@ -411,6 +433,7 @@ import {
   DeleteOutlined,
   DownOutlined,
 } from '@ant-design/icons-vue'
+import { confirmationLockKey, importConfirmationAction, importConfirmationStatus, persistConfirmationLock, type ImportConfirmation } from './importConfirmation'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import {
   agentAskUsingStream,
@@ -579,7 +602,7 @@ interface ChatMessage {
   stopped?: boolean
   stats?: ChatStats
   trace?: ChatTrace
-  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | AgentWikiResults
+  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | AgentWikiResults | ImportConfirmation
   messageId?: string
   conversationId?: string
   personalReferences?: PersonalFileReference[]
@@ -593,6 +616,35 @@ const streaming = ref(false)
 const lastMeta = ref<RagAskMeta | null>(null)
 const messageListRef = ref<HTMLElement>()
 const abortController = ref<AbortController | null>(null)
+const confirmationLocks = ref(new Set<string>())
+const confirmationNow = ref(Date.now())
+const confirmationTimer = setInterval(() => { confirmationNow.value = Date.now() }, 1000)
+onUnmounted(() => clearInterval(confirmationTimer))
+const confirmationLocked = (turnId: string) => {
+  const conversation = agentConversationId.value
+  if (!conversation) return true
+  const key = confirmationLockKey(conversation, turnId)
+  if (confirmationLocks.value.has(key)) return true
+  try { return sessionStorage.getItem(key) === '1' } catch { return false }
+}
+const lockConfirmation = (conversation: string, turnId: string) => {
+  const key = confirmationLockKey(conversation, turnId)
+  try {
+    if (!persistConfirmationLock(sessionStorage, key)) return false
+    confirmationLocks.value.add(key)
+    return true
+  } catch { return false }
+}
+const clearConfirmationLock = (conversation: string, turnId: string) => {
+  const key = confirmationLockKey(conversation, turnId)
+  confirmationLocks.value.delete(key)
+  try { sessionStorage.removeItem(key) } catch { /* Storage may be unavailable. */ }
+}
+const confirmationStatus = (message: ChatMessage) => {
+  const card = message.interaction
+  if (card?.kind !== 'import_confirmation') return 'unknown'
+  return importConfirmationStatus(card, confirmationNow.value, confirmationLocked(card.turnId))
+}
 
 const loadAgentConversations = async () => {
   try {
@@ -624,6 +676,14 @@ const openAgentConversation = async (id?: string) => {
   if (!id) { agentMessages.value = []; return }
   try {
     const response = await getAgentConversation(id)
+    if (agentConversationId.value !== id) return
+    for (const item of response.data.data ?? []) {
+      const interaction = item.interaction
+      if (interaction?.kind === 'import_confirmation' && (interaction.consumed || interaction.status !== 'pending'))
+        clearConfirmationLock(id, interaction.turnId)
+      else if (interaction?.kind === 'wiki_write_result' || interaction?.kind === 'wiki_write_results')
+        clearConfirmationLock(id, interaction.turnId)
+    }
     agentMessages.value = (response.data.data ?? []).map((item: AgentStoredMessage) => ({
       agentPreview: true,
       role: item.role,
@@ -739,6 +799,44 @@ const traceSteps = (msg: ChatMessage): { label: string; ms?: number | null; skip
 }
 
 // ---- 发送与流式接收 ----
+const submitImportConfirmation = async (message: ChatMessage, action: 'confirm' | 'cancel') => {
+  const conversation = agentConversationId.value
+  const card = message.interaction
+  if (!conversation || card?.kind !== 'import_confirmation' || streaming.value) return
+  const request = importConfirmationAction(card, action, Date.now(), confirmationLocked(card.turnId))
+  if (!request) return
+  if (!lockConfirmation(conversation, card.turnId)) {
+    antMessage.error('无法安全记录请求状态，请检查浏览器会话存储。')
+    return
+  }
+  streaming.value = true
+  abortController.value = new AbortController()
+  const assistantMsg: ChatMessage = reactive({ role: 'assistant', content: '', status: 'streaming', agentPreview: true })
+  agentMessages.value.push(assistantMsg)
+  try {
+    await agentSelectWikiChoiceUsingStream(conversation, request.turnId, request.token, {
+      onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
+      onWikiChoice: (next) => { assistantMsg.interaction = next },
+      onImportConfirmation: (next) => { assistantMsg.interaction = next },
+      onWikiResult: (result) => { assistantMsg.interaction = result },
+      onDone: () => { assistantMsg.status = 'done' },
+      onError: () => { assistantMsg.status = 'error'; assistantMsg.error = '请求结果未知，请核查会话后再操作。' },
+    }, abortController.value.signal)
+    if (assistantMsg.status === 'streaming') {
+      assistantMsg.status = 'error'
+      assistantMsg.error = '连接中断，结果未知，请核查会话。'
+    }
+  } catch {
+    assistantMsg.status = 'error'
+    assistantMsg.error = '连接中断，结果未知，请核查会话。'
+  } finally {
+    streaming.value = false
+    abortController.value = null
+    if (agentConversationId.value === conversation) await openAgentConversation(conversation)
+    scrollToBottom()
+  }
+}
+
 const selectWikiDestination = async (
   message: ChatMessage,
   option: AgentWikiChoice['options'][number],
@@ -757,6 +855,7 @@ const selectWikiDestination = async (
       onMeta: (meta) => { assistantMsg.citations = meta.citations ?? [] },
       onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
       onWikiChoice: (next) => { assistantMsg.interaction = next },
+      onImportConfirmation: (next) => { assistantMsg.interaction = next },
       onWikiResult: (result) => { assistantMsg.interaction = result },
       onDone: (done) => {
         choice.consumed = true
@@ -831,6 +930,7 @@ const send = async () => {
       },
       onDelta: (text) => { assistantMsg.content += text; scrollToBottom() },
       onWikiChoice: (choice) => { assistantMsg.interaction = choice; scrollToBottom() },
+      onImportConfirmation: (confirmation) => { assistantMsg.interaction = confirmation; scrollToBottom() },
       onWikiResult: (result) => { assistantMsg.interaction = result; scrollToBottom() },
       onDone: (done) => {
         assistantMsg.status = 'done'
@@ -1232,6 +1332,9 @@ onMounted(() => {
 .conversation-more { flex: 0 0 auto; color: #8a7a5f; }
 .conversation-empty { padding: 10px 8px; color: #a89a7f; font-size: 13px; }
 .wiki-choice-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
+.import-confirmation { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 10px 0; }
+.import-folder-segment { display: inline-block; padding: 2px 6px; margin: 2px 4px; border: 1px solid #ddd; border-radius: 4px; overflow-wrap: anywhere; }
+.import-url { overflow-wrap: anywhere; word-break: break-word; }
 .ai-assistant-page {
   max-width: 960px;
   margin: 0 auto;

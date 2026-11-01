@@ -58,6 +58,8 @@ public class AgentPreviewProxy {
             StringBuilder answer = new StringBuilder();
             String[] finalStats = {null};
             boolean success = false;
+            boolean completionSent = false;
+            PublicEvent pendingImportChoice = null;
             if (internalKey == null || internalKey.isEmpty()) {
                 sendError(out, "Agent service credential is not configured");
                 if (completed != null) completed.accept(false, new String[]{"", null});
@@ -119,6 +121,14 @@ public class AgentPreviewProxy {
                             done.put("totalMs", elapsedMs(startedAt));
                             finalStats[0] = JSON.writeValueAsString(done);
                             success = true;
+                            if (pendingImportChoice != null) {
+                                if (completed == null || internalInteraction == null ||
+                                        !"import_confirmation".equals(JSON.readTree(internalInteraction).path("kind").asText()))
+                                    throw new IllegalStateException("Import confirmation cannot be persisted");
+                                completionSent = true;
+                                completed.accept(true, new String[]{answer.toString(), finalStats[0], internalInteraction});
+                                writeFrame(out, "event: " + pendingImportChoice.name + "\ndata: " + JSON.writeValueAsString(pendingImportChoice.data) + "\n\n");
+                            }
                             writeFrame(out, "event: done\ndata: " + JSON.writeValueAsString(done) + "\n\n");
                         } else if ("personal_file_reference".equals(event)) {
                             String data = null;
@@ -133,9 +143,12 @@ public class AgentPreviewProxy {
                                     if (part.startsWith("data:")) data = part.substring(5).trim();
                                 if (data == null) throw new IllegalStateException("Wiki event has no data");
                                 PublicEvent projected = wikiEvents.project(event, JSON.readTree(data));
-                                if (projected != null)
-                                    writeFrame(out, "event: " + projected.name + "\ndata: "
+                                if (projected != null) {
+                                    if (projected.data instanceof Map && "import_confirmation".equals(((Map<?,?>)projected.data).get("kind")))
+                                        pendingImportChoice = projected;
+                                    else writeFrame(out, "event: " + projected.name + "\ndata: "
                                             + JSON.writeValueAsString(projected.data) + "\n\n");
+                                }
                             }
                         } else {
                             if ("delta".equals(event)) {
@@ -157,7 +170,7 @@ public class AgentPreviewProxy {
             } catch (Exception e) {
                 sendError(out, "Agent service unavailable");
             } finally {
-                if (completed != null) completed.accept(success, new String[]{answer.toString(), finalStats[0],
+                if (completed != null && !completionSent) completed.accept(success, new String[]{answer.toString(), finalStats[0],
                         wikiEvents == null ? null : wikiEvents.interactionJson()});
             }
         };

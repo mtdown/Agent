@@ -125,4 +125,51 @@ class AgentPreviewProxyWikiEventTest {
             assertEquals("已创建文件夹「整理任务」，文档尚未保存。", completed.get()[0]);
         } finally { server.stop(0); }
     }
+
+    @Test void importCardIsNotSentUntilCompletionHasPersisted() throws Exception {
+        HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/internal/agent/stream", exchange -> {
+            byte[] bytes=("event: wiki_choice_request\ndata: {\"importConfirmationRequired\":true}\n\nevent: done\ndata: {\"usage\":null}\n\n").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200,bytes.length);
+            try (java.io.OutputStream response=exchange.getResponseBody()) {response.write(bytes);}
+        });
+        server.start();
+        try {
+            java.util.concurrent.atomic.AtomicBoolean persisted=new java.util.concurrent.atomic.AtomicBoolean();
+            ByteArrayOutputStream output=new ByteArrayOutputStream() {
+                @Override public synchronized void write(byte[] bytes,int off,int len) {
+                    String text=new String(bytes,off,len,StandardCharsets.UTF_8);
+                    if(text.contains("event: wiki_choice")) assertTrue(persisted.get(),"card must follow persistence");
+                    super.write(bytes,off,len);
+                }
+            };
+            AgentPreviewProxy proxy=new AgentPreviewProxy("http://127.0.0.1:"+server.getAddress().getPort(),"test-key");
+            proxy.stream(Collections.singletonMap("query","x"),null,(success, result)->{assertTrue(success); persisted.set(true);},
+                new AgentPreviewProxy.WikiEvents() {
+                    public AgentPreviewProxy.PublicEvent project(String event,JsonNode data) {return new AgentPreviewProxy.PublicEvent("wiki_choice",java.util.Map.of("kind","import_confirmation"));}
+                    public String interactionJson(){return "{\"kind\":\"import_confirmation\"}";}
+                    public java.util.Map<String,Object> displayInteraction(String raw){return java.util.Map.of("kind","import_confirmation");}
+                }).writeTo(output);
+            assertTrue(output.toString(StandardCharsets.UTF_8).contains("event: wiki_choice"));
+        } finally {server.stop(0);}
+    }
+
+    @Test void importCardIsNotExposedWhenPersistenceFails() throws Exception {
+        HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/internal/agent/stream",exchange->{
+            byte[] bytes=("event: wiki_choice_request\ndata: {\"importConfirmationRequired\":true}\n\nevent: done\ndata: {\"usage\":null}\n\n").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200,bytes.length); try(java.io.OutputStream response=exchange.getResponseBody()){response.write(bytes);}
+        }); server.start();
+        try {
+            ByteArrayOutputStream out=new ByteArrayOutputStream();
+            AgentPreviewProxy proxy=new AgentPreviewProxy("http://127.0.0.1:"+server.getAddress().getPort(),"test-key");
+            proxy.stream(Collections.singletonMap("query","x"),null,(success,result)->{throw new IllegalStateException("mock save failure");},
+                new AgentPreviewProxy.WikiEvents(){
+                    public AgentPreviewProxy.PublicEvent project(String event,JsonNode data){return new AgentPreviewProxy.PublicEvent("wiki_choice",java.util.Map.of("kind","import_confirmation"));}
+                    public String interactionJson(){return "{\"kind\":\"import_confirmation\"}";}
+                    public java.util.Map<String,Object> displayInteraction(String raw){return java.util.Map.of("kind","import_confirmation");}
+                }).writeTo(out);
+            assertFalse(out.toString(StandardCharsets.UTF_8).contains("event: wiki_choice"));
+        } finally {server.stop(0);}
+    }
 }

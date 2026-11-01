@@ -47,7 +47,7 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
     }
 
     @Override public String getSkill(String userId, String id, int version) {
-        if (!(id.matches("[1-9][0-9]{0,18}") || "builtin:wiki-write".equals(id)) || version < 1)
+        if (!(id.matches("[1-9][0-9]{0,18}") || "builtin:wiki-write".equals(id) || "builtin:wiki-answer".equals(id) || "builtin:wiki-url-import".equals(id)) || version < 1)
             throw new IllegalArgumentException("Invalid Skill reference");
         return call("/api/internal/agent/skills/" + id + "/versions/" + version, userId, null).toString();
     }
@@ -88,6 +88,14 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
             if (cursor != null) url += "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8.name());
             return call(url, user, null).toString();
         } catch (java.io.UnsupportedEncodingException e) { throw new IllegalStateException("UTF-8 is unavailable", e); }
+    }
+
+    @Override public String importWikiUrls(String userId, String spaceId, String folderId, java.util.List<String> urls) {
+        ObjectNode body = JSON.createObjectNode(); body.put("spaceId",spaceId);
+        if (folderId == null) body.putNull("folderId"); else body.put("folderId",folderId);
+        com.fasterxml.jackson.databind.node.ArrayNode array = body.putArray("urls");
+        urls.forEach(array::add);
+        return call("/api/internal/agent/wiki-url-imports", userId, body.toString()).toString();
     }
 
     @Override public String writeWikiDocument(String userId, String spaceId, String title, String content) {

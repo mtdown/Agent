@@ -179,6 +179,8 @@ public class AgentLibraryStore {
 
     public SkillVersion skillVersion(long user, String rawId, int version) {
         if (AgentBuiltInWikiWriteSkill.ID.equals(rawId)) return AgentBuiltInWikiWriteSkill.version(version);
+        if (AgentBuiltInWikiAnswerSkill.ID.equals(rawId)) return AgentBuiltInWikiAnswerSkill.version(version);
+        if (AgentBuiltInWikiUrlImportSkill.ID.equals(rawId)) return AgentBuiltInWikiUrlImportSkill.version(version);
         long id = id(rawId);
         requireSkillAccess(user, id);
         List<SkillVersion> versions = jdbc.query("SELECT version, definitionJson FROM agent_skill_version " +
@@ -195,6 +197,8 @@ public class AgentLibraryStore {
 
     public SkillVersion enabledSkillVersion(long user, String rawId, int version) {
         if (AgentBuiltInWikiWriteSkill.ID.equals(rawId)) return AgentBuiltInWikiWriteSkill.version(version);
+        if (AgentBuiltInWikiAnswerSkill.ID.equals(rawId)) return AgentBuiltInWikiAnswerSkill.version(version);
+        if (AgentBuiltInWikiUrlImportSkill.ID.equals(rawId)) return AgentBuiltInWikiUrlImportSkill.version(version);
         long id = id(rawId);
         List<SkillVersion> versions = jdbc.query("SELECT v.version, v.definitionJson FROM agent_skill_item s " +
                         "JOIN agent_skill_version v ON v.skillId = s.id AND v.version = s.activeVersion " +
@@ -234,6 +238,8 @@ public class AgentLibraryStore {
                     result.version = rs.getInt("activeVersion");
                     return result;
                 }, user, user);
+        available.add(0, AgentBuiltInWikiUrlImportSkill.item());
+        available.add(0, AgentBuiltInWikiAnswerSkill.item());
         available.add(0, AgentBuiltInWikiWriteSkill.item());
         return available;
     }
@@ -255,6 +261,8 @@ public class AgentLibraryStore {
                     result.owner = rs.getLong("ownerUserId") == user;
                     return result;
                 }, user, user);
+        available.add(0, AgentBuiltInWikiUrlImportSkill.item());
+        available.add(0, AgentBuiltInWikiAnswerSkill.item());
         available.add(0, AgentBuiltInWikiWriteSkill.item());
         return available;
     }

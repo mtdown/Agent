@@ -28,6 +28,15 @@ public final class AgentResourceInternalController {
     @Resource
     private AgentWritableWikiLocations writableWikiLocations;
 
+    @Resource
+    private com.et.cloud.service.impl.AgentUrlImportService urlImports;
+
+    public static final class WikiUrlImportRequest {
+        public String spaceId;
+        public String folderId;
+        public java.util.List<String> urls;
+    }
+
     public static final class WriteFileRequest {
         public String path;
         public String content;
@@ -171,6 +180,32 @@ public final class AgentResourceInternalController {
         if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "缺少文档请求");
         return ResultUtils.success(creation.createDocument(user, body.spaceId, body.folderId,
                 body.title, body.content));
+    }
+
+    @PostMapping("/wiki-url-imports")
+    public BaseResponse<Map<String,Object>> importWikiUrls(
+            @RequestHeader(value = "X-Agent-Key", required = false) String key,
+            @RequestParam String userId, @RequestBody WikiUrlImportRequest body) {
+        long user = requireUser(key, userId);
+        if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "Missing import request");
+        try {
+            if (body.spaceId == null || !body.spaceId.matches("[1-9][0-9]{0,18}") ||
+                    (body.folderId != null && !body.folderId.matches("[1-9][0-9]{0,18}")))
+                throw new IllegalArgumentException();
+            Long.parseLong(body.spaceId);
+            if (body.folderId != null) Long.parseLong(body.folderId);
+            if (body.urls == null || body.urls.isEmpty() || body.urls.size() > 20)
+                throw new IllegalArgumentException();
+            for (String url : body.urls) if (url == null || url.isBlank() || url.length() > 2048 || url.matches(".*[\\r\\n,].*"))
+                throw new IllegalArgumentException();
+            Map<String,Object> draft = new java.util.LinkedHashMap<>();
+            draft.put("importConfirmationRequired", true);
+            draft.put("spaceId", body.spaceId); draft.put("folderId", body.folderId);
+            draft.put("urls", new java.util.ArrayList<>(body.urls));
+            return ResultUtils.success(draft);
+        } catch (IllegalArgumentException invalid) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "Invalid Wiki destination");
+        }
     }
 
     private long requireUser(String key, String userId) {

@@ -93,6 +93,17 @@ class WikiBatchImportServiceImplTest {
     }
 
     @Test
+    void publicUrlImportPreservesSuccessWhenCacheRefreshFailsTwice() throws IOException {
+        WikiBatchImportServiceImpl service = newService(url -> page(url, "标题", articleHtml()));
+        prepareSpace(); stubSavingFrom(55);
+        org.mockito.Mockito.doThrow(new IllegalStateException("secret")).when(wikiCacheManager).clearSpace(11L);
+        BatchImportItemResult item=service.importUrls(request(11L,null,Collections.singletonList("https://example.com/a")),loginUser).get(0);
+        assertEquals(BatchImportItemResult.STATUS_SUCCESS,item.getStatus());
+        assertEquals(55L,item.getDocumentId()); assertEquals("文档已保存，缓存刷新失败",item.getMessage());
+        verify(documentWikiService,times(1)).save(any()); verify(wikiCacheManager,times(2)).clearSpace(11L);
+    }
+
+    @Test
     void urlImportStoresSourceUrlAndMetadata() throws IOException {
         WikiBatchImportServiceImpl service = newService(url -> page(url, "政策解读", articleHtml()));
         prepareSpace();

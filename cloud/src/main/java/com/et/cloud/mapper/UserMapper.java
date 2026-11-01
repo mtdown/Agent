@@ -11,6 +11,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 */
 public interface UserMapper extends BaseMapper<User> {
 
+    @org.apache.ibatis.annotations.Select("SELECT * FROM user WHERE id = #{id} AND isDelete = 0 FOR UPDATE")
+    User lockActiveById(@org.apache.ibatis.annotations.Param("id") Long id);
+
 }
 
 

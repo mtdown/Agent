@@ -9,6 +9,9 @@ public interface AgentLibraryGateway {
     String readFile(String userId, String path);
     default String readFileSegment(String userId, String path, String cursor) { throw new UnsupportedOperationException(); }
     default String searchFile(String userId, String path, String query, String cursor) { throw new UnsupportedOperationException(); }
+    default String importWikiUrls(String userId, String spaceId, String folderId, java.util.List<String> urls) {
+        throw new UnsupportedOperationException("Wiki URL import unavailable");
+    }
     String writeWikiDocument(String userId, String spaceId, String title, String content);
 
     default String createWikiFolder(String userId, String spaceId, String taskName) {

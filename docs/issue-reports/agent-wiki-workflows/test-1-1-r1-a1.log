@@ -1,0 +1,46 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------------< com.et:cloud >----------------------------
+[INFO] Building cloud 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ cloud ---
+[INFO] Copying 15 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.8.1:compile (default-compile) @ cloud ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 244 source files to C:\Users\origin\IdeaProjects\Agent\cloud\target\classes
+[INFO] /C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/PictureServiceImpl.java: C:\Users\origin\IdeaProjects\Agent\cloud\src\main\java\com\et\cloud\service\impl\PictureServiceImpl.javaʹ�û򸲸����ѹ�ʱ�� API��
+[INFO] /C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/service/impl/PictureServiceImpl.java: �й���ϸ��Ϣ, ��ʹ�� -Xlint:deprecation ���±��롣
+[INFO] /C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/controller/PictureController.java: ĳЩ�����ļ�ʹ����δ�����򲻰�ȫ�Ĳ�����
+[INFO] /C:/Users/origin/IdeaProjects/Agent/cloud/src/main/java/com/et/cloud/controller/PictureController.java: �й���ϸ��Ϣ, ��ʹ�� -Xlint:unchecked ���±��롣
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ cloud ---
+[INFO] skip non existing resourceDirectory C:\Users\origin\IdeaProjects\Agent\cloud\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.8.1:testCompile (default-testCompile) @ cloud ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 64 source files to C:\Users\origin\IdeaProjects\Agent\cloud\target\test-classes
+[INFO] /C:/Users/origin/IdeaProjects/Agent/cloud/src/test/java/com/et/cloud/rag/InMemoryCosineVectorStoreTest.java: ĳЩ�����ļ�ʹ����δ�����򲻰�ȫ�Ĳ�����
+[INFO] /C:/Users/origin/IdeaProjects/Agent/cloud/src/test/java/com/et/cloud/rag/InMemoryCosineVectorStoreTest.java: �й���ϸ��Ϣ, ��ʹ�� -Xlint:unchecked ���±��롣
+[INFO] 
+[INFO] --- surefire:2.22.2:test (default-test) @ cloud ---
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.et.cloud.controller.AgentWikiAnswerSkillTest
+20:42:49.444 [main] DEBUG org.springframework.test.util.ReflectionTestUtils - Setting field 'jdbc' of type [null] on target object [com.et.cloud.controller.AgentLibraryStore@646811d6] or target class [class com.et.cloud.controller.AgentLibraryStore] to value [Mock for JdbcTemplate, hashCode: 796774130]
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.679 s - in com.et.cloud.controller.AgentWikiAnswerSkillTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  13.586 s
+[INFO] Finished at: 2026-10-31T20:42:49+08:00
+[INFO] ------------------------------------------------------------------------

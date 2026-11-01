@@ -60,7 +60,7 @@ When the user does not name a destination, the system SHALL present structured c
 
 ### Requirement: Agent creates a task folder and document using separate tools
 
-For each new content write, the Agent SHALL call a folder creation tool and then a document creation tool for the selected space. The folder SHALL use a normalized task-derived name followed by the server-local calendar date; the document SHALL use a concise title derived from the written content. The service SHALL append `（1）`, `（2）` and so on to a name that already exists among active siblings of the same kind. The document tool SHALL require a valid active folder in its selected space and SHALL return both the document and location IDs as strings.
+For each newly authored content write, the Agent SHALL call a folder creation tool and then a document creation tool for the selected space. For an explicitly requested webpage import, the Agent may use the user-selected existing writable folder or space root instead. The folder SHALL use a normalized task-derived name followed by the server-local calendar date; the document SHALL use a concise title derived from the written content. The service SHALL append `（1）`, `（2）` and so on to a name that already exists among active siblings of the same kind. The document tool SHALL require a valid active folder in its selected space and SHALL return both the document and location IDs as strings.
 
 #### Scenario: New task write
 - **GIVEN** a user asks to save content in a writable space

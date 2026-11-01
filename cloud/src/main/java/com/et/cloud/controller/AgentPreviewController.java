@@ -30,6 +30,7 @@ public class AgentPreviewController {
     private final AgentSkillCatalog skillCatalog;
     private final AgentWikiChoiceService choices;
     private final AgentPersonalFileReferences fileReferences;
+    @javax.annotation.Resource private com.et.cloud.service.impl.AgentUrlImportService urlImports;
 
     @Autowired
     public AgentPreviewController(UserService users, AgentPreviewProxy proxy, AgentConversationStore store,
@@ -133,6 +134,9 @@ public class AgentPreviewController {
     public static class WikiChoice {
         public String turnId;
         public String token;
+        @com.fasterxml.jackson.annotation.JsonIgnore public boolean unexpectedFields;
+        @com.fasterxml.jackson.annotation.JsonAnySetter
+        public void noteUnexpected(String name, Object value) { unexpectedFields = true; }
     }
 
     @PostMapping(value = "/conversations/{id}/wiki-choice/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -143,10 +147,39 @@ public class AgentPreviewController {
             throw new IllegalArgumentException("Invalid Wiki choice");
         User user = users.getLoginUser(request);
         AgentWikiChoiceService.Selection selected = choices.claim(user, Long.parseLong(id),
-                Long.parseLong(choice.turnId), choice.token);
+                Long.parseLong(choice.turnId), choice.token, choice.unexpectedFields);
+        if ("import_confirmation".equals(selected.kind)) return executeImportChoice(user, Long.parseLong(id), Long.parseLong(choice.turnId), selected);
         Ask resumed = new Ask(selected.originalQuery);
         resumed.conversationId = id;
         return streamInternal(resumed, request, selected.spaceId);
+    }
+
+    private StreamingResponseBody executeImportChoice(User user, long conversationId, long turnId, AgentWikiChoiceService.Selection selected) {
+        return out -> {
+            if (selected.cancelled) {
+                frame(out, "delta", Collections.singletonMap("content", "已取消网页导入。"));
+                frame(out, "done", Collections.singletonMap("usage", null));
+                return;
+            }
+            try {
+                Map<String,Object> result=urlImports.importUrls(user.getId(),Long.parseLong(selected.spaceId),
+                        selected.folderId == null ? null : Long.parseLong(selected.folderId),selected.urls,
+                        new com.et.cloud.service.impl.AgentUrlImportService.TargetSnapshot(selected.label,selected.pathSnapshot));
+                AgentWikiChoiceProjection projection=new AgentWikiChoiceProjection(choices,user,conversationId,turnId);
+                com.fasterxml.jackson.databind.node.ObjectNode event=JSON.createObjectNode();
+                event.put("name","import_wiki_urls"); event.set("result",JSON.valueToTree(result));
+                projection.project("wiki_tool_event",event);
+                String interaction=projection.interactionJson();
+                choices.finishImport(user,conversationId,selected,interaction);
+                Map<String,Object> display=projection.displayInteraction(interaction);
+                frame(out,"delta",Collections.singletonMap("content",projection.displayAnswer()));
+                frame(out,"wiki_result",display);
+                frame(out,"done",Collections.singletonMap("usage",null));
+            } catch (RuntimeException failure) {
+                frame(out,"delta",Collections.singletonMap("content","导入结果未知，请勿重复提交；可刷新会话查看状态。"));
+                frame(out,"done",Collections.singletonMap("usage",null));
+            }
+        };
     }
 
     private StreamingResponseBody streamInternal(Ask ask, HttpServletRequest request, String selectedSpaceId) {

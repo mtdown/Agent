@@ -1,0 +1,19 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/testhome -Dfile.encoding=UTF-8
+[INFO] Scanning for projects...
+[INFO] Artifact com.baomidou:mybatis-plus-bom:pom:3.5.9 is present in the local repository, but cached from a remote repository ID that is unavailable in current build context, verifying that is downloadable from [central (https://repo.maven.apache.org/maven2, default, releases)]
+[ERROR] [ERROR] Some problems were encountered while processing the POMs:
+[ERROR] Non-resolvable import POM: The following artifacts could not be resolved: com.baomidou:mybatis-plus-bom:pom:3.5.9 (present, but unavailable): Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact com.baomidou:mybatis-plus-bom:pom:3.5.9 has not been downloaded from it before. @ line 129, column 25
+[ERROR] 'dependencies.dependency.version' for com.baomidou:mybatis-plus-jsqlparser-4.9:jar is missing. @ line 74, column 21
+ @ 
+[ERROR] The build could not read 1 project -> [Help 1]
+[ERROR]   
+[ERROR]   The project com.et:cloud:0.0.1-SNAPSHOT (/work/cloud/pom.xml) has 2 errors
+[ERROR]     Non-resolvable import POM: The following artifacts could not be resolved: com.baomidou:mybatis-plus-bom:pom:3.5.9 (present, but unavailable): Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact com.baomidou:mybatis-plus-bom:pom:3.5.9 has not been downloaded from it before. @ line 129, column 25 -> [Help 2]
+[ERROR]     'dependencies.dependency.version' for com.baomidou:mybatis-plus-jsqlparser-4.9:jar is missing. @ line 74, column 21
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/ProjectBuildingException
+[ERROR] [Help 2] http://cwiki.apache.org/confluence/display/MAVEN/UnresolvableModelException

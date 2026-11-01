@@ -55,14 +55,21 @@ public class AgentWikiChoiceService {
 
     public static final class Selection {
         public final String originalQuery, spaceId, label;
+        public final String kind, folderId, messageId;
+        public final List<String> urls, pathSnapshot;
+        public final boolean cancelled;
         Selection(String originalQuery, String spaceId, String label) {
-            this.originalQuery = originalQuery;
-            this.spaceId = spaceId;
-            this.label = label;
+            this(originalQuery, spaceId, label, "destination_choice", null, null, java.util.Collections.emptyList(), java.util.Collections.emptyList(), false);
+        }
+        Selection(String originalQuery, String spaceId, String label, String kind, String folderId, String messageId, List<String> urls, List<String> pathSnapshot, boolean cancelled) {
+            this.originalQuery=originalQuery; this.spaceId=spaceId; this.label=label; this.kind=kind;
+            this.folderId=folderId; this.messageId=messageId; this.urls=urls; this.pathSnapshot=pathSnapshot; this.cancelled=cancelled;
         }
     }
 
     public Prepared prepare(User owner, long conversationId, long turnId, JsonNode request) {
+        if (request != null && request.path("importConfirmationRequired").asBoolean(false))
+            return prepareImport(owner, conversationId, turnId, request);
         if (owner == null || owner.getId() == null || request == null ||
                 !request.path("choiceRequired").asBoolean(false) || !request.path("candidates").isArray())
             throw new IllegalArgumentException("Invalid Wiki destination choice");
@@ -111,8 +118,60 @@ public class AgentWikiChoiceService {
         return new Prepared(display, internal.toString());
     }
 
+    private Prepared prepareImport(User owner, long conversationId, long turnId, JsonNode request) {
+        if (owner == null || owner.getId() == null) throw new IllegalArgumentException("Invalid import request");
+        String space = request.path("spaceId").asText("");
+        String folder = request.path("folderId").isNull() || request.path("folderId").isMissingNode() ? null : request.path("folderId").asText("");
+        if (!space.matches("[1-9][0-9]{0,18}") || (folder != null && !folder.matches("[1-9][0-9]{0,18}")))
+            throw new IllegalArgumentException("Invalid import destination");
+        spaces.requireSpaceAccess(Long.parseLong(space), owner, true);
+        String label = displayLabelFor(owner, space), folderLabel = "根目录";
+        List<String> pathSnapshot=new ArrayList<>(); List<String> folderSegments=new ArrayList<>();
+        if (folder != null) {
+            String cursor=null; Map<String,Map<?,?>> folders=new HashMap<>();
+            do {
+                Map<String,Object> page=directory.list(owner.getId(),space,cursor,100);
+                for (Object raw : (List<?>)page.get("folders")) {
+                    Map<?,?> item=(Map<?,?>)raw; folders.put(String.valueOf(item.get("id")),item);
+                }
+                cursor=(String)page.get("nextCursor");
+            } while(cursor != null);
+            List<String> path=new ArrayList<>(); java.util.Set<String> seen=new java.util.HashSet<>(); String next=folder;
+            while(next!=null) {
+                if(!seen.add(next) || path.size()>=100) throw new IllegalArgumentException("Invalid import folder path");
+                Map<?,?> item=folders.get(next);
+                if(item==null) throw new IllegalArgumentException("Import folder is unavailable");
+                path.add(String.valueOf(item.get("name"))); pathSnapshot.add(next + ":" + String.valueOf(item.get("name")));
+                Object parent=item.get("parentId"); next=parent==null ? null : String.valueOf(parent);
+            }
+            java.util.Collections.reverse(path); java.util.Collections.reverse(pathSnapshot); folderSegments.addAll(path); folderLabel=String.join(" / ",path);
+        }
+        JsonNode urls=request.path("urls");
+        if (!urls.isArray() || urls.isEmpty() || urls.size()>20) throw new IllegalArgumentException("Invalid import URLs");
+        ObjectNode state=JSON.createObjectNode(); state.put("kind","import_confirmation");
+        state.put("ownerId",owner.getId().toString()); state.put("conversationId",Long.toString(conversationId));
+        state.put("turnId",Long.toString(turnId)); state.put("expiresAt",Instant.now().toEpochMilli()+TTL_MILLIS);
+        state.put("spaceId",space); if(folder==null) state.putNull("folderId"); else state.put("folderId",folder);
+        state.put("spaceLabel",label); state.put("folderName",folderLabel); state.put("status","pending");
+        ArrayNode path=state.putArray("pathSnapshot"); pathSnapshot.forEach(path::add);
+        ArrayNode segments=state.putArray("folderSegments"); folderSegments.forEach(segments::add);
+        ArrayNode stored=state.putArray("urls");
+        for(JsonNode url:urls) {
+            if (!url.isTextual() || url.asText().isBlank() || url.asText().length()>2048 || url.asText().matches(".*[\\r\\n,].*")) throw new IllegalArgumentException("Invalid import URL");
+            stored.add(url.asText());
+        }
+        byte[] confirm=new byte[32],cancel=new byte[32]; RANDOM.nextBytes(confirm); RANDOM.nextBytes(cancel);
+        state.put("confirmToken",Base64.getUrlEncoder().withoutPadding().encodeToString(confirm));
+        state.put("cancelToken",Base64.getUrlEncoder().withoutPadding().encodeToString(cancel));
+        return new Prepared(safeDisplay(state.toString(),false),state.toString());
+    }
+
     @Transactional
     public Selection claim(User owner, long conversationId, long turnId, String token) {
+        return claim(owner,conversationId,turnId,token,false);
+    }
+    @Transactional
+    public Selection claim(User owner, long conversationId, long turnId, String token, boolean unexpectedFields) {
         if (owner == null || owner.getId() == null || token == null || !token.matches("[A-Za-z0-9_-]{43}"))
             throw new IllegalArgumentException("Invalid or expired choice");
         List<Integer> conversations = jdbc.query("SELECT busy FROM agent_conversation WHERE id=? " +
@@ -132,12 +191,28 @@ public class AgentWikiChoiceService {
         final JsonNode internal;
         try { internal = JSON.readTree(String.valueOf(rows.get(0).get("interactionJson"))); }
         catch (Exception e) { throw new IllegalArgumentException("Invalid choice state", e); }
-        if (!"destination_choice".equals(internal.path("kind").asText()) ||
+        String kind=internal.path("kind").asText();
+        if (!("destination_choice".equals(kind) || "import_confirmation".equals(kind)) ||
                 !owner.getId().toString().equals(internal.path("ownerId").asText()) ||
                 !Long.toString(conversationId).equals(internal.path("conversationId").asText()) ||
                 !Long.toString(turnId).equals(internal.path("turnId").asText()) ||
                 internal.path("expiresAt").asLong(0) <= Instant.now().toEpochMilli())
             throw new IllegalArgumentException("Invalid or expired choice");
+        if ("import_confirmation".equals(kind)) {
+            if (unexpectedFields) throw new IllegalArgumentException("Unexpected import confirmation fields");
+            if (!"pending".equals(internal.path("status").asText())) throw new IllegalArgumentException("Invalid or expired choice");
+            boolean confirm=MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),internal.path("confirmToken").asText("").getBytes(StandardCharsets.UTF_8));
+            boolean cancel=MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),internal.path("cancelToken").asText("").getBytes(StandardCharsets.UTF_8));
+            if (!confirm && !cancel) throw new IllegalArgumentException("Invalid or expired choice");
+            ObjectNode updated=(ObjectNode)internal.deepCopy(); updated.put("status",cancel ? "cancelled" : "unknown");
+            if (jdbc.update("UPDATE agent_message SET choiceConsumed=1, interactionJson=? WHERE id=? AND choiceConsumed=0", updated.toString(), rows.get(0).get("id")) != 1)
+                throw new IllegalArgumentException("Choice was already used");
+            List<String> urls=new ArrayList<>(); internal.path("urls").forEach(url -> urls.add(url.asText()));
+            List<String> pathSnapshot=new ArrayList<>(); internal.path("pathSnapshot").forEach(node -> pathSnapshot.add(node.asText()));
+            return new Selection(null, internal.path("spaceId").asText(), internal.path("spaceLabel").asText(), kind,
+                    internal.path("folderId").isNull() ? null : internal.path("folderId").asText(),
+                    String.valueOf(rows.get(0).get("id")), java.util.Collections.unmodifiableList(urls), java.util.Collections.unmodifiableList(pathSnapshot), cancel);
+        }
         JsonNode selected = null;
         for (JsonNode option : internal.path("options")) {
             if (MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),
@@ -156,6 +231,16 @@ public class AgentWikiChoiceService {
                 "AND conversationId=? AND role='user' AND status='DONE'", String.class,
                 turnId, conversationId);
         return new Selection(original, spaceId, selected.path("label").asText());
+    }
+
+    public void finishImport(User owner, long conversationId, Selection selection, String resultJson) {
+        if (owner == null || owner.getId() == null || selection == null || !"import_confirmation".equals(selection.kind) || selection.cancelled)
+            throw new IllegalArgumentException("Invalid import result");
+        int updated=jdbc.update("UPDATE agent_message m JOIN agent_conversation c ON c.id=m.conversationId " +
+                "SET m.interactionJson=? WHERE m.id=? AND m.conversationId=? AND m.choiceConsumed=1 " +
+                "AND c.ownerUserId=? AND c.isDelete=0 AND JSON_UNQUOTE(JSON_EXTRACT(m.interactionJson,'$.status'))='unknown'",
+                resultJson, Long.parseLong(selection.messageId), conversationId, owner.getId());
+        if(updated!=1) throw new IllegalStateException("Import result could not be recorded");
     }
 
     public static String displayLabel(String type, String name) {
@@ -267,7 +352,7 @@ public class AgentWikiChoiceService {
         try {
             JsonNode state = JSON.readTree(internalJson);
             String kind = state.path("kind").asText();
-            if ("destination_choice".equals(kind)) return safeDisplay(internalJson, consumed);
+            if ("destination_choice".equals(kind) || "import_confirmation".equals(kind)) return safeDisplay(internalJson, consumed);
             List<JsonNode> documentItems = new ArrayList<>();
             if (state.path("documents").isArray()) state.path("documents").forEach(documentItems::add);
             else if ("wiki_write_result".equals(kind)) documentItems.add(state);
@@ -365,7 +450,7 @@ public class AgentWikiChoiceService {
             List<Map<String,Object>> out=new ArrayList<>();
             for(int i=0;i<states.size();i++) {
                 JsonNode state=states.get(i); String kind=state.path("kind").asText();
-                if ("destination_choice".equals(kind)) {out.add(safeDisplay(inputs.get(i),consumed.get(i))); continue;}
+                if ("destination_choice".equals(kind) || "import_confirmation".equals(kind)) {out.add(safeDisplay(inputs.get(i),consumed.get(i))); continue;}
                 List<Map<String,Object>> own=new ArrayList<>();
                 for(int j=0;j<docCounts.get(i);j++) { Map<String,Object> item=new LinkedHashMap<>((Map<String,Object>)items.get(docOffset++)); item.put("turnId",state.path("turnId").asText()); own.add(item); }
                 for(int j=0;j<folderCounts.get(i);j++) { Map<String,Object> item=new LinkedHashMap<>((Map<String,Object>)items.get(folderOffset++)); item.put("turnId",state.path("turnId").asText()); own.add(item); }
@@ -389,20 +474,28 @@ public class AgentWikiChoiceService {
             int d=0, f=0;
             for (JsonNode op : state.path("operations")) {
                 String tool=op.path("tool").asText(), status=op.path("status").asText();
-                if (!java.util.Set.of("create_wiki_folder","create_wiki_document","write_wiki_document").contains(tool)) continue;
+                if (!java.util.Set.of("create_wiki_folder","create_wiki_document","write_wiki_document","import_wiki_urls").contains(tool)) continue;
                 if ("success".equals(status)) {
                     int index="create_wiki_folder".equals(tool) ? documents.size()+f++ : d++;
-                    if (index < resolved.size()) ordered.add(resolved.get(index));
+                    if (index < resolved.size()) {
+                        Map<String,Object> item=new LinkedHashMap<>(resolved.get(index));
+                        if (op.hasNonNull("sourceUrl")) item.put("sourceUrl",op.path("sourceUrl").asText());
+                        else if (op.hasNonNull("input")) item.put("sourceUrl",op.path("input").asText());
+                        if (op.hasNonNull("warning")) item.put("warning","文档已保存，缓存刷新失败");
+                        ordered.add(item);
+                    }
                 } else {
                     Map<String,Object> item=new LinkedHashMap<>(); item.put("kind","wiki_operation_result");
-                    item.put("operation",tool); item.put("status",java.util.Set.of("failed","blocked","unknown").contains(status) ? status : "unavailable");
+                    if (op.hasNonNull("input")) item.put("sourceUrl",op.path("input").asText());
+                    if ("target_changed".equals(op.path("reason").asText())) item.put("reason","target_changed");
+                    item.put("operation",tool); item.put("status",java.util.Set.of("failed","blocked","unknown","not_executed").contains(status) ? status : "unavailable");
                     ordered.add(item);
                 }
             }
         } else ordered.addAll(resolved);
         Map<String,Object> display=new LinkedHashMap<>();
         if ("wiki_write_result".equals(kind) && !resolved.isEmpty() && "wiki_write_result".equals(resolved.get(0).get("kind")) && resolved.get(0).containsKey("openToken")) {
-            display.putAll(resolved.get(0)); display.remove("validPath");
+            display.putAll(ordered.isEmpty() ? resolved.get(0) : ordered.get(0)); display.remove("validPath");
             if (state.path("operations").isArray() && ordered.size()>1) display.put("results",ordered);
             else if (!state.path("operations").isArray() && resolved.size()>1) display.put("results",resolved);
             return display;
@@ -423,15 +516,24 @@ public class AgentWikiChoiceService {
         }
         if (raw instanceof List<?>) for (Object item : (List<?>)raw) {
             Map<?,?> row=(Map<?,?>)item; String kind=String.valueOf(row.get("kind"));
-            if ("wiki_write_result".equals(kind)) answer.append("已创建文档「").append(row.get("documentTitle")).append("」，当前位置：").append(row.get("spaceLabel")).append(" / ").append(row.get("folderName")).append("。");
+            if ("wiki_write_result".equals(kind)) {
+                answer.append("已创建文档「").append(row.get("documentTitle")).append("」，当前位置：").append(row.get("spaceLabel")).append(" / ").append(row.get("folderName")).append("。");
+                if (row.containsKey("sourceUrl")) answer.append("来源：").append(row.get("sourceUrl")).append("。");
+                if (row.containsKey("warning")) answer.append("文档已保存，缓存刷新失败。");
+            }
             else if ("wiki_folder_result".equals(kind)) answer.append("已创建文件夹：").append(row.get("spaceLabel")).append(" / ").append(row.get("folderName")).append("。");
             else if ("wiki_partial_result".equals(kind)) answer.append("已在").append(row.get("spaceLabel")).append("创建文件夹「").append(row.get("folderName")).append("」，文档尚未保存。");
             else if ("wiki_operation_result".equals(kind)) {
                 String op=String.valueOf(row.get("operation")), status=String.valueOf(row.get("status"));
-                String label="create_wiki_folder".equals(op) ? "创建文件夹" : "create_wiki_document".equals(op) ? "创建文档" : "创建文件夹和文档";
+                String label="import_wiki_urls".equals(op) ? "网页导入" : "create_wiki_folder".equals(op) ? "创建文件夹" : "create_wiki_document".equals(op) ? "创建文档" : "创建文件夹和文档";
+                if (row.containsKey("sourceUrl")) answer.append("来源：").append(row.get("sourceUrl")).append("。 ");
                 if ("unknown".equals(status)) answer.append(answer.length()>0 ? "另一次写入结果未知（" : "写入结果未知（").append(label).append("），请先核查目标位置。");
                 else if ("blocked".equals(status)) answer.append(label).append("操作被阻止。");
-                else if ("failed".equals(status)) answer.append(label).append("操作失败。");
+                else if ("failed".equals(status)) {
+                    if ("target_changed".equals(row.get("reason"))) answer.append("目标名称或目录路径已变化，请重新确认。");
+                    else answer.append(label).append("操作失败。");
+                }
+                else if ("not_executed".equals(status)) answer.append(label).append("未执行。");
                 else answer.append(label).append("结果当前不可用。");
             } else answer.append("一项已确认的结果当前不可用。");
         }
@@ -448,6 +550,17 @@ public class AgentWikiChoiceService {
             Map<String, Object> display = new LinkedHashMap<>();
             display.put("kind", state.path("kind").asText());
             display.put("turnId", state.path("turnId").asText());
+            if ("import_confirmation".equals(state.path("kind").asText())) {
+                display.put("spaceLabel",state.path("spaceLabel").asText()); display.put("folderName",state.path("folderName").asText());
+                List<String> segments=new ArrayList<>(); state.path("folderSegments").forEach(node -> segments.add(node.asText())); display.put("folderSegments",segments);
+                List<String> urls=new ArrayList<>(); state.path("urls").forEach(url -> urls.add(url.asText())); display.put("urls",urls);
+                display.put("expiresAt",state.path("expiresAt").asLong()); display.put("consumed",consumed);
+                display.put("status",state.path("status").asText("unknown"));
+                if(!consumed && "pending".equals(state.path("status").asText())) {
+                    display.put("confirmToken",state.path("confirmToken").asText()); display.put("cancelToken",state.path("cancelToken").asText());
+                }
+                return display;
+            }
             if ("wiki_write_result".equals(state.path("kind").asText())) {
                 display.put("spaceLabel", state.path("spaceLabel").asText());
                 display.put("folderName", state.path("folderName").asText(""));
