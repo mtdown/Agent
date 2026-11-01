@@ -8,6 +8,8 @@
 
 正式新增、优化、重构或修复均使用 OpenSpec。新任务先检查工作区；存在未提交改动、未跟踪文件、分支占用或脚本拒绝创建分支时停止并向负责人说明，不自行清理或绕过。满足条件后使用根目录 `start-task.ps1` 从最新 `origin/main` 创建远程任务分支及本地跟踪分支，再运行 `openspec new change <change-id>`。新增、优化、重构分支为 `feature/<name>开发`，修复为 `fix/<name>修复`，name 为简短英文 kebab-case。不得直接在 main、master 开发或修改 OpenSpec；已有 change 先确认所属任务分支，无法确认则停止上报。开发、验证和归档准备均在该分支进行。
 
+改动按判据分为三级流程：**L0** 仅限文档、脚本、整理类改动，且不涉及对外契约、数据库、CI/CD 与公开 API——免 `design.md` 与 `specs` delta，保留 proposal 与 tasks；**L1** 为标准流程，保留全套工件；**L2** 涉及对外契约、数据库迁移、CI/CD、公开 API 或权限模型——保留全套工件并额外记录影响面与回滚方案。分级判据为排除式：凡不能明确排除对外契约、数据库、CI/CD、公开 API 影响的改动，一律不是 L0。
+
 `proposal.md` 写背景、范围及验收；`design.md` 写取舍、契约、权限、数据、缓存及风险；`specs/<capability>/spec.md` 写可验证场景；`tasks.md` 写分工、验证证据、问题编号和回滚办法，不维护问题当前状态。新增或修改文本的字节转换显式使用 UTF-8；PowerShell 5.1 的非 ASCII 脚本使用带 BOM 的 UTF-8 并验证解析。`ALIYUN_AI_API_KEY` 及相关废弃功能不纳入默认范围，除非负责人明确重启。
 
 新问题通过 `scripts/issue_tracker.py` 管理，本机 SQLite 是问题当前状态的唯一入口；命令和参数见 [使用说明](scripts/README-issue-tracker.md)。开发、测试按交接顺序更新问题和共享报告；独立复核者只读。报告保留当时的结果及证据。测试期间开发者停止写入被测文件。需启停本地开发服务时按顺序使用任务分支根目录的 `stop-dev.ps1`、`start-dev.ps1`；默认前端 `127.0.0.1:3000`，后端 `127.0.0.1:8123`，日志在 `tmp/`。`start-main-dev.ps1`、`stop-main-dev.ps1` 仅供负责人查看 main。
