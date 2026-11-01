@@ -99,11 +99,18 @@ jobs:
             printf 'COS_SECRET_KEY=%s\n' "$COS_SECRET_KEY"
             printf 'RAG_EMBEDDING_API_KEY=%s\n' "$RAG_EMBEDDING_API_KEY"
             printf 'RAG_LLM_API_KEY=%s\n' "$RAG_LLM_API_KEY"
+            printf 'DEEPSEEK_WEB_API_KEY=%s\n' "$DEEPSEEK_WEB_API_KEY"
             printf 'AGENT_INTERNAL_KEY=%s\n' "$AGENT_INTERNAL_KEY"
             printf 'DOC_USERNAME=%s\n' "${DOC_USERNAME:-admin}"
             printf 'DOC_PASSWORD=%s\n' "$DOC_PASSWORD"
             printf 'HTTP_PORT=8080\n'
           } > bundle/.env
+          # 自检：Secret 读到了不等于写进了 .env——之前就是因为只加 env 没加 printf，
+          # 日志里 env 显示有值、服务器 .env 却没有这一行，排查花了很久。
+          # 只校验「有没有这一行」，不打印值。
+          for required in DB_PASSWORD RAG_LLM_API_KEY DEEPSEEK_WEB_API_KEY HTTP_PORT; do
+            grep -q "^${required}=" bundle/.env || echo "::warning::bundle/.env 缺少 ${required} 行"
+          done
 
       - name: 打包
         run: tar czf bundle.tar.gz -C bundle .
