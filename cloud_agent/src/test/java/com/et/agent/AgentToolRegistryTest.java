@@ -31,8 +31,9 @@ class AgentToolRegistryTest {
                 Map.entry("read_file", AgentToolRegistry.Domain.FILE), Map.entry("read_file_segment", AgentToolRegistry.Domain.FILE),
                 Map.entry("search_file", AgentToolRegistry.Domain.FILE), Map.entry("write_wiki_document", AgentToolRegistry.Domain.WIKI),
                 Map.entry("create_wiki_folder", AgentToolRegistry.Domain.WIKI), Map.entry("create_wiki_document", AgentToolRegistry.Domain.WIKI),
+                Map.entry("import_wiki_urls", AgentToolRegistry.Domain.WIKI),
                 Map.entry("list_writable_wiki_locations", AgentToolRegistry.Domain.WIKI), Map.entry("plan_wiki_destination", AgentToolRegistry.Domain.WIKI));
-        java.util.Set<String> writes = java.util.Set.of("create_skill", "create_code", "write_file", "write_wiki_document", "create_wiki_folder", "create_wiki_document");
+        java.util.Set<String> writes = java.util.Set.of("create_skill", "create_code", "write_file", "write_wiki_document", "create_wiki_folder", "create_wiki_document", "import_wiki_urls");
         assertEquals(domains.keySet(), AgentToolRegistry.names());
         domains.forEach((name, domain) -> {
             assertEquals(domain, AgentToolRegistry.domain(name), name);

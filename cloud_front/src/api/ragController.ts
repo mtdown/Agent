@@ -2,6 +2,7 @@
 /* eslint-disable */
 // API 手写模块：RAG 问答（SSE 流式走 fetch，axios 不支持流式读取）
 import request from '@/request'
+import type { ImportConfirmation } from '@/pages/aiAssistant/importConfirmation'
 
 /**
  * 真实后端地址（axios baseURL）。开放 API 的 curl 示例必须指向它，
@@ -76,6 +77,8 @@ export interface AgentWikiResult {
   folderName: string
   documentTitle: string
   openToken: string
+  sourceUrl?: string
+  warning?: string
   results?: AgentWikiResults['results']
 }
 export interface AgentWikiResults {
@@ -83,7 +86,7 @@ export interface AgentWikiResults {
   turnId: string
   unknown: number
   failed: number
-  results: Array<AgentWikiResult | { kind: 'wiki_folder_result'; turnId: string; spaceLabel: string; folderName: string } | { kind: 'wiki_unavailable_result'; turnId: string } | { kind: 'wiki_operation_result'; operation: 'create_wiki_folder' | 'create_wiki_document' | 'write_wiki_document'; status: 'failed' | 'blocked' | 'unknown' | 'unavailable' }>
+  results: Array<AgentWikiResult | { kind: 'wiki_folder_result'; turnId: string; spaceLabel: string; folderName: string } | { kind: 'wiki_unavailable_result'; turnId: string } | { kind: 'wiki_operation_result'; operation: 'create_wiki_folder' | 'create_wiki_document' | 'write_wiki_document' | 'import_wiki_urls'; status: 'failed' | 'blocked' | 'unknown' | 'not_executed' | 'unavailable'; sourceUrl?: string }>
 }
 export interface AgentWikiPartialResult {
   kind: 'wiki_partial_result'
@@ -155,6 +158,7 @@ export interface RagAskHandlers {
   onDone?: (done: RagAskDone) => void
   onError?: (message: string) => void
   onWikiChoice?: (choice: AgentWikiChoice) => void
+  onImportConfirmation?: (confirmation: ImportConfirmation) => void
   onWikiResult?: (result: AgentWikiResult | AgentWikiPartialResult | AgentWikiResults) => void
 }
 
@@ -274,7 +278,7 @@ export interface AgentStoredMessage {
   status: 'PENDING' | 'DONE' | 'FAILED'
   citationsJson?: string | null
   statsJson?: string | null
-  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | AgentWikiResults | null
+  interaction?: AgentWikiChoice | AgentWikiResult | AgentWikiPartialResult | AgentWikiResults | ImportConfirmation | null
   personalFileReferences?: { token: string }[]
 }
 export interface PersonalFileReference { token: string; name: string; start: number | string; end: number | string }
@@ -349,7 +353,11 @@ function handleFrame(frame: string, handlers: RagAskHandlers) {
       handlers.onError?.(String(payload.message ?? '问答服务异常'))
       break
     case 'wiki_choice':
-      handlers.onWikiChoice?.(payload as AgentWikiChoice)
+      if (payload?.kind === 'import_confirmation') handlers.onImportConfirmation?.(payload as ImportConfirmation)
+      else handlers.onWikiChoice?.(payload as AgentWikiChoice)
+      break
+    case 'wiki_import_confirmation':
+      handlers.onImportConfirmation?.(payload as ImportConfirmation)
       break
     case 'wiki_result':
       handlers.onWikiResult?.(payload as AgentWikiResult | AgentWikiPartialResult | AgentWikiResults)

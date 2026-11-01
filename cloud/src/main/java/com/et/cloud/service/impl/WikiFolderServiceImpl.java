@@ -39,6 +39,9 @@ import java.util.stream.Collectors;
 public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFolder> implements WikiFolderService {
 
     @Resource
+    private WikiMutationLock mutationLock;
+
+    @Resource
     private WikiSpaceService wikiSpaceService;
 
     @Resource
@@ -69,7 +72,9 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long createFolder(Long spaceId, Long parentId, String name, User loginUser) {
+        loginUser = mutationLock.acquire(spaceId, loginUser.getId());
         wikiSpaceService.requireSpaceAccess(spaceId, loginUser, true);
         ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "文件夹名称不能为空");
         if (parentId != null) {
@@ -87,9 +92,12 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
     }
 
     @Override
+    @Transactional(noRollbackFor = RuntimeException.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean renameFolder(Long folderId, String name, User loginUser) {
         WikiFolder oldFolder = requireFolderAccess(folderId, null, loginUser, true);
         ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "文件夹名称不能为空");
+        loginUser = mutationLock.acquire(oldFolder.getSpaceId(), loginUser.getId());
+        oldFolder = requireFolderAccess(folderId, oldFolder.getSpaceId(), loginUser, true);
         oldFolder.setName(name);
         oldFolder.setEditTime(new Date());
         boolean result = this.updateById(oldFolder);
@@ -98,8 +106,11 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean moveFolder(Long folderId, Long parentId, User loginUser) {
         WikiFolder oldFolder = requireFolderAccess(folderId, null, loginUser, true);
+        loginUser = mutationLock.acquire(oldFolder.getSpaceId(), loginUser.getId());
+        oldFolder = requireFolderAccess(folderId, oldFolder.getSpaceId(), loginUser, true);
         ThrowUtils.throwIf(Objects.equals(folderId, parentId), ErrorCode.PARAMS_ERROR, "不能移动到自身");
         if (parentId != null) {
             WikiFolder parent = requireFolderAccess(parentId, oldFolder.getSpaceId(), loginUser, true);
@@ -119,9 +130,11 @@ public class WikiFolderServiceImpl extends ServiceImpl<WikiFolderMapper, WikiFol
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean deleteFolderTree(Long folderId, User loginUser) {
         WikiFolder oldFolder = requireFolderAccess(folderId, null, loginUser, true);
+        loginUser = mutationLock.acquire(oldFolder.getSpaceId(), loginUser.getId());
+        oldFolder = requireFolderAccess(folderId, oldFolder.getSpaceId(), loginUser, true);
         List<Long> subtreeIds = collectFolderSubtreeIds(oldFolder.getSpaceId(), folderId);
         String ids = joinIds(subtreeIds);
         Date now = new Date();

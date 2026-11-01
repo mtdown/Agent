@@ -37,6 +37,7 @@ public final class AgentWikiChoiceProjection implements AgentPreviewProxy.WikiEv
         }
         if (!"wiki_tool_event".equals(event)) return null;
         String name = data.path("name").asText("");
+        if ("import_wiki_urls".equals(name)) { appendImports(data.path("result")); return null; }
         if (!"create_wiki_folder".equals(name) && !"create_wiki_document".equals(name) && !"write_wiki_document".equals(name)) return null;
         attempted = true;
         JsonNode result = data.path("result");
@@ -66,6 +67,40 @@ public final class AgentWikiChoiceProjection implements AgentPreviewProxy.WikiEv
         }
         return null;
     }
+    private void appendImports(JsonNode result) {
+        attempted = true;
+        if (!result.path("items").isArray()) {
+            ObjectNode op=JSON.createObjectNode(); op.put("tool","import_wiki_urls");
+            String status=result.path("status").asText("");
+            if ("blocked".equals(status)) { op.put("status","blocked"); failed++; }
+            else if (result.path("saved").isBoolean() && !result.path("saved").asBoolean()) { op.put("status","failed"); failed++; }
+            else { op.put("status","unknown"); unknown++; }
+            operations.add(op);
+            return;
+        }
+        for (JsonNode entry : result.path("items")) {
+            ObjectNode op=JSON.createObjectNode(); op.put("tool","import_wiki_urls");
+            String input=entry.path("input").asText(""); op.put("input",input);
+            String status=entry.path("status").asText("unknown"); op.put("status",status); operations.add(op);
+            if ("unknown".equals(status)) { unknown++; continue; }
+            if ("failed".equals(status) || "blocked".equals(status)) {
+                if ("目标名称或目录路径已变化，请重新确认".equals(entry.path("message").asText())) op.put("reason","target_changed");
+                failed++; continue;
+            }
+            if (!"success".equals(status)) continue;
+            String id=entry.path("documentId").asText("");
+            if (!id.matches("[1-9][0-9]{0,18}")) { op.put("status","unknown"); unknown++; continue; }
+            ObjectNode doc=JSON.createObjectNode(); doc.put("documentId",id);
+            doc.put("spaceId",entry.path("spaceId").asText()); doc.put("folderId",entry.path("folderId").asText());
+            doc.put("documentTitle",entry.path("title").asText()); doc.put("folderName",entry.path("folderName").asText());
+            doc.put("spaceLabel",safeLabel(entry.path("spaceId").asText()));
+            byte[] bytes=new byte[32]; RANDOM.nextBytes(bytes);
+            doc.put("openToken",Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
+            documents.add(doc); op.put("documentId",id);
+            if (entry.hasNonNull("sourceUrl")) op.put("sourceUrl",entry.path("sourceUrl").asText());
+            if (entry.hasNonNull("warning")) op.put("warning","文档已保存，缓存刷新失败");
+        }
+    }
     private String safeLabel(String space) {
         try { return choices.displayLabelFor(owner, space); } catch (RuntimeException ignored) { return ""; }
     }
@@ -73,7 +108,9 @@ public final class AgentWikiChoiceProjection implements AgentPreviewProxy.WikiEv
         ObjectNode state = JSON.createObjectNode();
         boolean singlePair = folders.isEmpty() || (folders.size() == 1 && documents.size() == 1 &&
                 folders.get(0).path("folderId").asText().equals(documents.get(0).path("folderId").asText()));
-        String kind = documents.size() == 1 && singlePair && (folders.isEmpty() || (unknown == 0 && failed == 0)) ? "wiki_write_result" :
+        boolean importOperation = operations.stream().anyMatch(op -> "import_wiki_urls".equals(op.path("tool").asText()));
+        boolean importCanCollapse = !importOperation || (unknown == 0 && failed == 0 && operations.size() == 1);
+        String kind = documents.size() == 1 && singlePair && (folders.isEmpty() || (unknown == 0 && failed == 0)) && importCanCollapse ? "wiki_write_result" :
                 documents.isEmpty() && folders.size() == 1 && unknown == 0 && failed == 1 && operations.size() == 2 && "create_wiki_document".equals(operations.get(1).path("tool").asText()) && "failed".equals(operations.get(1).path("status").asText()) ? "wiki_partial_result" : "wiki_write_results";
         state.put("kind", kind); state.put("ownerId", owner.getId().toString());
         state.put("conversationId", Long.toString(conversationId)); state.put("turnId", Long.toString(turnId));
@@ -96,7 +133,7 @@ public final class AgentWikiChoiceProjection implements AgentPreviewProxy.WikiEv
     }
     @Override public Map<String, Object> displayInteraction(String internal) { return choices.currentDisplay(owner, internal, false); }
     @Override public String displayAnswer() {
-        if (choiceJson != null && !attempted) return "请选择写入空间";
+        if (choiceJson != null && !attempted) return choiceJson.contains("import_confirmation") ? "请确认网页导入" : "请选择写入空间";
         if (!attempted) return null;
         Map<String,Object> display = choices.currentDisplay(owner, state().toString(), false);
         return AgentWikiChoiceService.answerFor(display, unknown, failed);

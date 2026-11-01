@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
 public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace> implements WikiSpaceService {
 
     @Resource
+    private WikiMutationLock mutationLock;
+
+    @Resource
     private WikiSpaceUserMapper wikiSpaceUserMapper;
 
     @Resource
@@ -172,6 +175,7 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long createTeamSpace(String name, User loginUser) {
         requireAdmin(loginUser);
         ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "团队名称不能为空");
@@ -186,7 +190,10 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Long addTeamMember(Long spaceId, Long userId, String spaceRole, User loginUser) {
+        requireAdmin(loginUser);
+        loginUser = mutationLock.acquire(spaceId, loginUser.getId());
         requireAdmin(loginUser);
         WikiSpace wikiSpace = this.getById(spaceId);
         ThrowUtils.throwIf(wikiSpace == null || !Objects.equals(wikiSpace.getType(), TYPE_TEAM), ErrorCode.PARAMS_ERROR);
@@ -210,16 +217,20 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean removeTeamMember(Long spaceId, Long userId, User loginUser) {
         requireAdmin(loginUser);
         ThrowUtils.throwIf(spaceId == null || userId == null, ErrorCode.PARAMS_ERROR);
+        requireAdmin(mutationLock.acquire(spaceId, loginUser.getId()));
         return wikiSpaceUserMapper.delete(new QueryWrapper<WikiSpaceUser>().eq("spaceId", spaceId).eq("userId", userId)) >= 0;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean exitTeamSpace(Long spaceId, User loginUser) {
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
         ThrowUtils.throwIf(spaceId == null, ErrorCode.PARAMS_ERROR);
+        loginUser = mutationLock.acquire(spaceId, loginUser.getId());
         return wikiSpaceUserMapper.delete(new QueryWrapper<WikiSpaceUser>().eq("spaceId", spaceId).eq("userId", loginUser.getId())) >= 0;
     }
 
@@ -263,11 +274,15 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
     }
 
     @Override
+    @Transactional(noRollbackFor = RuntimeException.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean renameSpace(Long spaceId, String name, User loginUser) {
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
         ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(StrUtil.isBlank(name), ErrorCode.PARAMS_ERROR, "空间名称不能为空");
         WikiSpace wikiSpace = this.getById(spaceId);
+        ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
+        loginUser = mutationLock.acquire(spaceId, loginUser.getId());
+        wikiSpace = this.getById(spaceId);
         ThrowUtils.throwIf(wikiSpace == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(
                 !checkSpaceRenamable(wikiSpace, loginUser),
@@ -284,10 +299,12 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Boolean deleteTeamSpace(Long spaceId, Boolean confirm, User loginUser) {
         requireAdmin(loginUser);
         ThrowUtils.throwIf(!Boolean.TRUE.equals(confirm), ErrorCode.PARAMS_ERROR, "请确认删除");
+        loginUser = mutationLock.acquire(spaceId, loginUser.getId());
+        requireAdmin(loginUser);
         WikiSpace wikiSpace = this.getById(spaceId);
         ThrowUtils.throwIf(wikiSpace == null || !Objects.equals(wikiSpace.getType(), TYPE_TEAM), ErrorCode.PARAMS_ERROR);
         long folderCount = wikiFolderMapper.selectCount(new QueryWrapper<com.et.cloud.model.entity.WikiFolder>().eq("spaceId", spaceId));
@@ -298,8 +315,7 @@ public class WikiSpaceServiceImpl extends ServiceImpl<WikiSpaceMapper, WikiSpace
             return true;
         }
         Date now = new Date();
-        wikiSpace.setIsDelete(1);
-        this.updateById(wikiSpace);
+        ThrowUtils.throwIf(baseMapper.logicalDeleteById(spaceId) != 1, ErrorCode.OPERATION_ERROR, "空间删除失败");
         wikiFolderMapper.logicalDeleteBySpaceId(spaceId, now, loginUser.getId());
         documentWikiMapper.logicalDeleteBySpaceId(spaceId, now, loginUser.getId());
         wikiCacheManager.clearSpace(spaceId);

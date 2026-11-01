@@ -1,0 +1,111 @@
+Sanitized test results only; original raw log retained in private test directory.
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.config.RequestWrapperTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.112 s - in com.et.cloud.config.RequestWrapperTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.config.OpenApiLocalProfileTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s - in com.et.cloud.config.OpenApiLocalProfileTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.config.SaTokenConfigureTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.356 s - in com.et.cloud.config.SaTokenConfigureTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.CloudApplicationTests
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.803 s - in com.et.cloud.CloudApplicationTests
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RrfFusionTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.et.cloud.rag.RrfFusionTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagApiKeyServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.247 s - in com.et.cloud.rag.RagApiKeyServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.LexicalIndexTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s - in com.et.cloud.rag.LexicalIndexTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.LlmRagQueryExpansionClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.056 s - in com.et.cloud.rag.LlmRagQueryExpansionClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagRerankClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.362 s - in com.et.cloud.rag.RagRerankClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.OpenRagControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.04 s - in com.et.cloud.rag.OpenRagControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagEmbeddingClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.629 s - in com.et.cloud.rag.RagEmbeddingClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.WikiRagIndexServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.139 s - in com.et.cloud.rag.WikiRagIndexServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.MarkdownChunkerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.312 s - in com.et.cloud.rag.MarkdownChunkerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.DocumentWikiRagHookTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s - in com.et.cloud.rag.DocumentWikiRagHookTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.ChunkerProfileTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.et.cloud.rag.ChunkerProfileTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagPropertiesBindingTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.et.cloud.rag.RagPropertiesBindingTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagSearchServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 27, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.135 s - in com.et.cloud.rag.RagSearchServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.InMemoryCosineVectorStoreTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.et.cloud.rag.InMemoryCosineVectorStoreTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagLlmClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.216 s - in com.et.cloud.rag.RagLlmClientTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.rag.RagAskServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.01 s - in com.et.cloud.rag.RagAskServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPersonalFileStoreTest
+[ThreadedStreamConsumer] WARNING org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 12, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 1.312 s - in com.et.cloud.controller.AgentPersonalFileStoreTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPersonalFileReferenceTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s - in com.et.cloud.controller.AgentPersonalFileReferenceTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPersonalFileUploadTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.272 s - in com.et.cloud.controller.AgentPersonalFileUploadTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentLibraryControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s - in com.et.cloud.controller.AgentLibraryControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPreviewControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.03 s - in com.et.cloud.controller.AgentPreviewControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPersonalFilePreviewTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.et.cloud.controller.AgentPersonalFilePreviewTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentResourceInternalControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.221 s - in com.et.cloud.controller.AgentResourceInternalControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentConversationPersistenceMappingTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.et.cloud.controller.AgentConversationPersistenceMappingTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentWikiAnswerSkillTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s - in com.et.cloud.controller.AgentWikiAnswerSkillTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentSkillDefinitionValidatorTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.et.cloud.controller.AgentSkillDefinitionValidatorTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.DocumentWikiControllerEditFormatTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s - in com.et.cloud.controller.DocumentWikiControllerEditFormatTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentWikiUnknownProjectionTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s - in com.et.cloud.controller.AgentWikiUnknownProjectionTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.DocumentWikiControllerImportTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.et.cloud.controller.DocumentWikiControllerImportTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentConversationStoreTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s - in com.et.cloud.controller.AgentConversationStoreTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPreviewProxyTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s - in com.et.cloud.controller.AgentPreviewProxyTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPersonalFileSegmentTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.21 s - in com.et.cloud.controller.AgentPersonalFileSegmentTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentCodeVersionValidatorTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.et.cloud.controller.AgentCodeVersionValidatorTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentLibraryInternalControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s - in com.et.cloud.controller.AgentLibraryInternalControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.DocumentWikiBatchControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.et.cloud.controller.DocumentWikiBatchControllerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentSkillCatalogTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.et.cloud.controller.AgentSkillCatalogTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentPreviewProxyWikiEventTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s - in com.et.cloud.controller.AgentPreviewProxyWikiEventTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.DocumentWikiControllerCacheTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.056 s - in com.et.cloud.controller.DocumentWikiControllerCacheTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.exception.GlobalExceptionHandlerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.et.cloud.exception.GlobalExceptionHandlerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.DocumentWikiSpaceRulesTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.et.cloud.service.DocumentWikiSpaceRulesTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.WikiAttachmentServiceTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.051 s - in com.et.cloud.service.WikiAttachmentServiceTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.WikiDocumentImportServiceTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.111 s - in com.et.cloud.service.WikiDocumentImportServiceTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.DocumentWikiServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s - in com.et.cloud.service.DocumentWikiServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.WikiSpaceServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s - in com.et.cloud.service.WikiSpaceServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.impl.AgentUrlImportTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s - in com.et.cloud.service.impl.AgentUrlImportTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.impl.WebPageMarkdownCleanerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s - in com.et.cloud.service.impl.WebPageMarkdownCleanerTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.impl.HttpWebPageFetcherTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s - in com.et.cloud.service.impl.HttpWebPageFetcherTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.impl.WikiBatchImportServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 22, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s - in com.et.cloud.service.impl.WikiBatchImportServiceImplTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.service.impl.JsonDocumentSplitterTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.et.cloud.service.impl.JsonDocumentSplitterTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.model.vis.DocumentWikiVisArticleMetadataTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.et.cloud.model.vis.DocumentWikiVisArticleMetadataTest
+[main] WARNING org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 383, Failures: 0, Errors: 0, Skipped: 1
+[main] INFO org.apache.maven.cli.event.ExecutionEventLogger - BUILD SUCCESS

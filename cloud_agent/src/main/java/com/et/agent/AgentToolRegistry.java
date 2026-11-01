@@ -119,6 +119,19 @@ public final class AgentToolRegistry {
                             requiredText(args, "folderId"), title.isMissingNode() ? null : title.asText(),
                             requiredText(args, "content"));
                 });
+        ObjectNode urlImport = fields(new String[]{"spaceId", "urls"}, new String[]{"string", "array"});
+        urlImport.with("properties").putObject("folderId").putArray("type").add("string").add("null");
+        urlImport.with("properties").with("urls").putObject("items").put("type", "string");
+        register(Domain.WIKI, Access.WRITE, "import_wiki_urls", "Import explicitly requested web URLs into the chosen Wiki location.",
+                urlImport, (user, gateway) -> raw -> {
+                    JsonNode args=arguments(raw);
+                    JsonNode folder=args.path("folderId");
+                    if (!folder.isMissingNode() && !folder.isNull() && !folder.isTextual()) throw new IllegalArgumentException("Invalid folder");
+                    java.util.List<String> urls=new java.util.ArrayList<>();
+                    for (JsonNode url: args.path("urls")) urls.add(url.asText());
+                    return gateway.importWikiUrls(user,requiredText(args,"spaceId"),
+                            folder.isMissingNode() || folder.isNull() ? null : folder.asText(),urls);
+                });
         ObjectNode locations = JSON.createObjectNode().put("type", "object").put("additionalProperties", false);
         ObjectNode locationFields = locations.putObject("properties");
         locationFields.putObject("spaceId").put("type", "string");
@@ -225,7 +238,7 @@ public final class AgentToolRegistry {
         if (selectedSpaceId == null) return tools;
         if (!selectedSpaceId.matches("[1-9][0-9]{0,18}"))
             throw new IllegalArgumentException("Invalid selected Wiki space");
-        for (String name : new String[]{"create_wiki_folder", "create_wiki_document", "write_wiki_document"}) {
+        for (String name : new String[]{"create_wiki_folder", "create_wiki_document", "write_wiki_document", "import_wiki_urls"}) {
             AgentLoop.Tool delegate = tools.get(name);
             tools.put(name, raw -> {
                 if (!selectedSpaceId.equals(requiredText(arguments(raw), "spaceId")))

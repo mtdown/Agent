@@ -18,8 +18,8 @@ final class AgentWikiBoundary {
         if (isWikiTool(name)) events.add(new AgentLoop.ToolEvent(name, result));
     }
     static boolean choiceRequired(String name, String result) {
-        if (!"plan_wiki_destination".equals(name)) return false;
-        try { return JSON.readTree(result).path("choiceRequired").asBoolean(false); }
+        if (!"plan_wiki_destination".equals(name) && !"import_wiki_urls".equals(name)) return false;
+        try { return JSON.readTree(result).path("plan_wiki_destination".equals(name) ? "choiceRequired" : "importConfirmationRequired").asBoolean(false); }
         catch (java.io.IOException e) { throw new IllegalStateException("Invalid destination planning result", e); }
     }
     String argumentsFor(String name, String arguments) {
@@ -78,8 +78,8 @@ final class AgentWikiBoundary {
                 if (!args.isObject()) continue;
                 String tool=step.path("tool").asText();
                 List<String> fields=new ArrayList<>();
-                if (Arrays.asList("write_wiki_document","create_wiki_folder","create_wiki_document","list_writable_wiki_locations").contains(tool)) fields.add("spaceId");
-                if ("create_wiki_document".equals(tool)) fields.add("folderId");
+                if (Arrays.asList("write_wiki_document","create_wiki_folder","create_wiki_document","list_writable_wiki_locations","import_wiki_urls").contains(tool)) fields.add("spaceId");
+                if ("create_wiki_document".equals(tool) || "import_wiki_urls".equals(tool)) fields.add("folderId");
                 if ("list_writable_wiki_locations".equals(tool)) fields.add("cursor");
                 for (String field:fields) {
                     com.fasterxml.jackson.databind.JsonNode value=args.get(field);

@@ -1,0 +1,1330 @@
+{
+  "files": {
+    "cloud/pom.xml": {
+      "original_sha256": "96f4a4c1c8dfbff5c51d4367f39e77f1c56e025b9947b845669023d3d9504726",
+      "snapshot_sha256": "96f4a4c1c8dfbff5c51d4367f39e77f1c56e025b9947b845669023d3d9504726"
+    },
+    "deploy/schema-init.sql": {
+      "original_sha256": "a88e276c5730d6c1ab1b3bf80c43086922887385e8e4af47047b3b844bed6cd6",
+      "snapshot_sha256": "a88e276c5730d6c1ab1b3bf80c43086922887385e8e4af47047b3b844bed6cd6"
+    },
+    "cloud/src/main/resources/agent-conversation.sql": {
+      "original_sha256": "0deb8060562558b0fea405e43440443316ab5444b7e9e6043da6e13490767698",
+      "snapshot_sha256": "0deb8060562558b0fea405e43440443316ab5444b7e9e6043da6e13490767698"
+    },
+    "cloud/src/main/resources/agent-skill-library.sql": {
+      "original_sha256": "2728a53eefdfba35c6b0a0d5d81d2f05685c63317e53f1b5f7b0c09d7b060bcb",
+      "snapshot_sha256": "2728a53eefdfba35c6b0a0d5d81d2f05685c63317e53f1b5f7b0c09d7b060bcb"
+    },
+    "cloud/src/main/resources/agent-wiki-answer-skill.json": {
+      "original_sha256": "91832ff399bfff34ce4bfe20ae3e3f3f717b01fa596dfe734e3a81399ce6a061",
+      "snapshot_sha256": "91832ff399bfff34ce4bfe20ae3e3f3f717b01fa596dfe734e3a81399ce6a061"
+    },
+    "cloud/src/main/resources/agent-wiki-write-skill.json": {
+      "original_sha256": "453c6ca04042acb857cc21e73e7082571fb216b9c2eb933d08b2a5f877163cfb",
+      "snapshot_sha256": "453c6ca04042acb857cc21e73e7082571fb216b9c2eb933d08b2a5f877163cfb"
+    },
+    "cloud/src/main/resources/application-local.yml": {
+      "original_sha256": "00409c69ae2f24e7b1378a847339f2eefb360cb45487006489d407be957dbcb3",
+      "snapshot_sha256": "4abef97f03e41bbddce3a3cbd9d4a3202e4697e7ca5c401f3dbe4e7fd4b0b5e1"
+    },
+    "cloud/src/main/resources/application-prod.yml": {
+      "original_sha256": "211213bc9a91de987b6a7fcde1b1994a75c5a6165389678f84322d295a9e6092",
+      "snapshot_sha256": "211213bc9a91de987b6a7fcde1b1994a75c5a6165389678f84322d295a9e6092"
+    },
+    "cloud/src/main/resources/application.yml": {
+      "original_sha256": "45ac58b2921f6bd0acc5b36a7e5e3a25ec27a82ac9958da920c7ffaf526f5495",
+      "snapshot_sha256": "45ac58b2921f6bd0acc5b36a7e5e3a25ec27a82ac9958da920c7ffaf526f5495"
+    },
+    "cloud/src/main/java/com/et/cloud/AdminInitializer.java": {
+      "original_sha256": "41c05b89266782344b5acabec19d10a36d6a53b2b3c9264890442d0ae4c01e78",
+      "snapshot_sha256": "41c05b89266782344b5acabec19d10a36d6a53b2b3c9264890442d0ae4c01e78"
+    },
+    "cloud/src/main/java/com/et/cloud/CloudApplication.java": {
+      "original_sha256": "15d4c29bd9254605ded5933efde7e63d26adc9882d8268233b746e57f458a7a9",
+      "snapshot_sha256": "15d4c29bd9254605ded5933efde7e63d26adc9882d8268233b746e57f458a7a9"
+    },
+    "cloud/src/main/java/com/et/cloud/annotation/AuthCheck.java": {
+      "original_sha256": "497b34a332e96480137e64a62cf4568ff71b25cdfc61c6b3db1e795c6b76b3c1",
+      "snapshot_sha256": "497b34a332e96480137e64a62cf4568ff71b25cdfc61c6b3db1e795c6b76b3c1"
+    },
+    "cloud/src/main/java/com/et/cloud/commen/BaseResponse.java": {
+      "original_sha256": "375166d3d4bbec40065bd172044ca629682765bb8591ed3f3deaefbb2fe78929",
+      "snapshot_sha256": "375166d3d4bbec40065bd172044ca629682765bb8591ed3f3deaefbb2fe78929"
+    },
+    "cloud/src/main/java/com/et/cloud/commen/DeleteRequest.java": {
+      "original_sha256": "52d93256cdcc4161cab74f7e58ccf45a501fe2ac9dfc5dbb6431defa9b1f5ac1",
+      "snapshot_sha256": "52d93256cdcc4161cab74f7e58ccf45a501fe2ac9dfc5dbb6431defa9b1f5ac1"
+    },
+    "cloud/src/main/java/com/et/cloud/commen/PageRequest.java": {
+      "original_sha256": "8859960791376bec1c666b8feb135484403a009ff3123faceb0d92104ce6f8a0",
+      "snapshot_sha256": "8859960791376bec1c666b8feb135484403a009ff3123faceb0d92104ce6f8a0"
+    },
+    "cloud/src/main/java/com/et/cloud/commen/ResultUtils.java": {
+      "original_sha256": "cd6d7435a0a33501327aff5728e9f6b042bd6139083c426bb9af1a14c4e6845e",
+      "snapshot_sha256": "cd6d7435a0a33501327aff5728e9f6b042bd6139083c426bb9af1a14c4e6845e"
+    },
+    "cloud/src/main/java/com/et/cloud/config/CorsConfig.java": {
+      "original_sha256": "75aecfe343979fe7badb6d9dad5d2a7dd4588efb2b40dfc91267fa7731ba6f8a",
+      "snapshot_sha256": "75aecfe343979fe7badb6d9dad5d2a7dd4588efb2b40dfc91267fa7731ba6f8a"
+    },
+    "cloud/src/main/java/com/et/cloud/config/CosClientConfig.java": {
+      "original_sha256": "564a4a273424c23308b162e534457dbaaa3461b89cb6c811ba3b063025a42728",
+      "snapshot_sha256": "564a4a273424c23308b162e534457dbaaa3461b89cb6c811ba3b063025a42728"
+    },
+    "cloud/src/main/java/com/et/cloud/config/HttpRequestWrapperFilter.java": {
+      "original_sha256": "149a97fa2aa50e01ae66e28890cd3c070c41bcb18438bcb4b24402d3a62d2c78",
+      "snapshot_sha256": "149a97fa2aa50e01ae66e28890cd3c070c41bcb18438bcb4b24402d3a62d2c78"
+    },
+    "cloud/src/main/java/com/et/cloud/config/JsonConfig.java": {
+      "original_sha256": "6960dae11cd5b8ae4d3910b8e76995bc042d73e6ee31ce4785335467360d98cb",
+      "snapshot_sha256": "6960dae11cd5b8ae4d3910b8e76995bc042d73e6ee31ce4785335467360d98cb"
+    },
+    "cloud/src/main/java/com/et/cloud/config/MyBatisPlusConfig.java": {
+      "original_sha256": "1415579f6f915a6346d73f13131032e887259c6a2779bce97f84553f0b32e364",
+      "snapshot_sha256": "1415579f6f915a6346d73f13131032e887259c6a2779bce97f84553f0b32e364"
+    },
+    "cloud/src/main/java/com/et/cloud/config/RequestWrapper.java": {
+      "original_sha256": "f727b091eb07e82c999f58d46950b0d40215b42865bc62ec1b157b040f279423",
+      "snapshot_sha256": "f727b091eb07e82c999f58d46950b0d40215b42865bc62ec1b157b040f279423"
+    },
+    "cloud/src/main/java/com/et/cloud/config/StpKitRegisterConfig.java": {
+      "original_sha256": "e5c4918917fcd1401c68e674375ac7546b851d9d71ed69f0b4eb2f02e86fa8fc",
+      "snapshot_sha256": "e5c4918917fcd1401c68e674375ac7546b851d9d71ed69f0b4eb2f02e86fa8fc"
+    },
+    "cloud/src/main/java/com/et/cloud/config/WebMvcConfig.java": {
+      "original_sha256": "8aa37274e504deef509822c9cc1e0ceffd1055a19b966ec2862923369f352def",
+      "snapshot_sha256": "8aa37274e504deef509822c9cc1e0ceffd1055a19b966ec2862923369f352def"
+    },
+    "cloud/src/main/java/com/et/cloud/config/WikiSpaceInitializer.java": {
+      "original_sha256": "28882dcb8cd4a9d681199fa294f931471c2afd36141025cd169d57c0784abd8a",
+      "snapshot_sha256": "28882dcb8cd4a9d681199fa294f931471c2afd36141025cd169d57c0784abd8a"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentBuiltInWikiAnswerSkill.java": {
+      "original_sha256": "efedc5a82da8852eb32b058f80022a7d72e173e9be26bc7a5757a826539076c5",
+      "snapshot_sha256": "efedc5a82da8852eb32b058f80022a7d72e173e9be26bc7a5757a826539076c5"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentBuiltInWikiWriteSkill.java": {
+      "original_sha256": "24afea475b9d25ec78c9db7bf6a672a317a2881a7f7eda15bab5f5d58a4d8834",
+      "snapshot_sha256": "24afea475b9d25ec78c9db7bf6a672a317a2881a7f7eda15bab5f5d58a4d8834"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentCodeVersionValidator.java": {
+      "original_sha256": "e69fc805269d7940df8a83c4f3338fface38f0885131430ab1ee875a2b304a67",
+      "snapshot_sha256": "e69fc805269d7940df8a83c4f3338fface38f0885131430ab1ee875a2b304a67"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentConversationInitializer.java": {
+      "original_sha256": "0179b8a86b24ff5d23481fc969323f2c0d4a5488bdbea1b53fc79a8b3117b724",
+      "snapshot_sha256": "0179b8a86b24ff5d23481fc969323f2c0d4a5488bdbea1b53fc79a8b3117b724"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentConversationStore.java": {
+      "original_sha256": "fd6915f82cd5fa4a65991e63b5039e1ca4dce8ac2a85955c8bbf2204aba48ef3",
+      "snapshot_sha256": "fd6915f82cd5fa4a65991e63b5039e1ca4dce8ac2a85955c8bbf2204aba48ef3"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentLibraryController.java": {
+      "original_sha256": "c760d22b8fa63bfe5e5839f269b2ef55d7b0cf34c437ea17e1299157b32e7c73",
+      "snapshot_sha256": "c760d22b8fa63bfe5e5839f269b2ef55d7b0cf34c437ea17e1299157b32e7c73"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentLibraryInternalController.java": {
+      "original_sha256": "934242d8a4490a13b07c2a90e43472728d3882e923b076f091a7a4e0b1df36b8",
+      "snapshot_sha256": "934242d8a4490a13b07c2a90e43472728d3882e923b076f091a7a4e0b1df36b8"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentLibraryStore.java": {
+      "original_sha256": "e280676b318fa76cc3d7e7fa8a7ab64c67297a0452f2dc19aaa5891ed24a1f5f",
+      "snapshot_sha256": "e280676b318fa76cc3d7e7fa8a7ab64c67297a0452f2dc19aaa5891ed24a1f5f"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileEvidence.java": {
+      "original_sha256": "10fe54c2f8c2b42e978947019d33e4154fbef50b290ed225c4c0db445f0198f4",
+      "snapshot_sha256": "10fe54c2f8c2b42e978947019d33e4154fbef50b290ed225c4c0db445f0198f4"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileReferences.java": {
+      "original_sha256": "04008aad16b1603ec0c5696d32a9a6161cfb8816cb5c24c5aba095e2de96cdaa",
+      "snapshot_sha256": "04008aad16b1603ec0c5696d32a9a6161cfb8816cb5c24c5aba095e2de96cdaa"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileStore.java": {
+      "original_sha256": "41bb6b235cb3ef8cccbed6b6631914ef7cb804aaea8ba022f7d2488b6fe88a90",
+      "snapshot_sha256": "41bb6b235cb3ef8cccbed6b6631914ef7cb804aaea8ba022f7d2488b6fe88a90"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUpload.java": {
+      "original_sha256": "90b142e5b5c11fa2340579b62ce8099f61f9fc941b6f5cfe37dfaae85b9a1c29",
+      "snapshot_sha256": "90b142e5b5c11fa2340579b62ce8099f61f9fc941b6f5cfe37dfaae85b9a1c29"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPersonalFileUploadController.java": {
+      "original_sha256": "783239bf9e57c823e3e1f5aaa8bf960f676e029041c9cf40b74ea9d2ac24b467",
+      "snapshot_sha256": "783239bf9e57c823e3e1f5aaa8bf960f676e029041c9cf40b74ea9d2ac24b467"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPreviewController.java": {
+      "original_sha256": "6647cddff8863b2e317da862fb895bd1495178e7e75f317ccae0f1b2763386e7",
+      "snapshot_sha256": "6647cddff8863b2e317da862fb895bd1495178e7e75f317ccae0f1b2763386e7"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentPreviewProxy.java": {
+      "original_sha256": "a373f7641363ae92a2b7c74338299e64add658ee3bd06a6d1fe5a70fd33b105f",
+      "snapshot_sha256": "a373f7641363ae92a2b7c74338299e64add658ee3bd06a6d1fe5a70fd33b105f"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentResourceInternalController.java": {
+      "original_sha256": "067ec4ec09b9ed9599f8a587aef4c59b67d7bc65b49fad9b4bd022ed26a38225",
+      "snapshot_sha256": "067ec4ec09b9ed9599f8a587aef4c59b67d7bc65b49fad9b4bd022ed26a38225"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentSkillCatalog.java": {
+      "original_sha256": "7837f9694e3543a3bac869f4a7f2f6cdb9352f336b7440434451e631e8ec918f",
+      "snapshot_sha256": "7837f9694e3543a3bac869f4a7f2f6cdb9352f336b7440434451e631e8ec918f"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentSkillDefinitionValidator.java": {
+      "original_sha256": "319cb1627fc22d76c2758180e2c3d24a222365ff349d314576ac98c87602abb7",
+      "snapshot_sha256": "319cb1627fc22d76c2758180e2c3d24a222365ff349d314576ac98c87602abb7"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentWikiChoiceProjection.java": {
+      "original_sha256": "d40202c061ce14c14c369f37f339f86814604739bb4ad0155cc2ab48bcae9b86",
+      "snapshot_sha256": "d40202c061ce14c14c369f37f339f86814604739bb4ad0155cc2ab48bcae9b86"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentWikiChoiceService.java": {
+      "original_sha256": "33d0b0265ebdbea8aafbf115aa7ff572878a631de6d435489e3875a66d081142",
+      "snapshot_sha256": "33d0b0265ebdbea8aafbf115aa7ff572878a631de6d435489e3875a66d081142"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/AgentWritableWikiLocations.java": {
+      "original_sha256": "f8e481ce24d7c67650f5cc62cece9ed1d5c655cb64a581267fcba35f5e44b11d",
+      "snapshot_sha256": "f8e481ce24d7c67650f5cc62cece9ed1d5c655cb64a581267fcba35f5e44b11d"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/DocumentWikiBatchController.java": {
+      "original_sha256": "5d9a6658fe83f5a9ca4ba3197791d2a8e640edc2a18f6cb27e0fedf1076fd6e1",
+      "snapshot_sha256": "5d9a6658fe83f5a9ca4ba3197791d2a8e640edc2a18f6cb27e0fedf1076fd6e1"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/DocumentWikiController.java": {
+      "original_sha256": "52542680a4131e488e39cac175add605ee785b39cb1bae4d66f3a9e664a6ca09",
+      "snapshot_sha256": "52542680a4131e488e39cac175add605ee785b39cb1bae4d66f3a9e664a6ca09"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/FileController.java": {
+      "original_sha256": "10c9c2206017952e751508469b03b62e8526a41bdc7fbeb0301b7938b3b1456b",
+      "snapshot_sha256": "10c9c2206017952e751508469b03b62e8526a41bdc7fbeb0301b7938b3b1456b"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/MainController.java": {
+      "original_sha256": "c83092bee6217058ecef5833a0f9d6f90d1aed70ec0661a8ddc81f3bd5b4436d",
+      "snapshot_sha256": "c83092bee6217058ecef5833a0f9d6f90d1aed70ec0661a8ddc81f3bd5b4436d"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/OpenRagController.java": {
+      "original_sha256": "78cec42e1c8610a96999cdacf7c4945d79d274051a9b3954ed7f109e2215587e",
+      "snapshot_sha256": "78cec42e1c8610a96999cdacf7c4945d79d274051a9b3954ed7f109e2215587e"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/PersonalFileStorage.java": {
+      "original_sha256": "d99b133f1d60872d46f34ad6adff0a649346ffc138f5c5689c6b4535499b118a",
+      "snapshot_sha256": "d99b133f1d60872d46f34ad6adff0a649346ffc138f5c5689c6b4535499b118a"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/PictureController.java": {
+      "original_sha256": "a2b592b902a9b331ae8d7e975620c4badba0fff016d90b4a1103b6029958cde3",
+      "snapshot_sha256": "a2b592b902a9b331ae8d7e975620c4badba0fff016d90b4a1103b6029958cde3"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/RagApiKeyController.java": {
+      "original_sha256": "3d62adcc89251df608e75823243237b570f024f47065443a8f4690702c3e5f29",
+      "snapshot_sha256": "3d62adcc89251df608e75823243237b570f024f47065443a8f4690702c3e5f29"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/SpaceController.java": {
+      "original_sha256": "870b78ca5f1dcf14223162d3aa2566bed4a3f40de88c5a8dea8f32171538d533",
+      "snapshot_sha256": "870b78ca5f1dcf14223162d3aa2566bed4a3f40de88c5a8dea8f32171538d533"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/SpaceUserController.java": {
+      "original_sha256": "831798d76074f9416d23f02cb052d9e0dc5de890b1a812d0872e3f06a42cd84c",
+      "snapshot_sha256": "831798d76074f9416d23f02cb052d9e0dc5de890b1a812d0872e3f06a42cd84c"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/UserController.java": {
+      "original_sha256": "335a8e2089ab7604a7f34afb8781f824dc690a051ff82bb2c5dd65c1368f2c36",
+      "snapshot_sha256": "335a8e2089ab7604a7f34afb8781f824dc690a051ff82bb2c5dd65c1368f2c36"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/WikiFolderController.java": {
+      "original_sha256": "53ee9dad0954906dc96b1b9096ad37baba492bec80a056c05ec5224971164e34",
+      "snapshot_sha256": "53ee9dad0954906dc96b1b9096ad37baba492bec80a056c05ec5224971164e34"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/WikiRagAdminController.java": {
+      "original_sha256": "b6ab5e3d8a85fcb0aa1acee6bfbf35547d6b7a8de36d4a34408dd526ac63a513",
+      "snapshot_sha256": "b6ab5e3d8a85fcb0aa1acee6bfbf35547d6b7a8de36d4a34408dd526ac63a513"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/WikiRagController.java": {
+      "original_sha256": "41dc9d3b738132f6a82b299cce281e8f84f5154bb6ef8272d9b2ccaaa5f01768",
+      "snapshot_sha256": "41dc9d3b738132f6a82b299cce281e8f84f5154bb6ef8272d9b2ccaaa5f01768"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/WikiRecycleController.java": {
+      "original_sha256": "0019459a301fd2151df77195ab11ebcd0e252592afc5e939b1a29d9b6d0232d9",
+      "snapshot_sha256": "0019459a301fd2151df77195ab11ebcd0e252592afc5e939b1a29d9b6d0232d9"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/WikiSpaceController.java": {
+      "original_sha256": "9668d30d6f92868af767d80a2f9f280097cb22289f8e7e861cec4a9c14ae6cff",
+      "snapshot_sha256": "9668d30d6f92868af767d80a2f9f280097cb22289f8e7e861cec4a9c14ae6cff"
+    },
+    "cloud/src/main/java/com/et/cloud/enums/PictureReviewStatusEnum.java": {
+      "original_sha256": "149d7b377443c0ec7221e56fd36551cba00aa726a9a34fb3837afb91dd8f900f",
+      "snapshot_sha256": "149d7b377443c0ec7221e56fd36551cba00aa726a9a34fb3837afb91dd8f900f"
+    },
+    "cloud/src/main/java/com/et/cloud/enums/SpaceLevelEnum.java": {
+      "original_sha256": "3774ddd277119513d2b6629381e4d71d72cb9c022de82949aa7816159d918520",
+      "snapshot_sha256": "3774ddd277119513d2b6629381e4d71d72cb9c022de82949aa7816159d918520"
+    },
+    "cloud/src/main/java/com/et/cloud/enums/SpaceRoleEnum.java": {
+      "original_sha256": "9245415722e4c2e292404917f47fbc5b1134108b2113ac1ae9e040d17bd20c47",
+      "snapshot_sha256": "9245415722e4c2e292404917f47fbc5b1134108b2113ac1ae9e040d17bd20c47"
+    },
+    "cloud/src/main/java/com/et/cloud/enums/SpaceTypeEnum.java": {
+      "original_sha256": "1e04b66b1088cb7b830ae46f542592ca27d7f02561264eb7df68bdde3f79b87c",
+      "snapshot_sha256": "1e04b66b1088cb7b830ae46f542592ca27d7f02561264eb7df68bdde3f79b87c"
+    },
+    "cloud/src/main/java/com/et/cloud/enums/UserRoleEnum.java": {
+      "original_sha256": "4d8a7d89b949a9ead28fdd3fa3f872e77284d3a4f9290d2af143b3fcfa07ee42",
+      "snapshot_sha256": "4d8a7d89b949a9ead28fdd3fa3f872e77284d3a4f9290d2af143b3fcfa07ee42"
+    },
+    "cloud/src/main/java/com/et/cloud/enums/UserVisRoleEnum.java": {
+      "original_sha256": "e0be1bd26c858af8897f8c5c7cc91d36be6882e0089d48d9c0fd054125ad5d20",
+      "snapshot_sha256": "e0be1bd26c858af8897f8c5c7cc91d36be6882e0089d48d9c0fd054125ad5d20"
+    },
+    "cloud/src/main/java/com/et/cloud/exception/BusinessException.java": {
+      "original_sha256": "528e5d1a093b62a8ddcd1737d5e0efe1992a6d4f42a6e07582f7a03a79b1eb83",
+      "snapshot_sha256": "528e5d1a093b62a8ddcd1737d5e0efe1992a6d4f42a6e07582f7a03a79b1eb83"
+    },
+    "cloud/src/main/java/com/et/cloud/exception/ErrorCode.java": {
+      "original_sha256": "c0999f1802410954b4d529dd13bdb17469dcbbddae88645df6e281cdcb61bee6",
+      "snapshot_sha256": "c0999f1802410954b4d529dd13bdb17469dcbbddae88645df6e281cdcb61bee6"
+    },
+    "cloud/src/main/java/com/et/cloud/exception/GlobalExceptionHandler.java": {
+      "original_sha256": "e3b013e7ebb9020a7cea2bd9f97e75a646d360ae35519012b1dd85da9077ccc4",
+      "snapshot_sha256": "e3b013e7ebb9020a7cea2bd9f97e75a646d360ae35519012b1dd85da9077ccc4"
+    },
+    "cloud/src/main/java/com/et/cloud/exception/ThrowUtils.java": {
+      "original_sha256": "864a026bde97db0dced2a719049595139eea9b95a4a2d99c23e4a985ed0a7f73",
+      "snapshot_sha256": "864a026bde97db0dced2a719049595139eea9b95a4a2d99c23e4a985ed0a7f73"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/CosManager.java": {
+      "original_sha256": "22553fb049243f68cf9483c961fa5126d10280783ae9f6a6fe764150cc824c5d",
+      "snapshot_sha256": "22553fb049243f68cf9483c961fa5126d10280783ae9f6a6fe764150cc824c5d"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/FileManager.java": {
+      "original_sha256": "a16536ce0f39757eae7dd5a084076a664e44d0d471e8e24b92003091baa98348",
+      "snapshot_sha256": "a16536ce0f39757eae7dd5a084076a664e44d0d471e8e24b92003091baa98348"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/AgentConversationMapper.java": {
+      "original_sha256": "31add62b2072f30ef9dcf9ea995eb91fb382565354119cfebc3b3a11ccc4b1f0",
+      "snapshot_sha256": "31add62b2072f30ef9dcf9ea995eb91fb382565354119cfebc3b3a11ccc4b1f0"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/AgentMessageMapper.java": {
+      "original_sha256": "19cfd80763a1e1ade948be2d957ab959adbab11622391ea102b50fcfe94f4e64",
+      "snapshot_sha256": "19cfd80763a1e1ade948be2d957ab959adbab11622391ea102b50fcfe94f4e64"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/DocumentWikiMapper.java": {
+      "original_sha256": "14791b68f5e47b892d25c62ab37acab73c5409c81c4a9d077eb6565de22172ab",
+      "snapshot_sha256": "14791b68f5e47b892d25c62ab37acab73c5409c81c4a9d077eb6565de22172ab"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/PictureMapper.java": {
+      "original_sha256": "84455fd759780498bf58dde87e61f204b3d409ea27869d3d0b8e4f9f134e8701",
+      "snapshot_sha256": "84455fd759780498bf58dde87e61f204b3d409ea27869d3d0b8e4f9f134e8701"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/RagApiKeyMapper.java": {
+      "original_sha256": "b5323c94980be87709845940e99a2e6ad7fc1af18cdd0e3d8c158d4f4dd1bb65",
+      "snapshot_sha256": "b5323c94980be87709845940e99a2e6ad7fc1af18cdd0e3d8c158d4f4dd1bb65"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/SpaceMapper.java": {
+      "original_sha256": "002b9c7bcd48ba91f52ee3aac2b1656748bcc149d3b6761a71bcd7b3f4043923",
+      "snapshot_sha256": "002b9c7bcd48ba91f52ee3aac2b1656748bcc149d3b6761a71bcd7b3f4043923"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/SpaceUserMapper.java": {
+      "original_sha256": "ea2507c8175ce2a5c8d0422fe6d5ed59354d8eca04257ddae6b7866d7ea612c3",
+      "snapshot_sha256": "ea2507c8175ce2a5c8d0422fe6d5ed59354d8eca04257ddae6b7866d7ea612c3"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/UserMapper.java": {
+      "original_sha256": "c0a111439aeb3020d12af661e49cba87a27fc6b2ffcd54b21e6524f3d64bff26",
+      "snapshot_sha256": "c0a111439aeb3020d12af661e49cba87a27fc6b2ffcd54b21e6524f3d64bff26"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/WikiAttachmentMapper.java": {
+      "original_sha256": "44db905fcfd22ce4eebdf2c35186a3da5f49a78e9cccc96fe7273c00e468d967",
+      "snapshot_sha256": "44db905fcfd22ce4eebdf2c35186a3da5f49a78e9cccc96fe7273c00e468d967"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/WikiChunkMapper.java": {
+      "original_sha256": "603d79f2e53aed4ffa6a45c1dd7a481a518f5d67cfae84a89cea4fc0c68f37b7",
+      "snapshot_sha256": "603d79f2e53aed4ffa6a45c1dd7a481a518f5d67cfae84a89cea4fc0c68f37b7"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/WikiFolderMapper.java": {
+      "original_sha256": "1cbd4cf23fa0e4327c16803b0604ff7b899e6027e772e88d639afd2a85c72ca3",
+      "snapshot_sha256": "1cbd4cf23fa0e4327c16803b0604ff7b899e6027e772e88d639afd2a85c72ca3"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/WikiSpaceMapper.java": {
+      "original_sha256": "91740b59eb0abb25dae2b335f37a85273f9a56640266cb85fef74173ca5fb3a6",
+      "snapshot_sha256": "91740b59eb0abb25dae2b335f37a85273f9a56640266cb85fef74173ca5fb3a6"
+    },
+    "cloud/src/main/java/com/et/cloud/mapper/WikiSpaceUserMapper.java": {
+      "original_sha256": "6a1674792881f66e29a56ab3c432a32682e6a75c1cd0887477fb078d2d4e2e99",
+      "snapshot_sha256": "6a1674792881f66e29a56ab3c432a32682e6a75c1cd0887477fb078d2d4e2e99"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/ChunkerProfile.java": {
+      "original_sha256": "add5f935b7acc3a98f31a6ac985503f5ee9cef3a4a0b795f5d1181174ab885a7",
+      "snapshot_sha256": "add5f935b7acc3a98f31a6ac985503f5ee9cef3a4a0b795f5d1181174ab885a7"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/ChunkHit.java": {
+      "original_sha256": "86b886402c5580aedff5c4d09b740b1a926de3b4abb5d971c38fd627311948da",
+      "snapshot_sha256": "86b886402c5580aedff5c4d09b740b1a926de3b4abb5d971c38fd627311948da"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/InMemoryCosineVectorStore.java": {
+      "original_sha256": "9e8eba7f67f26c74f5474369eed3e9df95ce6f05b6a5edcd0ffc1e12e252e536",
+      "snapshot_sha256": "9e8eba7f67f26c74f5474369eed3e9df95ce6f05b6a5edcd0ffc1e12e252e536"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/LexicalIndex.java": {
+      "original_sha256": "da5442cf1885dcabf46fc42d720b4cd97edca4bb2c55e464980cf661e532a474",
+      "snapshot_sha256": "da5442cf1885dcabf46fc42d720b4cd97edca4bb2c55e464980cf661e532a474"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/LlmRagQueryExpansionClient.java": {
+      "original_sha256": "50baec9b1ebb0bf868400e0eaac82cb57bbd5dfcd243546a20b4e81fc35dee32",
+      "snapshot_sha256": "50baec9b1ebb0bf868400e0eaac82cb57bbd5dfcd243546a20b4e81fc35dee32"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/MarkdownChunk.java": {
+      "original_sha256": "53747ce8740f80c681f023e3ed7558e0e93e415b94d8872488abf3973820db1e",
+      "snapshot_sha256": "53747ce8740f80c681f023e3ed7558e0e93e415b94d8872488abf3973820db1e"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/MarkdownChunker.java": {
+      "original_sha256": "03145ca0267079f84d34b6a947bad0528d17d628e51c979c879fe218f2b94f9b",
+      "snapshot_sha256": "03145ca0267079f84d34b6a947bad0528d17d628e51c979c879fe218f2b94f9b"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/NoopRagQueryExpansionClient.java": {
+      "original_sha256": "e46effe0b6a197a92c62c494049d77872317a1b52b1396535706358b0a50766e",
+      "snapshot_sha256": "e46effe0b6a197a92c62c494049d77872317a1b52b1396535706358b0a50766e"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagApiKeyCreatedView.java": {
+      "original_sha256": "64526938bba4c7527a59869d5685d13f17c4eedd35b137828ef2bb7ba8eef8d7",
+      "snapshot_sha256": "64526938bba4c7527a59869d5685d13f17c4eedd35b137828ef2bb7ba8eef8d7"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagApiKeyService.java": {
+      "original_sha256": "7de5078df32e8a2f6f4ca076b76b43394b1b1526fb4b9ac2c959f25cd41e4668",
+      "snapshot_sha256": "7de5078df32e8a2f6f4ca076b76b43394b1b1526fb4b9ac2c959f25cd41e4668"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagApiKeyServiceImpl.java": {
+      "original_sha256": "b7d301254b78e141c4836e50692c6b3e91b9febf6dd47f0350ebf2b807ee6a25",
+      "snapshot_sha256": "b7d301254b78e141c4836e50692c6b3e91b9febf6dd47f0350ebf2b807ee6a25"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagApiKeyView.java": {
+      "original_sha256": "46fcbbed5fb298f05b1920fea779f28c7d239ce375bcf0005ad416e336b01ed6",
+      "snapshot_sha256": "46fcbbed5fb298f05b1920fea779f28c7d239ce375bcf0005ad416e336b01ed6"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagAskRequest.java": {
+      "original_sha256": "4db00921ab527af2570b39220fc1fdd2250d6cace5b2d2f610e7eeb99397c315",
+      "snapshot_sha256": "4db00921ab527af2570b39220fc1fdd2250d6cace5b2d2f610e7eeb99397c315"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagAskService.java": {
+      "original_sha256": "c6b0dc73c6034e7d4420dc8103af7cc97b53e6d64bfa8a24dc549404ad5d0040",
+      "snapshot_sha256": "c6b0dc73c6034e7d4420dc8103af7cc97b53e6d64bfa8a24dc549404ad5d0040"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagAskServiceImpl.java": {
+      "original_sha256": "3e3a53d48bec78a4837901a76f5e6644c7f90ed97597a86c359a6fbe042d34b9",
+      "snapshot_sha256": "3e3a53d48bec78a4837901a76f5e6644c7f90ed97597a86c359a6fbe042d34b9"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagAsyncConfig.java": {
+      "original_sha256": "422c483631596d6dc16ad99ff9e0990a23198cda013d647ecf12dd7da06de090",
+      "snapshot_sha256": "422c483631596d6dc16ad99ff9e0990a23198cda013d647ecf12dd7da06de090"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagCitation.java": {
+      "original_sha256": "3bf523423433a30773a0999c709b8a38033e86f4dce3af519790b0f215e09956",
+      "snapshot_sha256": "3bf523423433a30773a0999c709b8a38033e86f4dce3af519790b0f215e09956"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagEmbeddingClient.java": {
+      "original_sha256": "3bdadfb5a42e5d19299eb9f54000e093625de98b35c24b3a5ffa7ae0665b7ce9",
+      "snapshot_sha256": "3bdadfb5a42e5d19299eb9f54000e093625de98b35c24b3a5ffa7ae0665b7ce9"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagEmbeddingUnavailableException.java": {
+      "original_sha256": "43c108a5f0867bc37be3a51c78ff59c83ed3f8eb63d6659c101a28c02f6c006e",
+      "snapshot_sha256": "43c108a5f0867bc37be3a51c78ff59c83ed3f8eb63d6659c101a28c02f6c006e"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagLlmClient.java": {
+      "original_sha256": "ad1019c38fdd3fce57aa32219d580bfd1011685ed112999b850f4bf821434fde",
+      "snapshot_sha256": "ad1019c38fdd3fce57aa32219d580bfd1011685ed112999b850f4bf821434fde"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagProperties.java": {
+      "original_sha256": "b4bec96f6fdf157f82fae77659c6571d5de3551f4d139d9d8aa6118e79d13f3d",
+      "snapshot_sha256": "b4bec96f6fdf157f82fae77659c6571d5de3551f4d139d9d8aa6118e79d13f3d"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagQueryExpansion.java": {
+      "original_sha256": "687123cec444f7554fb84dee7effb4197a83db4d28cb263b90ca512ea515800c",
+      "snapshot_sha256": "687123cec444f7554fb84dee7effb4197a83db4d28cb263b90ca512ea515800c"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagQueryExpansionClient.java": {
+      "original_sha256": "ae0da6d7d1b453f790eaa1c2b4d6dd31975ecbfd57049bce8f86fd52d8d352e1",
+      "snapshot_sha256": "ae0da6d7d1b453f790eaa1c2b4d6dd31975ecbfd57049bce8f86fd52d8d352e1"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagRebuildReport.java": {
+      "original_sha256": "f4254259beef04db8ee4cc9cb9294fea5bd0166fec14c5b3b67a1688c11b35dc",
+      "snapshot_sha256": "f4254259beef04db8ee4cc9cb9294fea5bd0166fec14c5b3b67a1688c11b35dc"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagRerankClient.java": {
+      "original_sha256": "aad9b949f4a5fd07cd65ab388ed4883e1ea2c84156e01d791513643419411328",
+      "snapshot_sha256": "aad9b949f4a5fd07cd65ab388ed4883e1ea2c84156e01d791513643419411328"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagRerankUnavailableException.java": {
+      "original_sha256": "1d030943987fb3093f0d32a0ba464022046cb5c76fd21f6de6657a61c9e9cd95",
+      "snapshot_sha256": "1d030943987fb3093f0d32a0ba464022046cb5c76fd21f6de6657a61c9e9cd95"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagSearchRequest.java": {
+      "original_sha256": "6c3f1fcbbd59ecd210609f6b710bb955bd6dcde671f88162eff57c42a94f95b6",
+      "snapshot_sha256": "6c3f1fcbbd59ecd210609f6b710bb955bd6dcde671f88162eff57c42a94f95b6"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagSearchResult.java": {
+      "original_sha256": "c136096199069e4ecd3b5fe5a0be16b6b8eeb64144c56d9225761c4ef1dbc174",
+      "snapshot_sha256": "c136096199069e4ecd3b5fe5a0be16b6b8eeb64144c56d9225761c4ef1dbc174"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagSearchService.java": {
+      "original_sha256": "8136fcb6684c8b7f158dcfff5be5d6ea1759580dc4d367a912947f99f5d4945a",
+      "snapshot_sha256": "8136fcb6684c8b7f158dcfff5be5d6ea1759580dc4d367a912947f99f5d4945a"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RagSearchServiceImpl.java": {
+      "original_sha256": "0c46cd7528e9080d093489327c271d1213f1faa0d9c0ca5a3272de415691ff25",
+      "snapshot_sha256": "0c46cd7528e9080d093489327c271d1213f1faa0d9c0ca5a3272de415691ff25"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/RrfFusion.java": {
+      "original_sha256": "9a9c574a2120ce4b167e12e3ed51f5362fe11dfa7b737f36358081097c20c6ab",
+      "snapshot_sha256": "9a9c574a2120ce4b167e12e3ed51f5362fe11dfa7b737f36358081097c20c6ab"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/SearchTimings.java": {
+      "original_sha256": "9bc8545141f1ab9395d8ba8ed4d6b79eba7bfaf7ff9fcaa11b861b261f293c37",
+      "snapshot_sha256": "9bc8545141f1ab9395d8ba8ed4d6b79eba7bfaf7ff9fcaa11b861b261f293c37"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/VectorCodec.java": {
+      "original_sha256": "52d79de4dc87b4bc99a13093457078dedd013ac9c7874ec397ab84534d7bcad4",
+      "snapshot_sha256": "52d79de4dc87b4bc99a13093457078dedd013ac9c7874ec397ab84534d7bcad4"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/VectorStore.java": {
+      "original_sha256": "661eb84314b6c93f6ab1753afa7445dd9497d0b8ea91c20699d9d348ede8dd18",
+      "snapshot_sha256": "661eb84314b6c93f6ab1753afa7445dd9497d0b8ea91c20699d9d348ede8dd18"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/WikiChunkView.java": {
+      "original_sha256": "7dcec92a5b08b3fb0ab23a838d2dc01a4565a23efae484eb69fa122ee48d0893",
+      "snapshot_sha256": "7dcec92a5b08b3fb0ab23a838d2dc01a4565a23efae484eb69fa122ee48d0893"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/WikiDocumentChangedEvent.java": {
+      "original_sha256": "873f2e00a9693a5ac67e22e953ab5d1e9ec2043c52ec24bc9c26bca4a607bbce",
+      "snapshot_sha256": "873f2e00a9693a5ac67e22e953ab5d1e9ec2043c52ec24bc9c26bca4a607bbce"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/WikiRagIndexListener.java": {
+      "original_sha256": "45dbb517e30d085ddc93ae27bb7e0b53700b73074c3141c8660347b7cde92ce0",
+      "snapshot_sha256": "45dbb517e30d085ddc93ae27bb7e0b53700b73074c3141c8660347b7cde92ce0"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/WikiRagIndexService.java": {
+      "original_sha256": "d0a8003a587099d5f09db42b7a1cb720016c0b2eae3834e589946d260cf9930d",
+      "snapshot_sha256": "d0a8003a587099d5f09db42b7a1cb720016c0b2eae3834e589946d260cf9930d"
+    },
+    "cloud/src/main/java/com/et/cloud/rag/WikiRagIndexServiceImpl.java": {
+      "original_sha256": "bd3e2b23cde5aa9acc1d2b955c337a12a5b98c8cc580310a264a0b5cd51f013b",
+      "snapshot_sha256": "bd3e2b23cde5aa9acc1d2b955c337a12a5b98c8cc580310a264a0b5cd51f013b"
+    },
+    "cloud/src/main/java/com/et/cloud/service/DocumentWikiService.java": {
+      "original_sha256": "6768d57d329ea40a92097cd1c346f1122b873d90788e17602a65aa49a2f0ac03",
+      "snapshot_sha256": "6768d57d329ea40a92097cd1c346f1122b873d90788e17602a65aa49a2f0ac03"
+    },
+    "cloud/src/main/java/com/et/cloud/service/PictureService.java": {
+      "original_sha256": "52896465a23a0b8c4bb46cbb40dce4ec3843acf193d0902582a8e2503709a832",
+      "snapshot_sha256": "52896465a23a0b8c4bb46cbb40dce4ec3843acf193d0902582a8e2503709a832"
+    },
+    "cloud/src/main/java/com/et/cloud/service/SpaceService.java": {
+      "original_sha256": "c31849870c7ee5e2f70174a3a9496ddd18146ff02d024d7621338808b057a196",
+      "snapshot_sha256": "c31849870c7ee5e2f70174a3a9496ddd18146ff02d024d7621338808b057a196"
+    },
+    "cloud/src/main/java/com/et/cloud/service/SpaceUserService.java": {
+      "original_sha256": "a855752be27998ba7e4fcf0afbc5c6ce68808a4b054ccdf4583162a5f074b7df",
+      "snapshot_sha256": "a855752be27998ba7e4fcf0afbc5c6ce68808a4b054ccdf4583162a5f074b7df"
+    },
+    "cloud/src/main/java/com/et/cloud/service/UserService.java": {
+      "original_sha256": "4da2e2abd0c85f7e3ebd72f5241b793b6dd81ae8a8392a18309e23a2a84034bd",
+      "snapshot_sha256": "4da2e2abd0c85f7e3ebd72f5241b793b6dd81ae8a8392a18309e23a2a84034bd"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WebPageFetcher.java": {
+      "original_sha256": "0daad78a2deeba7fb106c93fd505d27bad14a7a8c567fa5add43f3761a937e45",
+      "snapshot_sha256": "0daad78a2deeba7fb106c93fd505d27bad14a7a8c567fa5add43f3761a937e45"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiAttachmentService.java": {
+      "original_sha256": "b2015af40bd4d628d119759ded6174ea47c5273b924b32572fc4c73271b96b0f",
+      "snapshot_sha256": "b2015af40bd4d628d119759ded6174ea47c5273b924b32572fc4c73271b96b0f"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiBatchImportService.java": {
+      "original_sha256": "ddb3ec32b51041d0593f14944776a4f003fd4c786296b6a7a1757488f5b37626",
+      "snapshot_sha256": "ddb3ec32b51041d0593f14944776a4f003fd4c786296b6a7a1757488f5b37626"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiCacheManager.java": {
+      "original_sha256": "9db43e35e0a79a738ab0bd16dbd72b24ec554be326bc2c3d6d26c2796bfc7962",
+      "snapshot_sha256": "9db43e35e0a79a738ab0bd16dbd72b24ec554be326bc2c3d6d26c2796bfc7962"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiChunkService.java": {
+      "original_sha256": "e0a8d8a3f840d4b9d3913047912d09b109b9d477019edbebf850f387df392e89",
+      "snapshot_sha256": "e0a8d8a3f840d4b9d3913047912d09b109b9d477019edbebf850f387df392e89"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiDocumentImportService.java": {
+      "original_sha256": "1e56fa8b4496c79dfe5c6b79c94df3e60b7d43a817bbed91755911fb7bb570f0",
+      "snapshot_sha256": "1e56fa8b4496c79dfe5c6b79c94df3e60b7d43a817bbed91755911fb7bb570f0"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiFolderService.java": {
+      "original_sha256": "3fcf82cd281fbb74b6e33ba65a657dd8c2891ce42c7d3c026d4e6bf5c231837d",
+      "snapshot_sha256": "3fcf82cd281fbb74b6e33ba65a657dd8c2891ce42c7d3c026d4e6bf5c231837d"
+    },
+    "cloud/src/main/java/com/et/cloud/service/WikiSpaceService.java": {
+      "original_sha256": "fe9f64a7608c1b204c73f6819e8c187e0271ac8d2be231b62d54f35078be47a8",
+      "snapshot_sha256": "fe9f64a7608c1b204c73f6819e8c187e0271ac8d2be231b62d54f35078be47a8"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/PictureEditHandler.java": {
+      "original_sha256": "ccdd2a0c5db98eb5072939d1f315c80f984b25708cb7189f547a01e08a74f6ad",
+      "snapshot_sha256": "ccdd2a0c5db98eb5072939d1f315c80f984b25708cb7189f547a01e08a74f6ad"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/WebSocketConfig.java": {
+      "original_sha256": "f010d0d624ea2c62666e63fc5229473e971a15953ee582e2d98af00e50686ccd",
+      "snapshot_sha256": "f010d0d624ea2c62666e63fc5229473e971a15953ee582e2d98af00e50686ccd"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/WsHandshakeInterceptor.java": {
+      "original_sha256": "9544c2bfeaf972377eee81330064e0e5873710d2bbdc1b1d34a45b8fd18aa470",
+      "snapshot_sha256": "9544c2bfeaf972377eee81330064e0e5873710d2bbdc1b1d34a45b8fd18aa470"
+    },
+    "cloud/src/main/java/com/et/cloud/api/aliyunai/CreateOutPaintingTaskRequest.java": {
+      "original_sha256": "4ca86488a0e8ce5fc5c32e8af13055285960d9ee0e905276a06280cff1635d06",
+      "snapshot_sha256": "4ca86488a0e8ce5fc5c32e8af13055285960d9ee0e905276a06280cff1635d06"
+    },
+    "cloud/src/main/java/com/et/cloud/api/aliyunai/CreateOutPaintingTaskResponse.java": {
+      "original_sha256": "535a137f04e16b040ca7647c00ee764001350fcc4c5db0bcd9147d1eeadba53f",
+      "snapshot_sha256": "535a137f04e16b040ca7647c00ee764001350fcc4c5db0bcd9147d1eeadba53f"
+    },
+    "cloud/src/main/java/com/et/cloud/api/aliyunai/GetOutPaintingTaskResponse.java": {
+      "original_sha256": "ec9e0bf0faf45aa3731c939f5e153fb5b68540fbe70b611dd6511a5bcd411d42",
+      "snapshot_sha256": "ec9e0bf0faf45aa3731c939f5e153fb5b68540fbe70b611dd6511a5bcd411d42"
+    },
+    "cloud/src/main/java/com/et/cloud/api/aliyunai/model/AliYunAiApi.java": {
+      "original_sha256": "1db4d2a768cae0878425cbd547bfbdf080588ff3f7ae8c64bb776f4f7b581317",
+      "snapshot_sha256": "1db4d2a768cae0878425cbd547bfbdf080588ff3f7ae8c64bb776f4f7b581317"
+    },
+    "cloud/src/main/java/com/et/cloud/controller/aop/AuthInterceptor.java": {
+      "original_sha256": "01bf4f36820e0479092012d27890999c7ed4936bd4f800c6880e6f57fcb03479",
+      "snapshot_sha256": "01bf4f36820e0479092012d27890999c7ed4936bd4f800c6880e6f57fcb03479"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/documentWiki/DocumentWikiAddRequest.java": {
+      "original_sha256": "dedf3dd7c323bd162d67d7287031b6265df39389840e8c75d7837d3df0de45a0",
+      "snapshot_sha256": "dedf3dd7c323bd162d67d7287031b6265df39389840e8c75d7837d3df0de45a0"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/documentWiki/DocumentWikiBatchUrlImportRequest.java": {
+      "original_sha256": "886767dab37bc7f4406b437b987ac47d30c89d6f5be9b2a19f71f7a26c891436",
+      "snapshot_sha256": "886767dab37bc7f4406b437b987ac47d30c89d6f5be9b2a19f71f7a26c891436"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/documentWiki/DocumentWikiEditRequest.java": {
+      "original_sha256": "f271f466d99ca6b116d9eaa30bb430a9d1f32bec850845d99d11b8dec06bfceb",
+      "snapshot_sha256": "f271f466d99ca6b116d9eaa30bb430a9d1f32bec850845d99d11b8dec06bfceb"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/documentWiki/DocumentWikiMoveRequest.java": {
+      "original_sha256": "8ae39e097db7251208a2d6e6de870e029072cab56c4d2b27d77c8d3a96818e91",
+      "snapshot_sha256": "8ae39e097db7251208a2d6e6de870e029072cab56c4d2b27d77c8d3a96818e91"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/documentWiki/DocumentWikiQueryRequest.java": {
+      "original_sha256": "86be2466581d3969b5aff31b50689fca0c600a74ded1a174f38643243fa8cad1",
+      "snapshot_sha256": "86be2466581d3969b5aff31b50689fca0c600a74ded1a174f38643243fa8cad1"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/file/UploadPictureResult.java": {
+      "original_sha256": "9a9626e5462d8fefa40769b2d7e5b3945ec327cf41f8c8e053838a1a2d316b4d",
+      "snapshot_sha256": "9a9626e5462d8fefa40769b2d7e5b3945ec327cf41f8c8e053838a1a2d316b4d"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/CreatePictureOutPaintingTaskRequest.java": {
+      "original_sha256": "f65936694712370869cf182c4c8c19099ceb0e72ec4c691d228f8e3ae62c9eb5",
+      "snapshot_sha256": "f65936694712370869cf182c4c8c19099ceb0e72ec4c691d228f8e3ae62c9eb5"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureDeleteRequest.java": {
+      "original_sha256": "ba84ce486c6ec97d5463c935ffb50b0a8c4537ee73441d489a73135993e212e9",
+      "snapshot_sha256": "ba84ce486c6ec97d5463c935ffb50b0a8c4537ee73441d489a73135993e212e9"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureEditRequest.java": {
+      "original_sha256": "ec9647eff11d71d52192b1f7e3cbd8288c53c90180d20f61b89e18ea2fc0b93c",
+      "snapshot_sha256": "ec9647eff11d71d52192b1f7e3cbd8288c53c90180d20f61b89e18ea2fc0b93c"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureQueryRequest.java": {
+      "original_sha256": "00a0336e744118954c54583a0a1265320012ababa1c3c0924c2d8eb9ffc99f45",
+      "snapshot_sha256": "00a0336e744118954c54583a0a1265320012ababa1c3c0924c2d8eb9ffc99f45"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureReviewRequest.java": {
+      "original_sha256": "013def672ca495a6115743351e7e080ad450b3d16c0649e417b9725316f52c5f",
+      "snapshot_sha256": "013def672ca495a6115743351e7e080ad450b3d16c0649e417b9725316f52c5f"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureUpdateRequest.java": {
+      "original_sha256": "525c6566329454af411c4b23086b238265a1c581090914dd02ccd93f2079c00f",
+      "snapshot_sha256": "525c6566329454af411c4b23086b238265a1c581090914dd02ccd93f2079c00f"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureUploadByBatchRequest.java": {
+      "original_sha256": "6395b6757391e360f6ee3ba12a2897a973f1e425ac73429519ff84922c43a5eb",
+      "snapshot_sha256": "6395b6757391e360f6ee3ba12a2897a973f1e425ac73429519ff84922c43a5eb"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/picture/PictureUploadRequest.java": {
+      "original_sha256": "4218409fa37cb5081555c0bc945111cb1fc530faae406458ce092e2f4648bc32",
+      "snapshot_sha256": "4218409fa37cb5081555c0bc945111cb1fc530faae406458ce092e2f4648bc32"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/space/SpaceAddRequest.java": {
+      "original_sha256": "97b8d93e91b1beecd5e1216e6279452947824650d94dd15ba1c72139db6247ce",
+      "snapshot_sha256": "97b8d93e91b1beecd5e1216e6279452947824650d94dd15ba1c72139db6247ce"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/space/SpaceEditRequest.java": {
+      "original_sha256": "b7178c004fdf94c4bf0e61c3bc01d2919060e8e78f6df71de38bb5332805a7bb",
+      "snapshot_sha256": "b7178c004fdf94c4bf0e61c3bc01d2919060e8e78f6df71de38bb5332805a7bb"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/space/SpaceLevel.java": {
+      "original_sha256": "19fa4e0ea4d95345dd541fcf5c9fc728c38881281da9d4e215068ddab3afbf2c",
+      "snapshot_sha256": "19fa4e0ea4d95345dd541fcf5c9fc728c38881281da9d4e215068ddab3afbf2c"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/space/SpaceQueryRequest.java": {
+      "original_sha256": "c07c659325a26815daa694d079467074d6c253bdb732d6c0d2c6da583a72d2b5",
+      "snapshot_sha256": "c07c659325a26815daa694d079467074d6c253bdb732d6c0d2c6da583a72d2b5"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/space/SpaceUpdateRequest.java": {
+      "original_sha256": "b076bf2e652749ce40fb89be5e729e6ab6c1c9ea71033c9ff7874180df31bdc1",
+      "snapshot_sha256": "b076bf2e652749ce40fb89be5e729e6ab6c1c9ea71033c9ff7874180df31bdc1"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/spaceuser/SpaceUserAddRequest.java": {
+      "original_sha256": "9e13de420a9e40e62d2b316d24f41a321d5dd3c962016902ca0da37753731aec",
+      "snapshot_sha256": "9e13de420a9e40e62d2b316d24f41a321d5dd3c962016902ca0da37753731aec"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/spaceuser/SpaceUserEditRequest.java": {
+      "original_sha256": "8b4270494acdc86dd30538d4c75e5cfefa5df6755e84875b38b6bd6ba3dfa33b",
+      "snapshot_sha256": "8b4270494acdc86dd30538d4c75e5cfefa5df6755e84875b38b6bd6ba3dfa33b"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/spaceuser/SpaceUserQueryRequest.java": {
+      "original_sha256": "48c6276db1a9fb99df822a942f797534f83ad449f81a10b2b02229ef7474317c",
+      "snapshot_sha256": "48c6276db1a9fb99df822a942f797534f83ad449f81a10b2b02229ef7474317c"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/user/UserAddRequest.java": {
+      "original_sha256": "73ca759c994f6468101fa1584cb469e1c5c4943209eb5ec6844f57fcd56d0906",
+      "snapshot_sha256": "73ca759c994f6468101fa1584cb469e1c5c4943209eb5ec6844f57fcd56d0906"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/user/UserLoginRequest.java": {
+      "original_sha256": "151ed06999bedbae8f1788dd79dce3b3a430f9da6dbe8380c209e53d0cc744b8",
+      "snapshot_sha256": "151ed06999bedbae8f1788dd79dce3b3a430f9da6dbe8380c209e53d0cc744b8"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/user/UserQueryRequest.java": {
+      "original_sha256": "83bb5e40be23150652b563c3ec01cf7a3d2d6fe8effdfd5ec313129967348b5e",
+      "snapshot_sha256": "83bb5e40be23150652b563c3ec01cf7a3d2d6fe8effdfd5ec313129967348b5e"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/user/UserRegisterRequest.java": {
+      "original_sha256": "28b8bf342b344f244fe6de609dc395151911cfa880a58d9edc2a113ee3f966b4",
+      "snapshot_sha256": "28b8bf342b344f244fe6de609dc395151911cfa880a58d9edc2a113ee3f966b4"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/user/UserUpdateRequest.java": {
+      "original_sha256": "756ab095a29fcb5be8da069c88101569dffd8f8d7714fac249fb20824da1c741",
+      "snapshot_sha256": "756ab095a29fcb5be8da069c88101569dffd8f8d7714fac249fb20824da1c741"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikifolder/WikiFolderAddRequest.java": {
+      "original_sha256": "37abea0ae2249ddcef9dcf93bc0611b3bf50b4e5d090dad1f0b30f0a32ce43f9",
+      "snapshot_sha256": "37abea0ae2249ddcef9dcf93bc0611b3bf50b4e5d090dad1f0b30f0a32ce43f9"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikifolder/WikiFolderMoveRequest.java": {
+      "original_sha256": "79ea1cd2d7e49de7add7918fc57213f016effa8530c05d06db9281a0266750f1",
+      "snapshot_sha256": "79ea1cd2d7e49de7add7918fc57213f016effa8530c05d06db9281a0266750f1"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikifolder/WikiFolderRenameRequest.java": {
+      "original_sha256": "4d2cad78d9d8d5380517490b97387b122e7f73cb961cc75f95629b7e123b8aa6",
+      "snapshot_sha256": "4d2cad78d9d8d5380517490b97387b122e7f73cb961cc75f95629b7e123b8aa6"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikirecycle/WikiRecycleActionRequest.java": {
+      "original_sha256": "67d1ceef74c99e730faa5838ab45cbc6bf7e1609fedc34e24b4a9a676717e5d9",
+      "snapshot_sha256": "67d1ceef74c99e730faa5838ab45cbc6bf7e1609fedc34e24b4a9a676717e5d9"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikispace/WikiSpaceConfirmRequest.java": {
+      "original_sha256": "1ae04f9f9191b2ee268b52c81582d7ca276fd10b6d065cafbf07b7957654cf5b",
+      "snapshot_sha256": "1ae04f9f9191b2ee268b52c81582d7ca276fd10b6d065cafbf07b7957654cf5b"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikispace/WikiSpaceRenameRequest.java": {
+      "original_sha256": "4b91b6cb3d156317923e45ac190b45b931332a795a682d9a325dd4368d072167",
+      "snapshot_sha256": "4b91b6cb3d156317923e45ac190b45b931332a795a682d9a325dd4368d072167"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikispace/WikiTeamMemberAddRequest.java": {
+      "original_sha256": "5f3542d7ebfa956174569e1d9cb61031f6f1156edf57f2627d436ef56e23dd56",
+      "snapshot_sha256": "5f3542d7ebfa956174569e1d9cb61031f6f1156edf57f2627d436ef56e23dd56"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikispace/WikiTeamMemberDeleteRequest.java": {
+      "original_sha256": "534c2c8ef5e1e9b08ca19461bda63e9b1ada0fada397341c57fc38c049a4566c",
+      "snapshot_sha256": "534c2c8ef5e1e9b08ca19461bda63e9b1ada0fada397341c57fc38c049a4566c"
+    },
+    "cloud/src/main/java/com/et/cloud/dto/wikispace/WikiTeamSpaceAddRequest.java": {
+      "original_sha256": "d544e6547ca37d446bad61895bbd2960a90a36118f6d070e248927a60f8e65c0",
+      "snapshot_sha256": "d544e6547ca37d446bad61895bbd2960a90a36118f6d070e248927a60f8e65c0"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/SpaceUserAuthContext.java": {
+      "original_sha256": "0b46a60a0c8f6d87b02fd07cf9695da5430a00a92c714260bdbb0aa4404651c8",
+      "snapshot_sha256": "0b46a60a0c8f6d87b02fd07cf9695da5430a00a92c714260bdbb0aa4404651c8"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/SpaceUserAuthManager.java": {
+      "original_sha256": "7bb7bd32499ae0e8b071df7475691f603c7b2b503c0a7ec2ef6a0c688d616438",
+      "snapshot_sha256": "7bb7bd32499ae0e8b071df7475691f603c7b2b503c0a7ec2ef6a0c688d616438"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/StpInterfaceImpl.java": {
+      "original_sha256": "7959a17962aac511373a78abdd400e8d1aeff2986b2b453ba0952b104a8b3bf7",
+      "snapshot_sha256": "7959a17962aac511373a78abdd400e8d1aeff2986b2b453ba0952b104a8b3bf7"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/StpKit.java": {
+      "original_sha256": "c2fb35f83c803b31ea13ba9ca7dbc0fb4ca7f5b4abe440eca7df0b8e48273285",
+      "snapshot_sha256": "c2fb35f83c803b31ea13ba9ca7dbc0fb4ca7f5b4abe440eca7df0b8e48273285"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/upload/FilePictureUpload.java": {
+      "original_sha256": "1e2854b6776d4aa70420efcc4fba8027128c7c44772a3d61b5711955ab3d9e25",
+      "snapshot_sha256": "1e2854b6776d4aa70420efcc4fba8027128c7c44772a3d61b5711955ab3d9e25"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/upload/PictureUploadTemplate.java": {
+      "original_sha256": "ef8c883d8345c52bfd1256f635af0458a9e7a18d8d7e3b5ad6394b73a33784b1",
+      "snapshot_sha256": "ef8c883d8345c52bfd1256f635af0458a9e7a18d8d7e3b5ad6394b73a33784b1"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/upload/UrlPictureUpload.java": {
+      "original_sha256": "b1534bda34c1c2d62339cb51770c995556cdfc625e42c2ab894d28b3588d237a",
+      "snapshot_sha256": "b1534bda34c1c2d62339cb51770c995556cdfc625e42c2ab894d28b3588d237a"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/annoation/SaSpaceCheckPermission.java": {
+      "original_sha256": "2714363af0f7a8eb27d94ae5797c77d5d77155acb87fc32fa0cf2dd97a8c9d36",
+      "snapshot_sha256": "2714363af0f7a8eb27d94ae5797c77d5d77155acb87fc32fa0cf2dd97a8c9d36"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/annoation/SaTokenConfigure.java": {
+      "original_sha256": "e1667ea092685e3df0ead4d1f74af8fa6067c72c0cac628dda51a0912f02cbaf",
+      "snapshot_sha256": "e1667ea092685e3df0ead4d1f74af8fa6067c72c0cac628dda51a0912f02cbaf"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/model/SpaceUserAuthConfig.java": {
+      "original_sha256": "aaa5eae6cc5a1509f90c281ae6cf36dc56a9d942404a1bb2a8bfc9ac531fdc3c",
+      "snapshot_sha256": "aaa5eae6cc5a1509f90c281ae6cf36dc56a9d942404a1bb2a8bfc9ac531fdc3c"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/model/SpaceUserPermission.java": {
+      "original_sha256": "92eaaa13fbdc65acf97a7fde13fb8df1214cab6cb4916a646737bbc6bef1ba08",
+      "snapshot_sha256": "92eaaa13fbdc65acf97a7fde13fb8df1214cab6cb4916a646737bbc6bef1ba08"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/model/SpaceUserPermissionConstant.java": {
+      "original_sha256": "c5619640e8e61d2906a418a9c8a7eae021c39220a58393c229a1a4dcf6cf778c",
+      "snapshot_sha256": "c5619640e8e61d2906a418a9c8a7eae021c39220a58393c229a1a4dcf6cf778c"
+    },
+    "cloud/src/main/java/com/et/cloud/manager/auth/model/SpaceUserRole.java": {
+      "original_sha256": "c70122c151339c4028bc7cb64493bb698aa8d55f78bee30d9e1b1feaf6202507",
+      "snapshot_sha256": "c70122c151339c4028bc7cb64493bb698aa8d55f78bee30d9e1b1feaf6202507"
+    },
+    "cloud/src/main/java/com/et/cloud/model/constant/UserConstant.java": {
+      "original_sha256": "7077a4cd75af87a63dcd70d5afc9f130144c9f755449c6f064c246e0d1be54d2",
+      "snapshot_sha256": "7077a4cd75af87a63dcd70d5afc9f130144c9f755449c6f064c246e0d1be54d2"
+    },
+    "cloud/src/main/java/com/et/cloud/model/dto/BatchImportItemResult.java": {
+      "original_sha256": "98d33f4efb8cd6b8dac7927a645dcc17a7faa96216a643a3480d7a6d0bd22425",
+      "snapshot_sha256": "98d33f4efb8cd6b8dac7927a645dcc17a7faa96216a643a3480d7a6d0bd22425"
+    },
+    "cloud/src/main/java/com/et/cloud/model/dto/FetchedPage.java": {
+      "original_sha256": "b0e74a52f07af91cc3ae83a876c4a6782675e3f2dc20e75f19187ba4a4ea87f4",
+      "snapshot_sha256": "b0e74a52f07af91cc3ae83a876c4a6782675e3f2dc20e75f19187ba4a4ea87f4"
+    },
+    "cloud/src/main/java/com/et/cloud/model/dto/ImportedWikiDocument.java": {
+      "original_sha256": "935330e194263bc3dbbe5aa0fb9382c7d6922fb50b1491790dfc81060f6bde6d",
+      "snapshot_sha256": "935330e194263bc3dbbe5aa0fb9382c7d6922fb50b1491790dfc81060f6bde6d"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/AgentConversation.java": {
+      "original_sha256": "b1543f6a381680bf760aa2cdb37141dc533bcdd17bae2ebe2513a9c6d60a7db0",
+      "snapshot_sha256": "b1543f6a381680bf760aa2cdb37141dc533bcdd17bae2ebe2513a9c6d60a7db0"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/AgentMessage.java": {
+      "original_sha256": "7e6a3499ec864a9fcc1a23566ca8bf73206000e201c70628137670fdd64f7cf3",
+      "snapshot_sha256": "7e6a3499ec864a9fcc1a23566ca8bf73206000e201c70628137670fdd64f7cf3"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/DocumentWiki.java": {
+      "original_sha256": "d61cf29be8e801b70be8d2894f181d31ea79e450fef80672f810545b42074806",
+      "snapshot_sha256": "d61cf29be8e801b70be8d2894f181d31ea79e450fef80672f810545b42074806"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/Picture.java": {
+      "original_sha256": "4f6603d5c41f8879e989bbd0569124ed872ee7b68eab5fc6959573a3c1c64ee0",
+      "snapshot_sha256": "4f6603d5c41f8879e989bbd0569124ed872ee7b68eab5fc6959573a3c1c64ee0"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/RagApiKey.java": {
+      "original_sha256": "eea186cdc09a27eb6242b6d301f0d7c0934c7fb96e01b3a67e393f2b8d7de4ea",
+      "snapshot_sha256": "eea186cdc09a27eb6242b6d301f0d7c0934c7fb96e01b3a67e393f2b8d7de4ea"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/Space.java": {
+      "original_sha256": "d453f1fe05a23551a02729cc6bcf2086a1b61cd10b308c9935c4cd3157cd049a",
+      "snapshot_sha256": "d453f1fe05a23551a02729cc6bcf2086a1b61cd10b308c9935c4cd3157cd049a"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/SpaceUser.java": {
+      "original_sha256": "1b2d79300fb66f2cdd114a0b1acb69fc04d6ebb9284d6c78782bbf9a5833de9e",
+      "snapshot_sha256": "1b2d79300fb66f2cdd114a0b1acb69fc04d6ebb9284d6c78782bbf9a5833de9e"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/User.java": {
+      "original_sha256": "85071eedd8303fb164ddcea6abe7396928dbb8c2e2889e0e388b015c75bd9f4d",
+      "snapshot_sha256": "85071eedd8303fb164ddcea6abe7396928dbb8c2e2889e0e388b015c75bd9f4d"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/WikiAttachment.java": {
+      "original_sha256": "d1cb8daadbb127e7ec68755099ca0c7976ee0f524827226c1c400b5e9b77bd2c",
+      "snapshot_sha256": "d1cb8daadbb127e7ec68755099ca0c7976ee0f524827226c1c400b5e9b77bd2c"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/WikiChunk.java": {
+      "original_sha256": "4bdd1bf0b0ae132f07c44019b3fa068ed938db4013366625f4d1c2c1c684ba77",
+      "snapshot_sha256": "4bdd1bf0b0ae132f07c44019b3fa068ed938db4013366625f4d1c2c1c684ba77"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/WikiFolder.java": {
+      "original_sha256": "a2dae09580f58cbac92ddd0742a5abb590dcea0e518053d2155bec646e610eb7",
+      "snapshot_sha256": "a2dae09580f58cbac92ddd0742a5abb590dcea0e518053d2155bec646e610eb7"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/WikiSpace.java": {
+      "original_sha256": "a0471ac7e3ba9e2482f1120eb11408a5c745f4c1845adfc174731bf9f832451c",
+      "snapshot_sha256": "a0471ac7e3ba9e2482f1120eb11408a5c745f4c1845adfc174731bf9f832451c"
+    },
+    "cloud/src/main/java/com/et/cloud/model/entity/WikiSpaceUser.java": {
+      "original_sha256": "1d269de4243b1c00a4f3f1037c5e740a1d1bf14767b06aafa981f9a714c93360",
+      "snapshot_sha256": "1d269de4243b1c00a4f3f1037c5e740a1d1bf14767b06aafa981f9a714c93360"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/DocumentWikiVis.java": {
+      "original_sha256": "e3875b45703b64eb9f91eb94e357cf08edb180ae3af9d417d8ee400edbbc937b",
+      "snapshot_sha256": "e3875b45703b64eb9f91eb94e357cf08edb180ae3af9d417d8ee400edbbc937b"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/LoginUserVis.java": {
+      "original_sha256": "b59d4d07377a1c37ef67bd0ef7021a9f18f9b599ef7c7a709c85f1637522910c",
+      "snapshot_sha256": "b59d4d07377a1c37ef67bd0ef7021a9f18f9b599ef7c7a709c85f1637522910c"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/PictureTagCategory.java": {
+      "original_sha256": "d5f8fda78d645843b9bdf300ea46d6c06973db8a8bf326ba37ffed65387a9d0b",
+      "snapshot_sha256": "d5f8fda78d645843b9bdf300ea46d6c06973db8a8bf326ba37ffed65387a9d0b"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/PictureVis.java": {
+      "original_sha256": "0b7d84db0862eba703ea2d1318f489a529641931dc9750f404facbd35dc09117",
+      "snapshot_sha256": "0b7d84db0862eba703ea2d1318f489a529641931dc9750f404facbd35dc09117"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/SpaceUserVis.java": {
+      "original_sha256": "50759429d15dc8b031a5657d49438661d1b7a20c0dd37cd804e01d8ef44d6b90",
+      "snapshot_sha256": "50759429d15dc8b031a5657d49438661d1b7a20c0dd37cd804e01d8ef44d6b90"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/SpaceVis.java": {
+      "original_sha256": "adbc891ac3acee4e34d6cba851299e0dc1a0d00dc452ed964b81078df0f3b4af",
+      "snapshot_sha256": "adbc891ac3acee4e34d6cba851299e0dc1a0d00dc452ed964b81078df0f3b4af"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/UserVis.java": {
+      "original_sha256": "daa5fee3638363b8f190ce62d04c5ab49acec64f9dba18ca2dddfb89fb5d9f6a",
+      "snapshot_sha256": "daa5fee3638363b8f190ce62d04c5ab49acec64f9dba18ca2dddfb89fb5d9f6a"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/WikiFolderVis.java": {
+      "original_sha256": "ad0ebf24d24e5c1e59045dcc8decc4e991e7830f356107637c7bef3f7a42291a",
+      "snapshot_sha256": "ad0ebf24d24e5c1e59045dcc8decc4e991e7830f356107637c7bef3f7a42291a"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/WikiRecycleItemVis.java": {
+      "original_sha256": "5c258ff3d94a42076b156875c4be9bed4663b648865723998e00aa8685666839",
+      "snapshot_sha256": "5c258ff3d94a42076b156875c4be9bed4663b648865723998e00aa8685666839"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/WikiSpaceUserVis.java": {
+      "original_sha256": "772aaa04860d1648d0040b89b3b1ac638aa3649b777087a5133a033a6d3f0a06",
+      "snapshot_sha256": "772aaa04860d1648d0040b89b3b1ac638aa3649b777087a5133a033a6d3f0a06"
+    },
+    "cloud/src/main/java/com/et/cloud/model/vis/WikiSpaceVis.java": {
+      "original_sha256": "a82f8c4fcdfe48b2c845d5b6c2c727c78e80740ee50cb4b2843102c0e22e2673",
+      "snapshot_sha256": "a82f8c4fcdfe48b2c845d5b6c2c727c78e80740ee50cb4b2843102c0e22e2673"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/AgentUrlImportService.java": {
+      "original_sha256": "9465bdf5a32c02bbfbc331da9f6e443c407cf6cfd83c92f6d628e19dead5f034",
+      "snapshot_sha256": "9465bdf5a32c02bbfbc331da9f6e443c407cf6cfd83c92f6d628e19dead5f034"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/AgentWikiCreationService.java": {
+      "original_sha256": "6beaa444fc879a43f52066f4ebec6ebd9519a883079d6712ca83f320b681770d",
+      "snapshot_sha256": "6beaa444fc879a43f52066f4ebec6ebd9519a883079d6712ca83f320b681770d"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/ArticleMetadataExtractor.java": {
+      "original_sha256": "906ff436c8f7cd24a67fc9d1209b2505552bfcd87cce211771107bcb57ae7aa3",
+      "snapshot_sha256": "906ff436c8f7cd24a67fc9d1209b2505552bfcd87cce211771107bcb57ae7aa3"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/DocumentWikiServiceImpl.java": {
+      "original_sha256": "b6e6ee1bcb7963b78dbbec974ed741d40ed7d82a04d3c1f7d8d27ca2d2866f47",
+      "snapshot_sha256": "b6e6ee1bcb7963b78dbbec974ed741d40ed7d82a04d3c1f7d8d27ca2d2866f47"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/HtmlToMarkdownConverter.java": {
+      "original_sha256": "476a8dc75fa50261858d0dcb52207090551e6fc07ba31cf3ad846e93cdca1ec5",
+      "snapshot_sha256": "476a8dc75fa50261858d0dcb52207090551e6fc07ba31cf3ad846e93cdca1ec5"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/HttpWebPageFetcher.java": {
+      "original_sha256": "a2b5d745a7c869aea9997c67910451a37fba88fc387513cf7ad1e5799b8278b8",
+      "snapshot_sha256": "a2b5d745a7c869aea9997c67910451a37fba88fc387513cf7ad1e5799b8278b8"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/JsonDocumentSplitter.java": {
+      "original_sha256": "a6e88b765b6eb0e1c9b76dfc68500e52e4f344e48a80567cf668f10b5023e547",
+      "snapshot_sha256": "a6e88b765b6eb0e1c9b76dfc68500e52e4f344e48a80567cf668f10b5023e547"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/PictureServiceImpl.java": {
+      "original_sha256": "4a097449c38e4b8fb24c5d1dde9a0869f83e9be0b1c4a13b1dcf8bf8ec75a942",
+      "snapshot_sha256": "4a097449c38e4b8fb24c5d1dde9a0869f83e9be0b1c4a13b1dcf8bf8ec75a942"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/SpaceServiceImpl.java": {
+      "original_sha256": "9baa49b60139023401835bd523653f8d22634c5b4d40a9baf2c6779de4044019",
+      "snapshot_sha256": "9baa49b60139023401835bd523653f8d22634c5b4d40a9baf2c6779de4044019"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/SpaceUserServiceImpl.java": {
+      "original_sha256": "9611bda2956e5e2cdaf7b6a57c7f94dd7e2e1b930067f64a4e9742c0956bfcd3",
+      "snapshot_sha256": "9611bda2956e5e2cdaf7b6a57c7f94dd7e2e1b930067f64a4e9742c0956bfcd3"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/UserServiceImpl.java": {
+      "original_sha256": "1c397c24cd5516d2304ed5b67f9f39675de28a87567e65b7a4e44943729421ca",
+      "snapshot_sha256": "1c397c24cd5516d2304ed5b67f9f39675de28a87567e65b7a4e44943729421ca"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WebPageMarkdownCleaner.java": {
+      "original_sha256": "be6817dae991f5d66773267172a94dd6cd0bd9861086e474f51f8145c7541870",
+      "snapshot_sha256": "be6817dae991f5d66773267172a94dd6cd0bd9861086e474f51f8145c7541870"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiAttachmentServiceImpl.java": {
+      "original_sha256": "956b91d61f08d8c9ea0a0158e1810e54eda409315f6fb73713fed38cd9b84a44",
+      "snapshot_sha256": "956b91d61f08d8c9ea0a0158e1810e54eda409315f6fb73713fed38cd9b84a44"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiBatchImportServiceImpl.java": {
+      "original_sha256": "013671d2c48402eb1473bab00f9b6961190870a61507ef546b55a51e49434419",
+      "snapshot_sha256": "013671d2c48402eb1473bab00f9b6961190870a61507ef546b55a51e49434419"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiCacheManagerImpl.java": {
+      "original_sha256": "9d889e26b656fd373707ef7fb343544c7f805ada2474cc562463fb09bb642734",
+      "snapshot_sha256": "9d889e26b656fd373707ef7fb343544c7f805ada2474cc562463fb09bb642734"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiChunkServiceImpl.java": {
+      "original_sha256": "38f003d5318d28b35ff2cbf1d487768a26cd3fc4ca162a48eb20d8135e0b2e1e",
+      "snapshot_sha256": "38f003d5318d28b35ff2cbf1d487768a26cd3fc4ca162a48eb20d8135e0b2e1e"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiDocumentImportServiceImpl.java": {
+      "original_sha256": "0c5f336171674d5189825325de88e415ef969702fbd84a274cf43fa2cfce9ac9",
+      "snapshot_sha256": "0c5f336171674d5189825325de88e415ef969702fbd84a274cf43fa2cfce9ac9"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiFolderServiceImpl.java": {
+      "original_sha256": "7c27dc0b5312a8693bb12711e153f956393525bf41f5386b099f5b3f960fbb7c",
+      "snapshot_sha256": "7c27dc0b5312a8693bb12711e153f956393525bf41f5386b099f5b3f960fbb7c"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiMutationLock.java": {
+      "original_sha256": "7d8cd47af4613f2cd9a6ec8d40f922e5fe3d53b342320846dfe198a38e96e60c",
+      "snapshot_sha256": "7d8cd47af4613f2cd9a6ec8d40f922e5fe3d53b342320846dfe198a38e96e60c"
+    },
+    "cloud/src/main/java/com/et/cloud/service/impl/WikiSpaceServiceImpl.java": {
+      "original_sha256": "7812468d06afe0c9d50ac8813674eb87bedec5749674ab86761f127b413a78b7",
+      "snapshot_sha256": "7812468d06afe0c9d50ac8813674eb87bedec5749674ab86761f127b413a78b7"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/model/PictureEditActionEnum.java": {
+      "original_sha256": "d80298e2f583f858f481603129a4e8accbfe0077803639e7b01c21aa1ad78d24",
+      "snapshot_sha256": "d80298e2f583f858f481603129a4e8accbfe0077803639e7b01c21aa1ad78d24"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/model/PictureEditMessageTypeEnum.java": {
+      "original_sha256": "cc732214b923966b5119848630b58060e5ad9c70223e85a5b70c3a7b06d87a58",
+      "snapshot_sha256": "cc732214b923966b5119848630b58060e5ad9c70223e85a5b70c3a7b06d87a58"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/model/PictureEditRequestMessage.java": {
+      "original_sha256": "bb7315167ff9b1edb68e6fb98f89ae91088b774c53e179463afbc73385b2d2eb",
+      "snapshot_sha256": "bb7315167ff9b1edb68e6fb98f89ae91088b774c53e179463afbc73385b2d2eb"
+    },
+    "cloud/src/main/java/com/et/cloud/websocket/model/PictureEditResponseMessage.java": {
+      "original_sha256": "4b666c75ecb37c809aaadb055c20c9c7e119ccf5e1730a40dd54a3a32230eae6",
+      "snapshot_sha256": "4b666c75ecb37c809aaadb055c20c9c7e119ccf5e1730a40dd54a3a32230eae6"
+    },
+    "cloud/src/main/java/generator/domain/Picture.java": {
+      "original_sha256": "31713fee91e5a09b57d947d4ebe598d95f604266138eac4d12a06b50710a9457",
+      "snapshot_sha256": "31713fee91e5a09b57d947d4ebe598d95f604266138eac4d12a06b50710a9457"
+    },
+    "cloud/src/main/java/generator/domain/Space.java": {
+      "original_sha256": "2a78be9b463edfb968c648cc51f27b3945df960f6bdcd76d5c56b8cfe90b989e",
+      "snapshot_sha256": "2a78be9b463edfb968c648cc51f27b3945df960f6bdcd76d5c56b8cfe90b989e"
+    },
+    "cloud/src/main/java/generator/mapper/PictureMapper.java": {
+      "original_sha256": "214f9c9864f84f99c612abd5e2943d6406cd08b1d7cc7314c126860aece948cc",
+      "snapshot_sha256": "214f9c9864f84f99c612abd5e2943d6406cd08b1d7cc7314c126860aece948cc"
+    },
+    "cloud/src/main/java/generator/mapper/SpaceMapper.java": {
+      "original_sha256": "287f90534bdd121ded465abec87c0b933d211148e6ef6a6e6c9cc357aadc60d8",
+      "snapshot_sha256": "287f90534bdd121ded465abec87c0b933d211148e6ef6a6e6c9cc357aadc60d8"
+    },
+    "cloud/src/main/java/generator/service/PictureService.java": {
+      "original_sha256": "5d22801ef35e5678bf5b8f306cb2bb56aaf7908860b65841e72383108ac08734",
+      "snapshot_sha256": "5d22801ef35e5678bf5b8f306cb2bb56aaf7908860b65841e72383108ac08734"
+    },
+    "cloud/src/main/java/generator/service/SpaceService.java": {
+      "original_sha256": "78930603d6c73ecdba1d5031443512555ae0fbdc05f6e01f219ade9ed46fd9ae",
+      "snapshot_sha256": "78930603d6c73ecdba1d5031443512555ae0fbdc05f6e01f219ade9ed46fd9ae"
+    },
+    "cloud/src/main/java/generator/service/impl/PictureServiceImpl.java": {
+      "original_sha256": "fa982e80f6a2172991c439da4d464505b7ab9ee649a08e9032895c08462c8a00",
+      "snapshot_sha256": "fa982e80f6a2172991c439da4d464505b7ab9ee649a08e9032895c08462c8a00"
+    },
+    "cloud/src/main/java/generator/service/impl/SpaceServiceImpl.java": {
+      "original_sha256": "395ee0f2704349e00adc0004144dafbb4b14ee57a4a62e1e9a84e963256cd9b3",
+      "snapshot_sha256": "395ee0f2704349e00adc0004144dafbb4b14ee57a4a62e1e9a84e963256cd9b3"
+    },
+    "cloud/src/main/resources/Avatar/admin.jpg": {
+      "original_sha256": "1b34040e7b809bc1b21770af2989038b78b1be8f862b55f8fea8aeaa397efc2d",
+      "snapshot_sha256": "1b34040e7b809bc1b21770af2989038b78b1be8f862b55f8fea8aeaa397efc2d"
+    },
+    "cloud/src/main/resources/biz/spaceUserAuthConfig.json": {
+      "original_sha256": "303e3a674b507abc675edf0eef0de4114d1bace01409c5b8a2b49fc0c37b54ab",
+      "snapshot_sha256": "303e3a674b507abc675edf0eef0de4114d1bace01409c5b8a2b49fc0c37b54ab"
+    },
+    "cloud/src/main/resources/static/admin.jpg": {
+      "original_sha256": "1b34040e7b809bc1b21770af2989038b78b1be8f862b55f8fea8aeaa397efc2d",
+      "snapshot_sha256": "1b34040e7b809bc1b21770af2989038b78b1be8f862b55f8fea8aeaa397efc2d"
+    },
+    "cloud/src/main/resources/static/index.html": {
+      "original_sha256": "586fd42ea02620b28385de2f584b2cad2c761d7477cff9d068e3bc1dd18a24a4",
+      "snapshot_sha256": "586fd42ea02620b28385de2f584b2cad2c761d7477cff9d068e3bc1dd18a24a4"
+    },
+    "cloud/src/main/resources/generator/mapper/PictureMapper.xml": {
+      "original_sha256": "ab62575c2c9aa6830c1c2a4c854f1fff8535f820674fd0eb419784ee82d3968b",
+      "snapshot_sha256": "ab62575c2c9aa6830c1c2a4c854f1fff8535f820674fd0eb419784ee82d3968b"
+    },
+    "cloud/src/main/resources/generator/mapper/SpaceMapper.xml": {
+      "original_sha256": "94ffe5b349705047e1ced499da7cadddaa028f78ba5d6ebd4ed650fb2b71c5e6",
+      "snapshot_sha256": "94ffe5b349705047e1ced499da7cadddaa028f78ba5d6ebd4ed650fb2b71c5e6"
+    },
+    "cloud/src/main/resources/generator/mapper/SpaceUserMapper.xml": {
+      "original_sha256": "1e3f941cee6406299950cfe92d60731219883f017fef3a7bc3b6bd45288780e8",
+      "snapshot_sha256": "1e3f941cee6406299950cfe92d60731219883f017fef3a7bc3b6bd45288780e8"
+    },
+    "cloud/src/main/resources/generator/mapper/UserMapper.xml": {
+      "original_sha256": "3f90c5322c3be431eaf58ffef28f4f9a6525cb2c876e9a65e5f80da0e0e7d0eb",
+      "snapshot_sha256": "3f90c5322c3be431eaf58ffef28f4f9a6525cb2c876e9a65e5f80da0e0e7d0eb"
+    },
+    "cloud/src/test/java/com/et/cloud/CloudApplicationTests.java": {
+      "original_sha256": "deecd8212918c9bd98ef6b79d7605609544667e2f89c5e4d4c0ce3c3a723882d",
+      "snapshot_sha256": "deecd8212918c9bd98ef6b79d7605609544667e2f89c5e4d4c0ce3c3a723882d"
+    },
+    "cloud/src/test/java/com/et/cloud/RedisStringTes.java": {
+      "original_sha256": "71a2fa7e65e983a86f19f084240fa06efe95f658c22e91c87a9258bd4fc34aa5",
+      "snapshot_sha256": "71a2fa7e65e983a86f19f084240fa06efe95f658c22e91c87a9258bd4fc34aa5"
+    },
+    "cloud/src/test/java/com/et/cloud/config/OpenApiLocalProfileTest.java": {
+      "original_sha256": "173503ceecc155a8eff0e20462afe7c246a03299418b6fb9e37b00ea0bcc677d",
+      "snapshot_sha256": "173503ceecc155a8eff0e20462afe7c246a03299418b6fb9e37b00ea0bcc677d"
+    },
+    "cloud/src/test/java/com/et/cloud/config/RequestWrapperTest.java": {
+      "original_sha256": "ac6df47fd479364b3c587062f7a71971d779444aac6c991a951c98e93819be33",
+      "snapshot_sha256": "ac6df47fd479364b3c587062f7a71971d779444aac6c991a951c98e93819be33"
+    },
+    "cloud/src/test/java/com/et/cloud/config/SaTokenConfigureTest.java": {
+      "original_sha256": "579cd64a068cfc0747306b2eb18906dca9660aac8adacc82d817f1aea4acc7ce",
+      "snapshot_sha256": "579cd64a068cfc0747306b2eb18906dca9660aac8adacc82d817f1aea4acc7ce"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentCodeVersionValidatorTest.java": {
+      "original_sha256": "f8ee088fb1dd77333d649cd2b2f9806280d16d2bb30b5deefb7e8fc593f891b4",
+      "snapshot_sha256": "f8ee088fb1dd77333d649cd2b2f9806280d16d2bb30b5deefb7e8fc593f891b4"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentConversationPersistenceMappingTest.java": {
+      "original_sha256": "9cde1448c2d38cd399bbf8a83fad504b6f4c2ff6047f9ce539609b60d5a5e128",
+      "snapshot_sha256": "9cde1448c2d38cd399bbf8a83fad504b6f4c2ff6047f9ce539609b60d5a5e128"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentConversationStoreTest.java": {
+      "original_sha256": "46112d8207e588df263b4f8c9dba8e3fd61531a1eb7a58f6bb69dcd1c2d27429",
+      "snapshot_sha256": "46112d8207e588df263b4f8c9dba8e3fd61531a1eb7a58f6bb69dcd1c2d27429"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentLibraryControllerTest.java": {
+      "original_sha256": "102f80ab546ce847ac82ea965c28a2455f57e96f555012b4fb9a96b4ed853734",
+      "snapshot_sha256": "102f80ab546ce847ac82ea965c28a2455f57e96f555012b4fb9a96b4ed853734"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentLibraryInternalControllerTest.java": {
+      "original_sha256": "f281e0572d4a580eb6fb08c9e78ecda7f96610f5ff678fe8c5e399a5e7a3dbb8",
+      "snapshot_sha256": "f281e0572d4a580eb6fb08c9e78ecda7f96610f5ff678fe8c5e399a5e7a3dbb8"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentLibrarySchemaIT.java": {
+      "original_sha256": "c4f103106100813dc9cc06f7c748ffadfcf0667a20ed134ed6166fde294034a7",
+      "snapshot_sha256": "c4f103106100813dc9cc06f7c748ffadfcf0667a20ed134ed6166fde294034a7"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentLibraryStoreIT.java": {
+      "original_sha256": "5804b002bffa264beda5fb6277747bd36045899b3e34b41202e62a1f0febcdfd",
+      "snapshot_sha256": "5804b002bffa264beda5fb6277747bd36045899b3e34b41202e62a1f0febcdfd"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPersonalFilePreviewTest.java": {
+      "original_sha256": "6c5d2b46f9fc3c92610e508d41ca496ab300d9dc8c176f65a97da9464f3c3340",
+      "snapshot_sha256": "6c5d2b46f9fc3c92610e508d41ca496ab300d9dc8c176f65a97da9464f3c3340"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileReferenceLocalIT.java": {
+      "original_sha256": "e17b920b5d3f68056ab91499584688fc02cdc2dfc530fe8b72b80513d62a8c38",
+      "snapshot_sha256": "e17b920b5d3f68056ab91499584688fc02cdc2dfc530fe8b72b80513d62a8c38"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileReferenceTest.java": {
+      "original_sha256": "fa261ccb1bc2fca08ad211201dcb9cf808ab7fb49f5984c5d2edd9c6c2e5ee75",
+      "snapshot_sha256": "fa261ccb1bc2fca08ad211201dcb9cf808ab7fb49f5984c5d2edd9c6c2e5ee75"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileSegmentTest.java": {
+      "original_sha256": "cfc008547d91e18dfe4a8fff9770f463c26582d2bd6fb20d27381a3bd8e58b25",
+      "snapshot_sha256": "cfc008547d91e18dfe4a8fff9770f463c26582d2bd6fb20d27381a3bd8e58b25"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileStoreTest.java": {
+      "original_sha256": "adc2d4df2171027a464536ff8710451adc04faa47d6964f5aab70586a7aa5ccc",
+      "snapshot_sha256": "adc2d4df2171027a464536ff8710451adc04faa47d6964f5aab70586a7aa5ccc"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPersonalFileUploadTest.java": {
+      "original_sha256": "b2339468868ee99e1d51adf561142598ea17e2675c50c521d15b855ea7c2bddf",
+      "snapshot_sha256": "b2339468868ee99e1d51adf561142598ea17e2675c50c521d15b855ea7c2bddf"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPreviewControllerTest.java": {
+      "original_sha256": "20ffeff9567e256f3d026e26cb9c890b7e864c4ee83f67db48e1037428b6b6da",
+      "snapshot_sha256": "20ffeff9567e256f3d026e26cb9c890b7e864c4ee83f67db48e1037428b6b6da"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPreviewProxyTest.java": {
+      "original_sha256": "f34f2e5edd97b957d898a2d6cc1de8f2f6d899d5a31d4a2c4f3937196a72b91c",
+      "snapshot_sha256": "f34f2e5edd97b957d898a2d6cc1de8f2f6d899d5a31d4a2c4f3937196a72b91c"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentPreviewProxyWikiEventTest.java": {
+      "original_sha256": "aacb1d7b3c1e2237472df12b9c39f72da9efbe94fa709bab2ecc4d038d16933c",
+      "snapshot_sha256": "aacb1d7b3c1e2237472df12b9c39f72da9efbe94fa709bab2ecc4d038d16933c"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentResourceInternalControllerTest.java": {
+      "original_sha256": "5409edbe4544654a311547d8800c4e52fd1daa5312773db8f13f52c31d3db383",
+      "snapshot_sha256": "5409edbe4544654a311547d8800c4e52fd1daa5312773db8f13f52c31d3db383"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentSkillCatalogTest.java": {
+      "original_sha256": "15e3d39afd14d4dff51c3e6b2caf71976d2412b8aca6f94da13d452ffce2f89a",
+      "snapshot_sha256": "15e3d39afd14d4dff51c3e6b2caf71976d2412b8aca6f94da13d452ffce2f89a"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentSkillDefinitionValidatorTest.java": {
+      "original_sha256": "395826fb649cd8c079d44fe50423b5f7494b4ad67485c65fbcc15ae9f3b799d6",
+      "snapshot_sha256": "395826fb649cd8c079d44fe50423b5f7494b4ad67485c65fbcc15ae9f3b799d6"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentToolTraceLocalIT.java": {
+      "original_sha256": "4da4969b20d754b0c71a996f4922f68ca7229fa537ea5967f6e9f4460dba4c7e",
+      "snapshot_sha256": "4da4969b20d754b0c71a996f4922f68ca7229fa537ea5967f6e9f4460dba4c7e"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentWikiAnswerSkillTest.java": {
+      "original_sha256": "85c04282dcfe0734c87c86b9efcdbba45df7e7173deb7a411d3fa73f2a9e9245",
+      "snapshot_sha256": "85c04282dcfe0734c87c86b9efcdbba45df7e7173deb7a411d3fa73f2a9e9245"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentWikiChoiceLocalIT.java": {
+      "original_sha256": "2e1f83ddefcc54a3b07a18f3cecee0fcbba1e492f11eca266cda0b89a5132e4f",
+      "snapshot_sha256": "2e1f83ddefcc54a3b07a18f3cecee0fcbba1e492f11eca266cda0b89a5132e4f"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentWikiCreationLocalIT.java": {
+      "original_sha256": "4f554b887a7e36819a765d37795df9129dab26612e06b1661b3e1341918b47c8",
+      "snapshot_sha256": "4f554b887a7e36819a765d37795df9129dab26612e06b1661b3e1341918b47c8"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentWikiMultiResultLocalIT.java": {
+      "original_sha256": "bf2cf0cea4c4ea555c5f43adfc3c629812f50363f7ea2392d76cb68d0a82b89b",
+      "snapshot_sha256": "bf2cf0cea4c4ea555c5f43adfc3c629812f50363f7ea2392d76cb68d0a82b89b"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentWikiUnknownProjectionTest.java": {
+      "original_sha256": "ec20c8952e21d099120c7020077d3feefe2b1559c124f88656212a5171ffe712",
+      "snapshot_sha256": "ec20c8952e21d099120c7020077d3feefe2b1559c124f88656212a5171ffe712"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/AgentWikiWriteLocalIT.java": {
+      "original_sha256": "47a9af91880e99acac675e61c020e66829ffbd35d0311b021539e0e221cc16ad",
+      "snapshot_sha256": "47a9af91880e99acac675e61c020e66829ffbd35d0311b021539e0e221cc16ad"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/BuiltInWikiWriteSkillLocalIT.java": {
+      "original_sha256": "f0d35721dd291a4edaa5ff14262d08c287b5f2819e1cb8962d5452cd4ab2588e",
+      "snapshot_sha256": "f0d35721dd291a4edaa5ff14262d08c287b5f2819e1cb8962d5452cd4ab2588e"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/DocumentWikiBatchControllerTest.java": {
+      "original_sha256": "15ee73c5e982cc10d63242ebb4912abc5dad06436444184983dc8795dcdd8e04",
+      "snapshot_sha256": "15ee73c5e982cc10d63242ebb4912abc5dad06436444184983dc8795dcdd8e04"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/DocumentWikiControllerCacheTest.java": {
+      "original_sha256": "12f34273585548e1fcdb885aba749e7bb42b0116144375b9d5efdadf52098c71",
+      "snapshot_sha256": "12f34273585548e1fcdb885aba749e7bb42b0116144375b9d5efdadf52098c71"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/DocumentWikiControllerEditFormatTest.java": {
+      "original_sha256": "6fbf3be695d9198cd53a675370bf6f11b2220ed3fd63408bb794a10a060cdc62",
+      "snapshot_sha256": "6fbf3be695d9198cd53a675370bf6f11b2220ed3fd63408bb794a10a060cdc62"
+    },
+    "cloud/src/test/java/com/et/cloud/controller/DocumentWikiControllerImportTest.java": {
+      "original_sha256": "095715af64c87e065aab6c721af261466aec711d40ffec7d7546d0d6ac7a49ec",
+      "snapshot_sha256": "095715af64c87e065aab6c721af261466aec711d40ffec7d7546d0d6ac7a49ec"
+    },
+    "cloud/src/test/java/com/et/cloud/exception/GlobalExceptionHandlerTest.java": {
+      "original_sha256": "0cec443a6e3f8a2ecedd7087573d4a2eacb6fffa5ef68bfc10717e1ce4875df1",
+      "snapshot_sha256": "0cec443a6e3f8a2ecedd7087573d4a2eacb6fffa5ef68bfc10717e1ce4875df1"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/ChineseChunkFixture.java": {
+      "original_sha256": "d54fc94a3adbbb31874626b6ffe8214fb52830d543878ec9ab86befa2e9f5464",
+      "snapshot_sha256": "d54fc94a3adbbb31874626b6ffe8214fb52830d543878ec9ab86befa2e9f5464"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/ChunkerProfileTest.java": {
+      "original_sha256": "270bfbd5f7a44cd4818c8efc802d865ced41f93893fd37178bc7b4ce7361cb8b",
+      "snapshot_sha256": "270bfbd5f7a44cd4818c8efc802d865ced41f93893fd37178bc7b4ce7361cb8b"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/DocumentWikiRagHookTest.java": {
+      "original_sha256": "abf1baa8055fc09862ac4b2ed51f19a9bc782818bb2680cd01de3007229f339e",
+      "snapshot_sha256": "abf1baa8055fc09862ac4b2ed51f19a9bc782818bb2680cd01de3007229f339e"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/InMemoryCosineVectorStoreTest.java": {
+      "original_sha256": "57ecf7abc07edffea698d90db73ea21787006d62edcedbd73f6ff2f689a8c4d2",
+      "snapshot_sha256": "57ecf7abc07edffea698d90db73ea21787006d62edcedbd73f6ff2f689a8c4d2"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/LexicalIndexTest.java": {
+      "original_sha256": "aecbab1e73f9c80febce9fe595d680bbb978b5457e16918a62f85db237fa1d60",
+      "snapshot_sha256": "aecbab1e73f9c80febce9fe595d680bbb978b5457e16918a62f85db237fa1d60"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/LlmRagQueryExpansionClientTest.java": {
+      "original_sha256": "24a43bbfc5ab956fe6d17ca33c7be24d7cc95a6ce21211003a50d458236e7755",
+      "snapshot_sha256": "24a43bbfc5ab956fe6d17ca33c7be24d7cc95a6ce21211003a50d458236e7755"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/MarkdownChunkerTest.java": {
+      "original_sha256": "32452c75343ce1d510d0c6f28bd0b143590eefc3e65922f03eeecee808922d16",
+      "snapshot_sha256": "32452c75343ce1d510d0c6f28bd0b143590eefc3e65922f03eeecee808922d16"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/OpenRagControllerTest.java": {
+      "original_sha256": "e06e50d02388ab57ddd796fd0ab8d09c601e9676efe268f5cbdc6d56b01a0c9c",
+      "snapshot_sha256": "e06e50d02388ab57ddd796fd0ab8d09c601e9676efe268f5cbdc6d56b01a0c9c"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagApiKeyServiceImplTest.java": {
+      "original_sha256": "2a5769f16b0b5be30fd08395289f9de220f4324a06830a83f9327c4d68239b55",
+      "snapshot_sha256": "2a5769f16b0b5be30fd08395289f9de220f4324a06830a83f9327c4d68239b55"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagAskServiceImplTest.java": {
+      "original_sha256": "3099ba47d9a24176ab2569dfe8ba812425c85e45737185d9ab25f12949b41699",
+      "snapshot_sha256": "3099ba47d9a24176ab2569dfe8ba812425c85e45737185d9ab25f12949b41699"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagEmbeddingClientTest.java": {
+      "original_sha256": "eeec59aec5fee310c03fcb11a82852e44e66dc170c23a8486b0922dd545f8305",
+      "snapshot_sha256": "eeec59aec5fee310c03fcb11a82852e44e66dc170c23a8486b0922dd545f8305"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagLlmClientTest.java": {
+      "original_sha256": "4549c43be9723b3206cd920071303803e8069cf92645902096c3bf892eebc407",
+      "snapshot_sha256": "4549c43be9723b3206cd920071303803e8069cf92645902096c3bf892eebc407"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagPropertiesBindingTest.java": {
+      "original_sha256": "d35ea3c646531a3c81d3a2c7f7561403b5c1be864c7c6d7d86d8de6849101c6d",
+      "snapshot_sha256": "d35ea3c646531a3c81d3a2c7f7561403b5c1be864c7c6d7d86d8de6849101c6d"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagRerankClientTest.java": {
+      "original_sha256": "e9312376c718db31670267a334e0c3f1cb377721ef71b96eb3eb8ff6f20a2363",
+      "snapshot_sha256": "e9312376c718db31670267a334e0c3f1cb377721ef71b96eb3eb8ff6f20a2363"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RagSearchServiceImplTest.java": {
+      "original_sha256": "5a0b5088ee3110928fa6abba182bb3b028aec66d1b6a71e146e6f6bed3ae0da2",
+      "snapshot_sha256": "5a0b5088ee3110928fa6abba182bb3b028aec66d1b6a71e146e6f6bed3ae0da2"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/RrfFusionTest.java": {
+      "original_sha256": "dd0d83ca99cf34424b6bb226f8a72eea224f9203269623990ceb217b6543478f",
+      "snapshot_sha256": "dd0d83ca99cf34424b6bb226f8a72eea224f9203269623990ceb217b6543478f"
+    },
+    "cloud/src/test/java/com/et/cloud/rag/WikiRagIndexServiceImplTest.java": {
+      "original_sha256": "caafc02e962c683663a85088d28105c9aaf2ba7bc1cb11067fd16ca6e1da43e0",
+      "snapshot_sha256": "caafc02e962c683663a85088d28105c9aaf2ba7bc1cb11067fd16ca6e1da43e0"
+    },
+    "cloud/src/test/java/com/et/cloud/service/DocumentWikiServiceImplTest.java": {
+      "original_sha256": "3fcb1e348a70f8fc958ecf597b024df7a78464efc8d615e4b08688908338f518",
+      "snapshot_sha256": "3fcb1e348a70f8fc958ecf597b024df7a78464efc8d615e4b08688908338f518"
+    },
+    "cloud/src/test/java/com/et/cloud/service/DocumentWikiSpaceRulesTest.java": {
+      "original_sha256": "38db2a4622509fb438e0a3d5ed90b92d8b5a31fdb81d0cbef5d4dfc17d227046",
+      "snapshot_sha256": "38db2a4622509fb438e0a3d5ed90b92d8b5a31fdb81d0cbef5d4dfc17d227046"
+    },
+    "cloud/src/test/java/com/et/cloud/service/WikiAttachmentServiceTest.java": {
+      "original_sha256": "7aae6ce2f13496945f6089e7a2aec144edc8904881f0e6351dce035a7e0f4a2d",
+      "snapshot_sha256": "7aae6ce2f13496945f6089e7a2aec144edc8904881f0e6351dce035a7e0f4a2d"
+    },
+    "cloud/src/test/java/com/et/cloud/service/WikiDocumentImportServiceTest.java": {
+      "original_sha256": "374f11b3930cc63a6624761c0f90320d369c3a0cc35365b10c0370ac5862616c",
+      "snapshot_sha256": "374f11b3930cc63a6624761c0f90320d369c3a0cc35365b10c0370ac5862616c"
+    },
+    "cloud/src/test/java/com/et/cloud/service/WikiSpaceServiceImplTest.java": {
+      "original_sha256": "08ca0f5481b0ee67107a8fc74fa442cb618ce3f53f04d3bf0cf9f6e8861b9a93",
+      "snapshot_sha256": "08ca0f5481b0ee67107a8fc74fa442cb618ce3f53f04d3bf0cf9f6e8861b9a93"
+    },
+    "cloud/src/test/java/com/et/cloud/model/vis/DocumentWikiVisArticleMetadataTest.java": {
+      "original_sha256": "7266ecd4865f8237ec617ad2e962569b5b1e83f9c6400970a8ff3edf1e9249c0",
+      "snapshot_sha256": "7266ecd4865f8237ec617ad2e962569b5b1e83f9c6400970a8ff3edf1e9249c0"
+    },
+    "cloud/src/test/java/com/et/cloud/service/impl/AgentUrlImportConcurrencyLocalIT.java": {
+      "original_sha256": "1f82cbb3129f2b8bb4af7d9acfbdf8b7d63fc07b7c9efea4c843554498489b58",
+      "snapshot_sha256": "1f82cbb3129f2b8bb4af7d9acfbdf8b7d63fc07b7c9efea4c843554498489b58"
+    },
+    "cloud/src/test/java/com/et/cloud/service/impl/AgentUrlImportTest.java": {
+      "original_sha256": "b7533dd6187ac9a42b768dee6eda70d80d1996f50dbc59b4163bf12898f14a0a",
+      "snapshot_sha256": "b7533dd6187ac9a42b768dee6eda70d80d1996f50dbc59b4163bf12898f14a0a"
+    },
+    "cloud/src/test/java/com/et/cloud/service/impl/HttpWebPageFetcherTest.java": {
+      "original_sha256": "d3b9aed4c61b0487d238526debceaa0e100784ba0d7096be9d4bb70a8f355435",
+      "snapshot_sha256": "d3b9aed4c61b0487d238526debceaa0e100784ba0d7096be9d4bb70a8f355435"
+    },
+    "cloud/src/test/java/com/et/cloud/service/impl/JsonDocumentSplitterTest.java": {
+      "original_sha256": "92f55d0590dc961cf87006b5d945e1556f1ca9b1f69b73ddce178b269bece9db",
+      "snapshot_sha256": "92f55d0590dc961cf87006b5d945e1556f1ca9b1f69b73ddce178b269bece9db"
+    },
+    "cloud/src/test/java/com/et/cloud/service/impl/WebPageMarkdownCleanerTest.java": {
+      "original_sha256": "01043290cd2f1d72201a2759e1e74111848cc125cfa0271b7e91c707c1b0f716",
+      "snapshot_sha256": "01043290cd2f1d72201a2759e1e74111848cc125cfa0271b7e91c707c1b0f716"
+    },
+    "cloud/src/test/java/com/et/cloud/service/impl/WikiBatchImportServiceImplTest.java": {
+      "original_sha256": "d5e92193af88821f807b59a1527bf5a7bd94bdf1667a789696a174ffeee17ecb",
+      "snapshot_sha256": "d5e92193af88821f807b59a1527bf5a7bd94bdf1667a789696a174ffeee17ecb"
+    }
+  },
+  "redacted_keys": [
+    "password",
+    "secretId",
+    "secretKey",
+    "apiKey"
+  ]
+}

@@ -1,0 +1,7 @@
+Sanitized test results only; original raw log retained in private test directory.
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentConversationPersistenceMappingTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.03 s - in com.et.cloud.controller.AgentConversationPersistenceMappingTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Running com.et.cloud.controller.AgentConversationStoreTest
+[ThreadedStreamConsumer] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.963 s - in com.et.cloud.controller.AgentConversationStoreTest
+[main] INFO org.apache.maven.plugin.surefire.SurefirePlugin - Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+[main] INFO org.apache.maven.cli.event.ExecutionEventLogger - BUILD SUCCESS

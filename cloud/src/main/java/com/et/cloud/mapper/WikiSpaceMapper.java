@@ -15,6 +15,9 @@ public interface WikiSpaceMapper extends BaseMapper<WikiSpace> {
     @Select("SELECT * FROM wiki_space WHERE id = #{id}")
     WikiSpace selectByIdIncludeDeleted(@Param("id") Long id);
 
+    @Update("UPDATE wiki_space SET isDelete = 1 WHERE id = #{id} AND isDelete = 0")
+    int logicalDeleteById(@Param("id") Long id);
+
     @Update("UPDATE wiki_space SET isDelete = 0 WHERE id = #{id}")
     int restoreById(@Param("id") Long id);
 

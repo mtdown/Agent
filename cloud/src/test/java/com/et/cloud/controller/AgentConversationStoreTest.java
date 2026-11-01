@@ -48,4 +48,34 @@ class AgentConversationStoreTest {
         verify(conversations).countOwned(7L, 99L);
         verifyNoInteractions(messages);
     }
+
+    @Test void initializerAddsOnlyMissingLegacyChoiceColumn() throws Exception {
+        DataSource source = mock(DataSource.class);
+        java.sql.Connection connection = mock(java.sql.Connection.class);
+        java.sql.DatabaseMetaData metadata = mock(java.sql.DatabaseMetaData.class);
+        java.sql.ResultSet fields = mock(java.sql.ResultSet.class);
+        java.sql.Statement statement = mock(java.sql.Statement.class);
+        when(source.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metadata);
+        when(metadata.getColumns(null, null, "agent_message", "interactionJson")).thenReturn(fields);
+        when(fields.next()).thenReturn(false);
+        when(connection.createStatement()).thenReturn(statement);
+        new AgentConversationInitializer(source, mock(AgentConversationMapper.class))
+                .ensureChoiceColumn("interactionJson", "mediumtext NULL");
+        verify(statement).execute("ALTER TABLE agent_message ADD COLUMN interactionJson mediumtext NULL");
+    }
+
+    @Test void initializerDoesNotAlterExistingLegacyChoiceColumn() throws Exception {
+        DataSource source = mock(DataSource.class);
+        java.sql.Connection connection = mock(java.sql.Connection.class);
+        java.sql.DatabaseMetaData metadata = mock(java.sql.DatabaseMetaData.class);
+        java.sql.ResultSet fields = mock(java.sql.ResultSet.class);
+        when(source.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metadata);
+        when(metadata.getColumns(null, null, "agent_message", "choiceConsumed")).thenReturn(fields);
+        when(fields.next()).thenReturn(true);
+        new AgentConversationInitializer(source, mock(AgentConversationMapper.class))
+                .ensureChoiceColumn("choiceConsumed", "tinyint NOT NULL DEFAULT 0");
+        verify(connection, never()).createStatement();
+    }
 }

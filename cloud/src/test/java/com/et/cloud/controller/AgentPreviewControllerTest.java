@@ -108,6 +108,7 @@ class AgentPreviewControllerTest {
         verify(search).search(eq(user), captured.capture());
         assertEquals(List.of(123L), captured.getValue().getFolderIds());
         assertEquals(List.of(), captured.getValue().getSpaceIds());
+        verifyNoInteractions(proxy);
     }
 
     private static AgentSkillCatalog emptyCatalog() {

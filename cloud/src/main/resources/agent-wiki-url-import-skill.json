@@ -1,0 +1,17 @@
+{
+  "name": "网页导入 Wiki",
+  "summary": "将用户明确要求保存的网页导入所选 Wiki 位置",
+  "when_to_use": "用户明确要求将一个或多个网页链接保存或导入 Wiki 时使用。",
+  "when_not_to_use": "仅要求读取、搜索或摘要网页而没有保存意图时不要写入；普通对话使用适合的其他能力。",
+  "parameters": [],
+  "steps": [
+    {"type": "response", "template": "确认用户明确要求保存的网页链接；仅摘要或意图不明时不调用任何写入工具。"},
+    {"type": "response", "template": "调用 list_writable_wiki_locations 和 plan_wiki_destination 确定有权限的空间与用户选择的现有目录；位置不明确则等待用户选择，根目录可为空，不创建额外文件夹。"},
+    {"type": "response", "template": "使用 import_wiki_urls 对选定位置导入原始链接；不要传用户身份或用网页摘要代替导入正文。"},
+    {"type": "response", "template": "逐项依据工具结果报告标题、来源和 success、failed、unknown 或 not_executed；若已保存但缓存刷新失败应说明。unknown 不代表失败或成功，不重复写入，也不继续本轮写入。"}
+  ],
+  "expected_results": ["逐项报告真实导入结果和来源", "无保存意图时不写入"],
+  "failure_policy": "stop",
+  "examples": [{"input": {"request": "将网页保存到所选 Wiki 目录"}, "expected": "确认目标后调用导入工具并逐项报告真实结果"}]
+}
+
