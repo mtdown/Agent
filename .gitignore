@@ -47,6 +47,8 @@ eval/.env
 
 ### Local runtime and diagnostics ###
 .local/issue-tracker/
+.local/video-security-venv/
+.local/video-security-pip-temp/
 scripts/__pycache__/
 .workbuddy/
 tmp/
