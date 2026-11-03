@@ -23,7 +23,7 @@
 
 **云策库（CloudPolicy Wiki）** 是一个面向政策解读与公共办事问答场景的企业知识库平台。平台以 **Wiki 知识库** 沉淀结构化、可协作、可追溯的团队知识资产，并已在其上建成完整的 **RAG（检索增强生成）** 链路——「文档入库 → 切片向量化 → 权限过滤检索 → AI 流式问答」，配套开放式检索 API 与可复现的检索层评测体系。
 
-系统采用前后端分离架构：前端提供双栏 Wiki 工作台（空间树 + 文档列表 + Markdown 编辑器），后端负责空间权限、文档生命周期、附件存储与全文检索。
+系统采用前后端分离架构：前端提供双栏 Wiki 工作台（空间树 + 文档列表 + Markdown 编辑器），知识库后端负责空间权限、文档生命周期、附件存储与全文检索，独立 Agent 服务负责流式对话循环和工具调用。
 
 ## 演进路线
 
@@ -31,8 +31,8 @@
 | --- | --- | --- |
 | **第一步 · Wiki 知识库** | 多空间（公开/团队/个人）文档沉淀、Markdown 编辑、附件/图片、全文检索、回收站、团队 RBAC 权限 | ✅ 已实现 |
 | **第二步 · RAG 检索增强** | 文档切片向量化 → 权限过滤检索（含文号精确匹配层）→ AI 流式问答；开放检索 API 与评测体系 | ✅ 已实现 |
-| **第三步 · 检索层优化** | 精排 rerank、证据充分性判定与拒答、跨语料泛化性检验 | 🚧 规划中 |
-| **最终 · 政策解读对话** | 面向政策/公共办事问答的智能体，基于知识库给出可溯源、结构化的解答 | 🎯 目标 |
+| **第三步 · 检索层优化** | 混合检索与语义重排已实现；证据充分性、拒答与跨语料泛化效果需进一步评测 | 🚧 持续优化 |
+| **最终 · 政策解读对话** | 面向政策/公共办事问答的应用方向；回答质量需结合实际语料和评测判断 | 🎯 目标 |
 
 ## 功能特性
 
@@ -60,6 +60,14 @@
 - **开放检索 API**：`POST /open/rag/search`、`/open/rag/ask`，以 `X-API-Key` 替代登录态，复用同一套权限过滤逻辑。
 - **链路可观测**：permission / docNumber / embed / vector / firstToken / llm 分步耗时，前端可展开调用明细时间线。
 
+### Agent 与工具
+
+- **独立 Agent 服务**：`cloud_agent/` 提供流式对话循环与工具调用，并与知识库后端交互。
+- **多轮对话与历史**：对话可带入先前消息作为上下文；支持新建、查看、重命名和删除历史会话。
+- **Wiki 写入**：Agent 可查询可写位置；目标不明确时请求选择，用户确认写入空间后再创建文件夹和文档，也支持按请求导入网页。
+- **Skill 与代码库**：管理可复用 Skill 的版本和启停，以及 Python / Java 代码版本；代码保存即发布，初始状态为未验证，发布或绑定 Skill 不等于执行。
+- **联网搜索与抓取**：配置独立的网页 API 密钥后启用；搜索词或 URL 会发送给上游，网页内容进入模型上下文。每轮搜索和抓取各最多三次上游请求（含重试），可能产生费用，详见 [网页能力说明](./cloud_agent/README-web-research.md)。
+
 ### 安全与治理
 
 - **双认证域**：Sa-Token 多账户登录，站点主登录态与空间登录态（`StpKit.SPACE`）完全隔离。
@@ -78,11 +86,13 @@
    +-- 2. 文号精确匹配  查询含公文文号时按 docNumber 精确命中
    +-- 3. 混合检索      向量通道（DashScope 1024 维）+ BM25 词法通道（CJK bigram）
    |                    RRF 融合 → 候选池 top-50
-   +-- 4. 语义重排      候选池 50 条 → qwen3.7-text-rerank 精排 → 截断 top-6
+   +-- 4. 语义重排      可按配置启用；服务不可用时回退（历史基线使用 top-50 → top-6）
    +-- 5. 答案生成      证据送入 LLM，SSE 流式输出，句末标注来源角标
 ```
 
-### 当前基线
+### 历史基线
+
+以下结果来自 [2026-09-16 HTTP 基线文件](./eval/results/baseline-20260916-201335-http.json)，使用当时的语料、模型与配置，不代表当前部署效果；423 题中 399 题计入召回指标。更换链路、语料或模型后应重新评测并按题型比较。
 
 数据集 `eval/golden.v2.jsonl`（423 题 / 七类题型），http 模式实测真实系统，embedding 为
 DashScope `qwen3.7-text-embedding-flash`（1024 维），检索为「混合检索 + 语义重排」。
@@ -125,6 +135,8 @@ DashScope `qwen3.7-text-embedding-flash`（1024 维），检索为「混合检�
 
 ### RAG 与 AI 工程
 
+下述评测数字沿用上文历史基线及其对比实验，适用于当时的语料和配置，并非当前部署的实测结果。
+
 1. **七类题型评测集（423 题）**：配对 / 文号 / 无答案 / 权限镜像 / 合成，外加扩题新增的**跨文档**（新闻提问、答案锚政策原文）与**单文档**。gold 锚点用 `docId + chunkIndex` 逻辑坐标而非数据库主键——索引重建是「旧行置 INVALID + 插新行」，绑主键会全部失效；`gold[].quote` 经程序校验必须真实存在于原文，防止标注幻觉。
 2. **把评测集本身当工程对象迭代**：先用置信区间量化"考卷够不够用"，再定位根因——出题只在**标题**的书名号里找政策名，159 篇解读类只配上 31 对（128 篇媒体视角只中 4 篇）。放宽到正文匹配后配对数 **31 → 150**，文档覆盖 **17% → 85%**，可分辨样本 **29 → 76**，置信区间收窄到 **±11.2%**；并额外量化出「同数据重跑抖动 0.13 个百分点」作为**数值可信下限**。
 3. **文号精确匹配层**：公文文号在纯向量下几乎不可分，加入规则层精确命中后，B 类题 `docRecall@6` 与 `hitRate@6` 均达 **1.000**，与语义检索形成互补。
@@ -148,10 +160,11 @@ DashScope `qwen3.7-text-embedding-flash`（1024 维），检索为「混合检�
 | --- | --- |
 | 前端 | Vue 3.5 + Vite 6 + TypeScript 5.6 + Ant Design Vue 4.2 + Pinia + Vue Router |
 | 后端 | Spring Boot 2.7.6 + Java 11 + MyBatis-Plus 3.5.9 |
+| Agent 服务 | 独立 Spring Boot 服务，负责流式对话循环和工具调用 |
 | 权限认证 | Sa-Token 1.44（多账户认证域 + AOP 声明式校验） |
 | 数据库 | MySQL 8（逻辑删除、FULLTEXT 全文索引） |
 | 缓存 | Redis 7（分布式缓存 / Session）+ Caffeine 3.1（本地缓存） |
-| 检索增强（RAG） | 自研链路：Markdown 切块 + OpenAI 兼容 embedding + 内存向量余弦检索 + 文号精确匹配层 |
+| 检索增强（RAG） | Markdown 切块、权限过滤、文号匹配、向量与 BM25 混合检索（RRF 融合），语义重排可配置 |
 | 大模型接入 | OpenAI 兼容接口（DashScope / DeepSeek），SSE 流式输出，思考型与快速模型可切换 |
 | 对象存储 | 腾讯云 COS（图片/附件，缩略图压缩） |
 | 接口文档 | Knife4j 4.4（OpenAPI 2） + @umijs/openapi 代码生成 |
@@ -177,6 +190,7 @@ DashScope `qwen3.7-text-embedding-flash`（1024 维），检索为「混合检�
 │   │   └── websocket/           # WebSocket + Disruptor 协同编辑
 │   ├── sql/                     # 建表 / 补列 / 全文索引 / 数据订正脚本
 │   └── pom.xml
+├── cloud_agent/                 # 独立 Agent 服务（对话循环 / 工具调用）
 ├── cloud_front/                 # 前端 Vue 3 + Vite
 │   ├── src/
 │   │   ├── api/                 # @umijs/openapi 生成的接口与类型定义
@@ -195,7 +209,7 @@ DashScope `qwen3.7-text-embedding-flash`（1024 维），检索为「混合检�
 │   └── legacy-notes/            # 旧项目学习笔记归档（图库 → Wiki 演进记录，含配图）
 ├── openspec/                    # OpenSpec 需求与执行管理（changes / specs）
 ├── start-dev.ps1 / stop-dev.ps1 # 本地开发服务启停脚本
-└── IssueLog.xlsx                # 问题日志（按任务记录报错/阻塞/解决方案）
+└── scripts/                     # 辅助脚本与 SQLite 问题跟踪工具
 ```
 
 ### 文档指引
@@ -212,12 +226,20 @@ DashScope `qwen3.7-text-embedding-flash`（1024 维），检索为「混合检�
 
 ## 快速开始
 
-### 环境要求
+### 环境要求与配置
 
-- Java 11+
-- Node.js 18+
-- MySQL 8
-- Redis 7
+- Windows PowerShell、Java 11+、Maven、Node.js 18+ 和 npm
+- MySQL 8、Redis 7；启动脚本检查本机 MySQL **3307** 和 Redis **6379**，未监听时警告。先启动依赖服务并按数据库状态执行 `cloud/sql/` 下所需脚本。
+- 一键启动脚本以 `local` profile 启动后端；[基础配置](./cloud/src/main/resources/application.yml)中的数据库和 Redis 地址不一定对应脚本检查端口，请核对本地覆盖配置。
+- 按使用的功能配置数据库、Redis、对象存储及模型凭据，参考 [后端配置](./cloud/src/main/resources/application.yml)、[Agent 配置](./cloud_agent/src/main/resources/application.yml) 和 [部署说明](./deploy/README.md)。根目录 `.env.dev` 是 Git 忽略的本地文件，脚本读取其中的 `KEY=VALUE` 注入进程环境，请勿提交密钥；未配置 Agent 内部密钥时脚本生成本次运行的临时密钥。
+
+首次使用前安装前端依赖：
+
+```powershell
+cd cloud_front
+npm install
+cd ..
+```
 
 ### 1. 启动后端
 
@@ -227,7 +249,7 @@ cd cloud
 mvn spring-boot:run
 ```
 
-后端启动后接口文档地址：`http://127.0.0.1:8123/api/doc.html`
+后端启动后接口文档地址：`http://127.0.0.1:8123/api/doc.html`。如使用本地覆盖配置，可指定 `-Dspring-boot.run.profiles=local`。
 
 ### 2. 启动前端
 
@@ -237,22 +259,33 @@ npm install
 npm run dev
 ```
 
-### 3. 本地开发一键启停
+### 3. 启动 Agent 服务
 
-项目根目录提供一键启动脚本（默认开启 cloudflared 公网隧道并在控制台展示公网地址；启动前自动清理遗留服务，无需先手动停止）：
+完整 Agent 对话需要独立启动 `cloud_agent/`；手动启动时，后端与 Agent 进程需配置相同的 `AGENT_INTERNAL_KEY`，并按使用的功能配置模型凭据。可在分别配置好环境变量的终端中运行：
+
+```bash
+cd cloud_agent
+mvn spring-boot:run
+```
+
+### 4. 本地开发一键启停
+
+在项目根目录依次运行：
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
 powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 ```
 
-启动完成后按回车即停止全部服务（后端 + 前端 + 隧道）；直接关闭窗口则服务保留，之后可用 `stop-dev.ps1` 回收。仅局域网访问时加 `-NoTunnel`。
+脚本构建并启动知识库后端（8123）、Agent（8124）和前端（3000），日志位于 `tmp/`。默认尝试开启 cloudflared 公网隧道，未安装时仅局域网访问；仅需局域网访问可加 `-NoTunnel`。按回车停止全部服务和隧道；关闭窗口后可用 `stop-dev.ps1` 停止。`-Preview` 构建并预览前端，`-NoPause` 跳过等待回车。
 
 ## 访问地址
 
 | 服务 | 地址 |
 | --- | --- |
 | 前端 | http://127.0.0.1:3000 |
-| 后端 API | http://127.0.0.1:8123 |
+| 后端 API | http://127.0.0.1:8123/api |
+| Agent 服务 | http://127.0.0.1:8124 |
 | 接口文档 | http://127.0.0.1:8123/api/doc.html |
 | 健康检查 | http://127.0.0.1:8123/api/health |
 
@@ -262,7 +295,8 @@ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 | --- | --- |
 | 前端（Vite） | 3000 |
 | 后端（Spring Boot） | 8123 |
-| MySQL | 3306 |
+| Agent 服务 | 8124 |
+| MySQL（启动脚本检查） | 3307 |
 | Redis | 6379 |
 
 ## 常用命令
@@ -274,8 +308,14 @@ mvn compile          # 编译
 mvn test             # 测试（建议 -Dspring.profiles.active=local）
 mvn -DskipTests package  # 打包
 
+# Agent
+cd ../cloud_agent
+mvn compile
+mvn test
+mvn -DskipTests package
+
 # 前端
-cd cloud_front
+cd ../cloud_front
 npm run dev          # 开发
 npm run type-check   # 类型检查
 npm run build        # 构建（类型检查 + 打包）
@@ -284,7 +324,7 @@ npm run openapi      # 根据后端 api-docs 重新生成接口代码
 
 ## 开发规范
 
-本项目采用 OpenSpec 管理需求与执行流程，分支命名遵循 `feature/xxx开发` / `fix/xxx修复`，任务全程记录到根目录 `IssueLog.xlsx`。详见 [AGENTS.md](./AGENTS.md)。
+本项目采用 [OpenSpec](./openspec/) 管理需求与执行流程，分支命名、协作和验收规则详见 [AGENTS.md](./AGENTS.md)。新问题当前状态由本机 SQLite 的 `scripts/issue_tracker.py` 管理，操作及备份见 [问题跟踪说明](./scripts/README-issue-tracker.md)。
 
 ## 路线图
 
@@ -292,8 +332,10 @@ npm run openapi      # 根据后端 api-docs 重新生成接口代码
 - [x] RAG 检索增强：文档切片向量化 → 权限过滤检索（含文号精确匹配层）→ AI 流式问答
 - [x] 检索层评测体系：七类题型数据集（423 题，文档覆盖 85%）、双模式 runner、分组指标报告、跨版本对比与可复现性量化
 - [x] 开放检索 API：`X-API-Key` 鉴权的外部只读接口
-- [x] 检索层优化：精排 rerank、证据充分性判定与拒答、跨语料泛化性检验
-- [x] 政策解读对话：面向政策/公共办事问答的智能体落地
+- [x] 检索层优化：混合检索与可配置语义重排
+- [x] Agent 服务：流式对话、工具调用、Wiki 目标选择及确认后写入、Skill 和代码库
+- [ ] 持续评测证据充分性、拒答与跨语料泛化效果
+- [ ] 政策解读对话：面向政策/公共办事问答持续验证效果
 
 ---
 
