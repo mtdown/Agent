@@ -51,3 +51,7 @@
 阶段 2 第 1 轮：2.1 A1 FAIL、2.1 A2 PASS；2.2 A1 PASS、A2 PASS；2.3 A1 FAIL、A2 PASS。问题 29；证据：`docs/issue-reports/readme-update/stage-2-round-1.md`。按固定验收修复并复测，不降低原条件。
 
 阶段 2 第 2 轮判定：2.1 A1 PASS、A2 PASS；2.2 A1 PASS、A2 PASS；2.3 A1 PASS、A2 PASS，阶段 1 固定项复验 PASS。问题 29 已关闭；证据：`docs/issue-reports/readme-update/stage-2-round-2.md`。未启动服务或重跑评测。
+
+### 归档判定（2026-11-03）
+
+本次为 L0 纯文档变更。项目共同规则明确免 design.md；`openspec instructions design --change readme-update --json` 将设计稿限定于跨模块架构、依赖／数据模型、安全／性能／迁移或需要预先技术决策的歧义等条件，本次均不适用。归档要求的必需工件是 proposal 和 tasks，二者均已完成；CLI 1.13.2 仍显示 design 为 `ready`，不是 `skipped`，也不代表已生成设计稿。`skip_specs: true` 仅跳过规格增量，状态输出中规格 `existingOutputPaths` 为空，无需同步。六项任务完成，阶段 2 第 2 轮独立静态验收通过；未启动服务或重跑评测。
