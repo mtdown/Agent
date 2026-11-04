@@ -1,0 +1,8 @@
+{
+  "cloud/src/test/java/com/et/cloud/AgentWikiIdempotencyBaselineLocalIT.java": "9e75f544d03d2cb6b22c57c4f33fa5d4da97b962b21ce82d87a14beca61832ee",
+  "cloud_agent/src/test/java/com/et/agent/AgentWikiBaselineAgentIT.java": "307c28423a7c2f637a631c9aad31b61c83447eda8f0459a2c66664776ee6c932",
+  "docs/issue-reports/agent-wiki-write-idempotency/stage-1-baseline.md": "2e0c412c58f6a11e29fe0b07790d548f534f18dd72293d9262226809955d3afa",
+  "docs/issue-reports/agent-wiki-write-idempotency/awib-b8a8d5c04a7e417d8e3ec946cb6c2b65-agent.csv": "fd070365e125cb29d1329f44b043bb8f7d7c7ef13b48cbfc9e57b3a564272d76",
+  "docs/issue-reports/agent-wiki-write-idempotency/awib-b8a8d5c04a7e417d8e3ec946cb6c2b65-db.csv": "23df513cd74d12789202f486ce7e19c4089ff7fbd161c14dc3f1de24aa6eced4",
+  "docs/handoff/agent-wiki-write-idempotency/stage-1-tasks.md": "1e4ab1b7f68a3bf08e8e38b4482bcfb4ce960f51f54ab20c4d9c58dc52adf963"
+}

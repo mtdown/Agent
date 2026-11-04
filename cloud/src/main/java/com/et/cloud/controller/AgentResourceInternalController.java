@@ -59,6 +59,7 @@ public final class AgentResourceInternalController {
         public String folderId;
         public String title;
         public String content;
+        public String operationId;
     }
 
     public AgentResourceInternalController(AgentPersonalFileStore files,
@@ -178,8 +179,9 @@ public final class AgentResourceInternalController {
             @RequestParam String userId, @RequestBody WikiCreateDocumentRequest body) {
         long user = requireUser(key, userId);
         if (body == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "缺少文档请求");
-        return ResultUtils.success(creation.createDocument(user, body.spaceId, body.folderId,
-                body.title, body.content));
+        return ResultUtils.success(body.operationId == null
+                ? creation.createDocument(user, body.spaceId, body.folderId, body.title, body.content)
+                : creation.createDocument(user, body.spaceId, body.folderId, body.title, body.content, body.operationId));
     }
 
     @PostMapping("/wiki-url-imports")

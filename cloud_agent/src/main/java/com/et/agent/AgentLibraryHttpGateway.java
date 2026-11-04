@@ -112,11 +112,26 @@ public final class AgentLibraryHttpGateway implements AgentLibraryGateway {
 
     @Override public String createWikiDocument(String userId, String spaceId, String folderId,
                                                String title, String content) {
+        return newWikiCreateOperation(userId, spaceId, folderId, title, content).execute();
+    }
+
+    WikiCreateOperation newWikiCreateOperation(String userId, String spaceId, String folderId,
+                                                String title, String content) {
         ObjectNode body = JSON.createObjectNode();
         body.put("spaceId", spaceId); body.put("folderId", folderId);
         if (title != null) body.put("title", title);
         body.put("content", content);
-        return call("/api/internal/agent/wiki-documents/create", userId, body.toString()).toString();
+        body.put("operationId", java.util.UUID.randomUUID().toString());
+        return new WikiCreateOperation(userId, body.toString());
+    }
+
+    final class WikiCreateOperation {
+        private final String userId;
+        private final String body;
+        private WikiCreateOperation(String userId, String body) { this.userId = userId; this.body = body; }
+        String execute() {
+            return call("/api/internal/agent/wiki-documents/create", userId, body).toString();
+        }
     }
 
     @Override public String listWritableWikiLocations(String userId, String spaceId, String cursor, Integer limit) {

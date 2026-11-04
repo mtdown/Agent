@@ -17,11 +17,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.Objects;
+import java.util.UUID;
 
 /** Cloud-owned, transactional naming and persistence for Agent Wiki writes. */
 @Service
@@ -35,6 +43,7 @@ public class AgentWikiCreationService {
     private final WikiFolderService folders;
     private final DocumentWikiService documents;
     private final WikiCacheManager cache;
+    private JdbcTemplate operationJdbc;
 
     public AgentWikiCreationService(UserService users, WikiSpaceService spaces, WikiSpaceMapper spaceMapper,
                                     WikiFolderService folders, DocumentWikiService documents, WikiCacheManager cache) {
@@ -45,6 +54,9 @@ public class AgentWikiCreationService {
         this.documents = documents;
         this.cache = cache;
     }
+
+    @Autowired(required = false)
+    public void setOperationJdbc(JdbcTemplate operationJdbc) { this.operationJdbc = operationJdbc; }
 
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public FolderResult createFolder(long userId, String rawSpaceId, String taskName) {
@@ -97,6 +109,62 @@ public class AgentWikiCreationService {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "文档保存失败");
         clearSpaceAfterCommit(spaceId);
         return new DocumentResult(spaceId, folderId, document.getId(), title, folder.getName());
+    }
+
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
+    public DocumentResult createDocument(long userId, String rawSpaceId, String rawFolderId,
+                                         String requestedTitle, String content, String operationId) {
+        if (operationId == null) return createDocument(userId, rawSpaceId, rawFolderId, requestedTitle, content);
+        try {
+            if (!UUID.fromString(operationId).toString().equals(operationId)) throw new IllegalArgumentException();
+        } catch (IllegalArgumentException e) { throw new BusinessException(ErrorCode.PARAMS_ERROR, "Invalid operation ID"); }
+        if (operationJdbc == null) throw new IllegalStateException("Operation storage is unavailable");
+        User user = requireUser(userId);
+        long spaceId = positiveId(rawSpaceId), folderId = positiveId(rawFolderId);
+        spaces.requireSpaceAccess(spaceId, user, true);
+        lockAndRecheck(spaceId, user);
+        WikiFolder folder = folders.requireFolderAccess(folderId, spaceId, user, true);
+        String hash = requestHash(rawSpaceId, rawFolderId, requestedTitle, content);
+        try {
+            operationJdbc.update("INSERT INTO agent_wiki_operation(user_id,operation_id,request_version,request_hash,space_id,folder_id,document_id) VALUES(?,?,1,?,?,?,NULL)",
+                    userId, operationId, hash, spaceId, folderId);
+        } catch (DuplicateKeyException duplicate) {
+            java.util.List<java.util.Map<String,Object>> rows = operationJdbc.queryForList(
+                    "SELECT request_version,request_hash,space_id,folder_id,document_id FROM agent_wiki_operation WHERE user_id=? AND operation_id=?",
+                    userId, operationId);
+            if (rows.size() != 1) throw new IllegalStateException("Operation result is unavailable");
+            java.util.Map<String,Object> row = rows.get(0);
+            if (((Number)row.get("request_version")).intValue() != 1 || !hash.equals(row.get("request_hash")))
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "Operation request conflict");
+            Object stored = row.get("document_id");
+            if (!(stored instanceof Number)) throw new IllegalStateException("Operation result is unavailable");
+            DocumentWiki existing = documents.getById(((Number)stored).longValue());
+            if (existing == null || Objects.equals(existing.getIsDelete(), 1)
+                    || !Objects.equals(existing.getSpaceId(), spaceId) || !Objects.equals(existing.getFolderId(), folderId))
+                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "Operation result is unavailable");
+            return new DocumentResult(spaceId, folderId, existing.getId(), existing.getTitle(), folder.getName());
+        }
+        DocumentResult result = createDocument(userId, rawSpaceId, rawFolderId, requestedTitle, content);
+        if (operationJdbc.update("UPDATE agent_wiki_operation SET document_id=? WHERE user_id=? AND operation_id=? AND document_id IS NULL",
+                Long.parseLong(result.documentId), userId, operationId) != 1)
+            throw new IllegalStateException("Operation result could not be recorded");
+        return result;
+    }
+
+    private static String requestHash(String space, String folder, String title, String content) {
+        try {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(buffer);
+            out.writeInt(1);
+            for (String field : new String[]{space, folder, title, content}) {
+                if (field == null) out.writeInt(-1);
+                else { byte[] bytes = field.getBytes(StandardCharsets.UTF_8); out.writeInt(bytes.length); out.write(bytes); }
+            }
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(buffer.toByteArray());
+            StringBuilder result = new StringBuilder(64);
+            for (byte b : digest) result.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
+            return result.toString();
+        } catch (java.io.IOException | java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
 
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
