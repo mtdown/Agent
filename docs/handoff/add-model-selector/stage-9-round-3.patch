@@ -1,0 +1,1256 @@
+diff --git a/start-dev.ps1 b/start-dev.ps1
+index 763fa12..7820237 100644
+--- a/start-dev.ps1
++++ b/start-dev.ps1
+@@ -1,11 +1,11 @@
+-# ============================================================
++﻿# ============================================================
+ #  start-dev.ps1 - one-click start for backend + frontend (dev)
+ #  Usage:  powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+ #  Starts: Spring Boot backend (127.0.0.1:8123) + Vite dev server
+ #          (0.0.0.0:3000, LAN accessible). Logs go to tmp/dev-backend.log
+ #          and tmp/dev-frontend.log.
+ #
+-#  Public tunnel (cloudflared quick tunnel) is ON by default; the
++#  Public tunnel (cloudflared quick tunnel) is OFF by default; the
+ #  public URL is scraped from the cloudflared log and shown in a
+ #  green box together with the local port it forwards. Front and
+ #  back share one port (the vite dev server proxies /api to 8123),
+@@ -21,7 +21,8 @@
+ #    - Close window -> everything keeps running (recover later
+ #      with .\stop-dev.ps1).
+ #
+-#  -NoTunnel  stay on the LAN only, do not expose anything publicly
++#  -Tunnel    enable the temporary public tunnel
++#  -NoTunnel  stay on the LAN only; takes precedence over -Tunnel
+ #  -Preview   build first and serve the bundle instead of the dev
+ #             server (far fewer requests through the tunnel)
+ #  -NoPause   do not wait for Enter at the end (used by parent
+@@ -32,7 +33,9 @@
+ #        non-ASCII message text can be misdecoded at parse time.
+ # ============================================================
+ param(
+-    # -NoTunnel / : stay on the LAN only (no public exposure)
++    # -Tunnel: explicitly enable the public tunnel
++    [switch]$Tunnel,
++    # -NoTunnel: stay on the LAN only, even when -Tunnel is set
+     [switch]$NoTunnel,
+     # -Preview: build first and serve the bundle instead of the dev server.
+     [switch]$Preview,
+@@ -156,14 +159,14 @@ if (-not $portsClear) { exit 1 }
+ $javaExe = Find-Java
+ if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
+ 
+-# Load local secrets (.env.dev, git-ignored): each KEY=VALUE line becomes a
++# Load local secrets (.env.local, git-ignored): each KEY=VALUE line becomes a
+ # process env var so the backend jar started below inherits it. Values may be
+ # quoted ("v" or 'v'); blank lines and # comments are skipped. Only variable
+ # NAMES are printed - never the values.
+ function Import-DevEnvFile {
+-    $envFile = Join-Path $root '.env.dev'
++    $envFile = Join-Path $root '.env.local'
+     if (-not (Test-Path $envFile)) {
+-        Write-Host '    NOTE: .env.dev not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
++        Write-Host '    NOTE: .env.local not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
+         return
+     }
+     $loaded = @()
+@@ -182,13 +185,18 @@ function Import-DevEnvFile {
+             $value = $value.Substring(1, $value.Length - 2)
+         }
+         if ($key.Length -eq 0) { continue }
++        # 只注入模型相关的 RAG_*/DEEPSEEK_* 变量。评测专属的 DB_*/EVAL_*
++        # 与 VITE_* 不进入后端进程环境，避免被 Spring relaxed binding 误认。
++        if ($key -notmatch '^(RAG_|DEEPSEEK_)[A-Z0-9_]+$') { continue }
++        # 空值代表「未在此文件配置」，不能覆盖系统用户作用域已有的同名变量。
++        if ($value.Length -eq 0) { continue }
+         Set-Item -Path ("Env:" + $key) -Value $value
+         $loaded += $key
+     }
+     if ($loaded.Count -gt 0) {
+-        Write-Host ("    .env.dev injected env vars: " + ($loaded -join ', '))
++        Write-Host ("    .env.local injected env vars: " + ($loaded -join ', '))
+     } else {
+-        Write-Host '    WARN: .env.dev exists but contains no KEY=VALUE entries.'
++        Write-Host '    WARN: .env.local exists but contains no KEY=VALUE entries.'
+     }
+ }
+ Import-DevEnvFile
+@@ -234,6 +242,13 @@ $agentProc = Start-Process -FilePath $javaExe `
+     -WindowStyle Hidden -PassThru
+ Write-Host "    Agent PID: $($agentProc.Id) (log: $agentLog)"
+ 
++# Prevent local key endpoint registration when the temporary tunnel is enabled.
++if ($Tunnel -and -not $NoTunnel) {
++    $env:CLOUDWIKI_DISABLE_LOCAL_ENV = '1'
++} else {
++    $env:CLOUDWIKI_DISABLE_LOCAL_ENV = '0'
++}
++
+ $frontLog = Join-Path $tmpDir 'dev-frontend.log'
+ $frontErr = Join-Path $tmpDir 'dev-frontend.err.log'
+ if ($Preview) {
+@@ -383,12 +398,11 @@ function Start-PublicTunnel {
+ }
+ 
+ $publicUrl = $null
+-if (-not $NoTunnel) {
+-    # Default is ON: the site is exposed via cloudflared. Use -NoTunnel
+-    # to keep it on the LAN only.
++if ($Tunnel -and -not $NoTunnel) {
++    # Explicit opt-in; -NoTunnel takes precedence.
+     $publicUrl = Start-PublicTunnel -Port $frontPort
+ } else {
+-    Write-Host 'Public tunnel disabled (-NoTunnel) - LAN access only.'
++    Write-Host 'Public tunnel disabled - LAN access only.'
+ }
+ Write-Host ''
+ if ($publicUrl) {
+
+--- /dev/null
++++ b/cloud_front/vite/localEnvPlugin.ts
+import { fileURLToPath, URL } from 'node:url'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { Plugin } from 'vite'
+
+/** 本文件位于 cloud_front/vite/，上两级即项目根（与 start-dev.ps1 的 $root 一致）。 */
+const ROOT_DIR = fileURLToPath(new URL('../../', import.meta.url))
+const LOCAL_ENV_FILE = path.join(ROOT_DIR, '.env.local')
+const ENV_EXAMPLE_FILE = path.join(ROOT_DIR, 'deploy', '.env.example')
+
+export const LOCAL_ENV_ENDPOINT = '/__cw/local-env'
+
+/** 可写入的键名来自云端同一份登记表，避免前端写入任意环境变量或 VITE_ 前缀。 */
+function readAllowedKeys(): Set<string> {
+  if (!fs.existsSync(ENV_EXAMPLE_FILE)) return new Set()
+  return new Set(
+    fs.readFileSync(ENV_EXAMPLE_FILE, 'utf8')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#') && line.includes('='))
+      .map((line) => line.split('=', 1)[0].trim())
+      .filter((key) => key.endsWith('_API_KEY') && !key.startsWith('VITE_'))
+  )
+}
+
+function readLocalEnv(): Map<string, string> {
+  const result = new Map<string, string>()
+  if (!fs.existsSync(LOCAL_ENV_FILE)) return result
+  for (const line of fs.readFileSync(LOCAL_ENV_FILE, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+    const [key, ...rest] = trimmed.split('=')
+    result.set(key.trim(), rest.join('=').trim())
+  }
+  return result
+}
+
+/** 只替换第一个同名键并移除其余重复项，保留其他行的内容和顺序。 */
+export function upsertEnvContent(content: string, key: string, value: string): string {
+  const newline = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content ? content.split(/\r?\n/) : []
+  if (lines.length && lines[lines.length - 1] === '') lines.pop()
+  let hit = false
+  const next: string[] = []
+  for (const line of lines) {
+    const equals = line.indexOf('=')
+    if (equals >= 0 && line.slice(0, equals).trim() === key) {
+      if (!hit) next.push(`${key}=${value}`)
+      hit = true
+    } else {
+      next.push(line)
+    }
+  }
+  if (!hit) next.push(`${key}=${value}`)
+  return next.join(newline) + newline
+}
+
+/** upsert 单个键；先写临时文件再 rename。 */
+function upsertLocalEnv(key: string, value: string): void {
+  const current = fs.existsSync(LOCAL_ENV_FILE) ? fs.readFileSync(LOCAL_ENV_FILE, 'utf8') : ''
+  const content = upsertEnvContent(current, key, value)
+  const tmp = `${LOCAL_ENV_FILE}.${process.pid}.tmp`
+  try {
+    fs.writeFileSync(tmp, content, 'utf8')
+    fs.renameSync(tmp, LOCAL_ENV_FILE)
+  } finally {
+    if (fs.existsSync(tmp)) fs.unlinkSync(tmp)
+  }
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.statusCode = status
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-store')
+  res.end(JSON.stringify(body))
+}
+
+async function readBody(req: IncomingMessage): Promise<string> {
+  let data = ''
+  for await (const chunk of req) {
+    data += chunk
+    if (data.length > 4096) throw new Error('body too large')
+  }
+  return data
+}
+
+/**
+ * 浏览器无法写磁盘，但 dev server 是 Node 进程。前端「模型管理」把明文 POST 到这里，
+ * 由它 upsert 到项目根 .env.local（已被 gitignore）；响应只回「是否配置」布尔，不回传值。
+ * apply:'serve' + configureServer 保证 build / preview 不注册该端点，云端产物零端点。
+ */
+export function localEnvPlugin(): Plugin {
+  return {
+    name: 'cloudwiki-local-env',
+    apply: 'serve',
+    configureServer(server) {
+      if (process.env.CLOUDWIKI_DISABLE_LOCAL_ENV === '1') return
+      server.middlewares.use(LOCAL_ENV_ENDPOINT, (req, res) => {
+        if (req.method === 'GET') {
+          const current = readLocalEnv()
+          const keys = [...readAllowedKeys()].map((key) => ({
+            key,
+            configured: (current.get(key) ?? '').length > 0,
+          }))
+          sendJson(res, 200, { ok: true, keys })
+          return
+        }
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { ok: false, error: 'method not allowed' })
+          return
+        }
+        void (async () => {
+          let raw: string
+          try {
+            raw = await readBody(req)
+          } catch {
+            sendJson(res, 400, { ok: false, error: '请求体过大' })
+            return
+          }
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(raw || '{}') as unknown
+          } catch {
+            sendJson(res, 400, { ok: false, error: '请求体解析失败' })
+            return
+          }
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            sendJson(res, 400, { ok: false, error: '请求体格式不合法' })
+            return
+          }
+          const payload = parsed as { key?: unknown; value?: unknown }
+          const key = typeof payload.key === 'string' ? payload.key.trim() : ''
+          const rawValue = typeof payload.value === 'string' ? payload.value : ''
+          const value = rawValue.trim()
+          if (!readAllowedKeys().has(key)) {
+            sendJson(res, 400, { ok: false, error: '键名不在允许清单内' })
+            return
+          }
+          if (!value || value.length > 512 || /[\r\n]/.test(rawValue)) {
+            sendJson(res, 400, { ok: false, error: '密钥值不合法' })
+            return
+          }
+          try {
+            upsertLocalEnv(key, value)
+          } catch {
+            sendJson(res, 500, { ok: false, error: '写入本地密钥文件失败' })
+            return
+          }
+          sendJson(res, 200, { ok: true, key, configured: true })
+        })()
+      })
+    },
+  }
+}
+
+
+--- /dev/null
++++ b/cloud_front/src/constants/modelProfiles.ts
+/**
+ * 模型选择器的模型清单（当前选择的单一事实源）。
+ *
+ * 只收录「生成 / 对话模型」：embedding 与 rerank 模型不能替换问答链路的 LLM，
+ * 误选会造成零切片或重排报错，因此单列在 NON_CHAT_MODELS 中且不可选。
+ *
+ * 凭据契约：档位里只存「密钥变量名」apiKeyEnv，绝不存密钥值。明文由前端管理弹窗
+ * 一次性 POST 给本地 dev server，写入项目根 .env.local（已被 gitignore）；
+ * 后端 / Agent / Python 评测链都从环境变量或该文件读取。
+ *
+ * 自定义档位（用户在界面新增）不入库，只存浏览器 localStorage：
+ * 见 MODEL_CUSTOM_STORAGE_KEY 与 isUsableCustomProfile 的读取校验。
+ */
+
+export type ModelLocation = 'local' | 'cloud'
+export type ModelProvider = 'ollama' | 'deepseek' | 'dashscope' | 'other'
+
+export interface ModelProfile {
+  id: string
+  label: string
+  model: string
+  baseUrl: string
+  provider: ModelProvider
+  location: ModelLocation
+  group: string
+  note: string
+  /** 密钥变量名（引用，不是值）；空或缺省表示无需密钥。 */
+  apiKeyEnv?: string
+}
+
+/** 用户在界面新增档位时填写的字段；id 与 group 由 store 生成。 */
+export type CustomModelInput = Omit<ModelProfile, 'id' | 'group'>
+
+export interface NonChatModel {
+  label: string
+  role: string
+}
+
+/** 浏览器本地保存选中档位的 key；后续评测链如需读取，用同一个 key。 */
+export const MODEL_PROFILE_STORAGE_KEY = 'cloudwiki.selected-model-profile'
+
+/** 用户自定义档位清单的 key（与选中档位分开，避免一份损坏影响另一份）。 */
+export const MODEL_CUSTOM_STORAGE_KEY = 'cloudwiki.custom-model-profiles'
+
+/** 自定义档位在下拉菜单中的分组名。 */
+export const CUSTOM_MODEL_GROUP = '自定义模型'
+
+/** 本地 .env.local 允许写入的键名，与 deploy/.env.example 及云端 GitHub Secrets 对齐。 */
+export const LOCAL_ENV_KEYS: { value: string; label: string }[] = [
+  { value: 'RAG_LLM_API_KEY', label: 'RAG_LLM_API_KEY · 回答生成（DeepSeek）' },
+  { value: 'RAG_EMBEDDING_API_KEY', label: 'RAG_EMBEDDING_API_KEY · DashScope embedding / chat' },
+  { value: 'DEEPSEEK_WEB_API_KEY', label: 'DEEPSEEK_WEB_API_KEY · Agent 联网' },
+]
+
+/** 档位表单可选：不需要密钥，或引用上表中的某个变量名。 */
+export const API_KEY_ENV_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: '不需要密钥（本地 Ollama）' },
+  ...LOCAL_ENV_KEYS,
+]
+
+export const LOCAL_ENV_KEY_NAMES: string[] = LOCAL_ENV_KEYS.map((item) => item.value)
+
+/**
+ * 写入端点只在 dev server 存在；生产构建把 DEV 折叠成 false，
+ * 端点字符串随之被消除，云端产物里既没有端点也没有调用入口。
+ */
+export const LOCAL_ENV_ENDPOINT: string | null = import.meta.env.DEV ? '/__cw/local-env' : null
+export const isLocalEnvWritable: boolean = LOCAL_ENV_ENDPOINT !== null
+
+export const MODEL_PROVIDER_OPTIONS: { value: ModelProvider; label: string }[] = [
+  { value: 'ollama', label: 'Ollama / 本地推理' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'dashscope', label: 'DashScope' },
+  { value: 'other', label: '其他（OpenAI 兼容端点）' },
+]
+
+export const MODEL_LOCATION_OPTIONS: { value: ModelLocation; label: string }[] = [
+  { value: 'local', label: '本地' },
+  { value: 'cloud', label: '云端' },
+]
+
+/** 列表中只展示变量名，不展示任何密钥值。 */
+export function describeCredential(profile: ModelProfile): string {
+  return profile.apiKeyEnv ? `密钥变量 ${profile.apiKeyEnv}` : '无需密钥'
+}
+
+export const MODEL_PROFILES: ModelProfile[] = [
+  {
+    id: 'local-qwen3-1.7b',
+    label: 'qwen3:1.7b',
+    model: 'qwen3:1.7b',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    provider: 'ollama',
+    location: 'local',
+    group: '本地 · Ollama',
+    note: '基础评测目标，本机已安装（completion / tools / thinking）',
+  },
+  {
+    id: 'cloud-deepseek-flash',
+    label: 'deepseek-flash',
+    model: 'deepseek-flash',
+    baseUrl: 'https://api.deepseek.com',
+    provider: 'deepseek',
+    location: 'cloud',
+    group: '云端 · DeepSeek',
+    note: 'RAG_LLM_FAST_MODEL 默认值；cloud_agent 当前使用',
+    apiKeyEnv: 'RAG_LLM_API_KEY',
+  },
+  {
+    id: 'cloud-deepseek-v4-flash-vision-exp',
+    label: 'deepseek-v4-flash-vision-exp',
+    model: 'deepseek-v4-flash-vision-exp',
+    baseUrl: 'https://api.deepseek.com',
+    provider: 'deepseek',
+    location: 'cloud',
+    group: '云端 · DeepSeek',
+    note: 'RAG_LLM_MODEL 默认值（思考型）',
+    apiKeyEnv: 'RAG_LLM_API_KEY',
+  },
+  {
+    id: 'cloud-qwen3.8-flash',
+    label: 'qwen3.8-flash',
+    model: 'qwen3.8-flash',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    provider: 'dashscope',
+    location: 'cloud',
+    group: '云端 · DashScope',
+    note: 'eval/.env 的 LLM_MODEL；RAG_MULTI_QUERY_MODEL 默认值',
+    apiKeyEnv: 'RAG_EMBEDDING_API_KEY',
+  },
+  {
+    id: 'cloud-qwen3.8-max',
+    label: 'qwen3.8-max',
+    model: 'qwen3.8-max',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    provider: 'dashscope',
+    location: 'cloud',
+    group: '云端 · DashScope',
+    note: '历史答案层实验臂用过，非当前默认配置',
+    apiKeyEnv: 'RAG_EMBEDDING_API_KEY',
+  },
+]
+
+/** 检索链路专用模型：列出来便于核对现状，但不参与对话模型切换。 */
+export const NON_CHAT_MODELS: NonChatModel[] = [
+  { label: 'qwen3.7-text-embedding-flash', role: '云端 embedding' },
+  { label: 'qwen3.7-text-rerank', role: '云端 rerank' },
+  { label: 'qwen3-embedding:4b', role: '本地 embedding' },
+  { label: 'nomic-embed-text:latest', role: '本地 embedding' },
+]
+
+/** 默认使用远程 DeepSeek Flash 档位。 */
+export const DEFAULT_MODEL_PROFILE_ID = 'cloud-deepseek-flash'
+
+export function getModelProfile(id: string): ModelProfile {
+  return MODEL_PROFILES.find((profile) => profile.id === id)
+    ?? MODEL_PROFILES.find((profile) => profile.id === DEFAULT_MODEL_PROFILE_ID)!
+}
+
+/**
+ * localStorage 里的自定义档位是不可信输入：结构损坏、缺字段、id 与内置冲突
+ * 都必须在读取时过滤掉，否则会让选择器白屏或覆盖内置档位。
+ * apiKeyEnv 是可选字段：旧版本档位没有它时仍可用；一旦出现就必须是白名单里的
+ * 变量名，杜绝把任意字符串（更不用说明文密钥）带进调用契约。
+ */
+export function isUsableCustomProfile(value: unknown): value is ModelProfile {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  const providers: string[] = MODEL_PROVIDER_OPTIONS.map((option) => option.value)
+  const baseValid =
+    typeof item.id === 'string' &&
+    item.id.startsWith('custom-') &&
+    typeof item.label === 'string' &&
+    item.label.trim().length > 0 &&
+    typeof item.model === 'string' &&
+    item.model.trim().length > 0 &&
+    typeof item.baseUrl === 'string' &&
+    /^https?:\/\//i.test(item.baseUrl) &&
+    (item.location === 'local' || item.location === 'cloud') &&
+    typeof item.provider === 'string' &&
+    providers.includes(item.provider) &&
+    typeof item.note === 'string' &&
+    typeof item.group === 'string'
+  if (!baseValid) return false
+
+  if (item.apiKeyEnv === undefined) return true
+  if (typeof item.apiKeyEnv !== 'string') return false
+  if (!item.apiKeyEnv) return true
+  return LOCAL_ENV_KEY_NAMES.includes(item.apiKeyEnv)
+}
+
+export interface ModelProfileGroup {
+  name: string
+  profiles: ModelProfile[]
+}
+
+export const MODEL_PROFILE_GROUPS: ModelProfileGroup[] = MODEL_PROFILES.reduce<
+  ModelProfileGroup[]
+>((groups, profile) => {
+  let group = groups.find((item) => item.name === profile.group)
+  if (!group) {
+    group = { name: profile.group, profiles: [] }
+    groups.push(group)
+  }
+  group.profiles.push(profile)
+  return groups
+}, [])
+
+/**
+ * 只在本地显示，云端部署不渲染。
+ * - 本地 dev（vite）：DEV=true，直接显示。
+ * - 云端构建产物（vite build / preview）：DEV=false 且无该变量，组件不会渲染。
+ * - 本地 preview 演示若也要显示，在 cloud_front/.env.local（*.local 已被 gitignore）写：
+ *     VITE_ENABLE_MODEL_SELECTOR=true
+ *   该文件不进版本库，所以云端构建永远拿不到它。
+ * 注意：preview 下即使显示组件，写入端点也不存在，密钥区会自动禁用。
+ */
+export const isModelSelectorVisible: boolean =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_MODEL_SELECTOR === 'true'
+
+
+--- /dev/null
++++ b/cloud_front/src/components/ModelSelector.vue
+<template>
+  <div v-if="visible" class="model-selector">
+    <a-dropdown :trigger="['click']" placement="topLeft">
+      <button type="button" class="model-selector-trigger" :title="SELECTOR_HINT">
+        <span class="model-selector-name">{{ selected.label }}</span>
+        <span class="model-selector-location">
+          {{ selected.location === 'local' ? '本地' : '云端' }}
+        </span>
+        <DownOutlined class="model-selector-chevron" />
+      </button>
+      <template #overlay>
+        <a-menu :selectedKeys="[selectedId]" @click="onSelect">
+          <a-menu-item-group
+            v-for="group in groups"
+            :key="group.name"
+            :title="group.name"
+          >
+            <a-menu-item v-for="profile in group.profiles" :key="profile.id">
+              <div class="model-option">
+                <span class="model-option-name">{{ profile.label }}</span>
+                <span class="model-option-note">{{ profile.note }}</span>
+              </div>
+            </a-menu-item>
+          </a-menu-item-group>
+          <a-menu-divider />
+          <a-menu-item :key="MANAGE_KEY">
+            <span class="model-manage-entry">
+              <PlusOutlined /> 新增 / 管理模型
+            </span>
+          </a-menu-item>
+          <a-menu-divider />
+          <a-menu-item-group title="检索链路专用 · 不可选">
+            <a-menu-item v-for="item in NON_CHAT_MODELS" :key="item.label" disabled>
+              <div class="model-option">
+                <span class="model-option-name">{{ item.label }}</span>
+                <span class="model-option-note">{{ item.role }}</span>
+              </div>
+            </a-menu-item>
+          </a-menu-item-group>
+          <a-menu-divider />
+          <a-menu-item disabled>
+            <div class="model-hint">{{ SELECTOR_HINT }}</div>
+            <div class="model-hint">{{ CUSTOM_HINT }}</div>
+          </a-menu-item>
+        </a-menu>
+      </template>
+    </a-dropdown>
+
+    <a-modal
+      v-model:open="managerOpen"
+      title="自定义模型与本地密钥"
+      :footer="null"
+      width="560px"
+    >
+      <div class="model-manager">
+        <div class="manager-section-title">新增档位</div>
+        <div class="manager-form">
+          <label class="manager-field">
+            <span>显示名称</span>
+            <a-input v-model:value="form.label" placeholder="如 qwen3:8b" allow-clear />
+          </label>
+          <label class="manager-field">
+            <span>模型 ID</span>
+            <a-input v-model:value="form.model" placeholder="调用时传给 API 的 model 值" allow-clear />
+          </label>
+          <label class="manager-field">
+            <span>Base URL</span>
+            <a-input
+              v-model:value="form.baseUrl"
+              placeholder="http://127.0.0.1:11434/v1"
+              allow-clear
+            />
+          </label>
+          <div class="manager-row">
+            <label class="manager-field">
+              <span>位置</span>
+              <a-select v-model:value="form.location" :options="MODEL_LOCATION_OPTIONS" />
+            </label>
+            <label class="manager-field">
+              <span>提供商</span>
+              <a-select v-model:value="form.provider" :options="MODEL_PROVIDER_OPTIONS" />
+            </label>
+          </div>
+          <label class="manager-field">
+            <span>备注（选填）</span>
+            <a-input v-model:value="form.note" placeholder="用途说明" allow-clear />
+          </label>
+          <label class="manager-field">
+            <span>密钥变量名（选填，只存引用不存值）</span>
+            <a-select v-model:value="form.apiKeyEnv" :options="API_KEY_ENV_OPTIONS" />
+          </label>
+          <label v-if="form.apiKeyEnv" class="manager-field">
+            <span>API Key（选填，写入项目根 .env.local）</span>
+            <a-input-password
+              v-model:value="newModelKey"
+              :disabled="!envWritable"
+              placeholder="留空则只引用已配置的密钥"
+              autocomplete="off"
+            />
+          </label>
+          <a-button type="primary" block :loading="submitting" @click="submitCustom">
+            添加到列表并选中
+          </a-button>
+        </div>
+
+        <div class="manager-section-title">
+          已添加的自定义模型（{{ customProfiles.length }}）
+        </div>
+        <div v-if="!customProfiles.length" class="manager-empty">
+          暂无。新增后会出现在下拉菜单的「自定义模型」分组。
+        </div>
+        <div v-for="item in customProfiles" :key="item.id" class="manager-item">
+          <div class="manager-item-info">
+            <span class="manager-item-name">{{ item.label }}</span>
+            <span class="manager-item-meta">
+              {{ item.location === 'local' ? '本地' : '云端' }} · {{ item.model }} ·
+              {{ item.baseUrl }}
+            </span>
+            <span class="manager-item-meta">{{ describeCredential(item) }}</span>
+          </div>
+          <a-popconfirm
+            title="删除这个自定义档位？"
+            ok-text="删除"
+            cancel-text="取消"
+            @confirm="onRemove(item.id)"
+          >
+            <a-button danger size="small" type="text">删除</a-button>
+          </a-popconfirm>
+        </div>
+
+        <div class="manager-section-title">本地密钥（项目根 .env.local）</div>
+        <div v-if="!envWritable" class="manager-empty">
+          密钥写入端点不可用；云端构建或启用临时隧道时不提供该能力。
+        </div>
+        <template v-else>
+          <div v-for="item in LOCAL_ENV_KEYS" :key="item.value" class="env-status-row">
+            <span class="env-status-name">{{ item.value }}</span>
+            <a-tag :color="envStatus[item.value] ? 'green' : 'default'">
+              {{ envStatus[item.value] ? '文件内已配置' : '文件内未配置' }}
+            </a-tag>
+          </div>
+          <div class="manager-row env-write-row">
+            <label class="manager-field">
+              <span>变量名</span>
+              <a-select v-model:value="keyForm.envKey" :options="LOCAL_ENV_KEYS" />
+            </label>
+            <label class="manager-field">
+              <span>密钥值</span>
+              <a-input-password
+                v-model:value="keyForm.value"
+                placeholder="sk-..."
+                autocomplete="off"
+              />
+            </label>
+          </div>
+          <a-button block :loading="savingKey" @click="saveStandaloneKey">
+            保存到 .env.local
+          </a-button>
+          <p class="manager-hint">
+            状态只反映 .env.local 文件本身；系统环境变量里的同名键仍会生效。
+            明文只发给本机 dev server，不保存在浏览器、不进入前端产物；
+            写入后需重启后端与 Agent 才会生效。
+          </p>
+        </template>
+
+        <p class="manager-hint">{{ CUSTOM_HINT }}</p>
+        <p class="manager-hint">{{ SELECTOR_HINT }}</p>
+      </div>
+    </a-modal>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { type MenuProps, message } from 'ant-design-vue'
+import {
+  API_KEY_ENV_OPTIONS,
+  CUSTOM_MODEL_GROUP,
+  LOCAL_ENV_ENDPOINT,
+  LOCAL_ENV_KEYS,
+  describeCredential,
+  isLocalEnvWritable,
+  isModelSelectorVisible,
+  MODEL_LOCATION_OPTIONS,
+  MODEL_PROFILE_GROUPS,
+  MODEL_PROVIDER_OPTIONS,
+  NON_CHAT_MODELS,
+  type CustomModelInput,
+  type ModelProfileGroup,
+} from '@/constants/modelProfiles.ts'
+import { useModelProfileStore } from '@/stores/useModelProfileStore.ts'
+
+const MANAGE_KEY = '__manage-model__'
+const SELECTOR_HINT =
+  '选择仅保存在本地浏览器，供后续评测链读取；后端模型仍由启动环境变量决定，尚未随此按钮切换。'
+const CUSTOM_HINT =
+  '自定义档位只存本浏览器（Python 评测链读不到）；密钥值不存浏览器，统一写入项目根 .env.local。'
+
+interface LocalEnvResponse {
+  ok: boolean
+  keys?: { key: string; configured: boolean }[]
+  error?: string
+}
+
+const visible = isModelSelectorVisible
+const store = useModelProfileStore()
+const selected = computed(() => store.selected)
+const selectedId = computed(() => store.selectedId)
+const customProfiles = computed(() => store.customProfiles)
+
+const groups = computed<ModelProfileGroup[]>(() => {
+  const result = MODEL_PROFILE_GROUPS.map((group) => ({
+    ...group,
+    profiles: [...group.profiles],
+  }))
+  if (customProfiles.value.length) {
+    result.push({ name: CUSTOM_MODEL_GROUP, profiles: customProfiles.value })
+  }
+  return result
+})
+
+const managerOpen = ref(false)
+const form = reactive<CustomModelInput>({
+  label: '',
+  model: '',
+  baseUrl: '',
+  provider: 'ollama',
+  location: 'local',
+  note: '',
+  apiKeyEnv: '',
+})
+const newModelKey = ref('')
+const submitting = ref(false)
+
+const envWritable = ref(false)
+const envStatus = ref<Record<string, boolean>>({})
+const keyForm = reactive({ envKey: LOCAL_ENV_KEYS[0].value, value: '' })
+const savingKey = ref(false)
+
+/** dev server 的本地端点：GET 只取「是否配置」布尔，POST 只发明文值。 */
+async function callLocalEnv(
+  method: 'GET' | 'POST',
+  payload?: { key: string; value: string },
+): Promise<LocalEnvResponse> {
+  if (!LOCAL_ENV_ENDPOINT) throw new Error('当前构建不提供本地密钥端点')
+  const response = await fetch(LOCAL_ENV_ENDPOINT, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: method === 'POST' ? JSON.stringify(payload) : undefined,
+  })
+  let data: LocalEnvResponse
+  try {
+    data = (await response.json()) as LocalEnvResponse
+  } catch {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  if (!response.ok || !data.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+  return data
+}
+
+async function refreshEnvStatus() {
+  if (!isLocalEnvWritable) return
+  try {
+    const data = await callLocalEnv('GET')
+    envStatus.value = Object.fromEntries(
+      (data.keys ?? []).map((item) => [item.key, item.configured]),
+    )
+    envWritable.value = true
+  } catch {
+    // 端点不可达（例如本地 preview 强行显示了组件）时禁用密钥区，不影响档位选择。
+    envWritable.value = false
+  }
+}
+
+/** 返回是否写入成功；明文在请求结束后即清空，不进入任何持久化层。 */
+async function saveEnvKey(key: string, value: string): Promise<boolean> {
+  if (!envWritable.value) {
+    message.warning('密钥写入端点不可用')
+    return false
+  }
+  savingKey.value = true
+  try {
+    await callLocalEnv('POST', { key, value })
+    await refreshEnvStatus()
+    message.success(`已写入 .env.local：${key}；重启后端与 Agent 后生效`)
+    return true
+  } catch (error) {
+    message.error(`密钥保存失败：${(error as Error).message}`)
+    return false
+  } finally {
+    savingKey.value = false
+  }
+}
+
+async function saveStandaloneKey() {
+  const value = keyForm.value.trim()
+  if (!value) {
+    message.warning('请填写密钥值')
+    return
+  }
+  const ok = await saveEnvKey(keyForm.envKey, value)
+  if (ok) keyForm.value = ''
+}
+
+function resetForm() {
+  Object.assign(form, {
+    label: '',
+    model: '',
+    baseUrl: '',
+    provider: 'ollama',
+    location: 'local',
+    note: '',
+    apiKeyEnv: '',
+  } satisfies CustomModelInput)
+  newModelKey.value = ''
+}
+
+const onSelect: MenuProps['onClick'] = ({ key }) => {
+  const id = String(key)
+  if (id === MANAGE_KEY) {
+    managerOpen.value = true
+    return
+  }
+  // store 内部按 allProfiles 校验 id，非法 key（含禁用项）会被忽略。
+  store.setSelectedId(id)
+}
+
+async function submitCustom() {
+  if (submitting.value) return
+  const label = form.label.trim()
+  const model = form.model.trim()
+  const baseUrl = form.baseUrl.trim().replace(/\/+$/, '')
+  if (!label || !model || !baseUrl) {
+    message.warning('请填写显示名称、模型 ID 与 Base URL')
+    return
+  }
+  if (!/^https?:\/\//i.test(baseUrl)) {
+    message.warning('Base URL 需以 http:// 或 https:// 开头')
+    return
+  }
+  try {
+    new URL(baseUrl)
+  } catch {
+    message.warning('Base URL 格式不正确')
+    return
+  }
+
+  submitting.value = true
+  try {
+    // 填了 API Key 就先落盘，写入失败则中止新增，避免出现「档位引用了不存在的密钥」。
+    if (form.apiKeyEnv && newModelKey.value.trim()) {
+      const ok = await saveEnvKey(form.apiKeyEnv, newModelKey.value.trim())
+      if (!ok) return
+    }
+    const profile = store.addCustomProfile({
+      label,
+      model,
+      baseUrl,
+      provider: form.provider,
+      location: form.location,
+      note: form.note.trim() || '自定义档位（仅本浏览器）',
+      apiKeyEnv: form.apiKeyEnv || undefined,
+    })
+    store.setSelectedId(profile.id)
+    message.success(`已添加并选中 ${label}`)
+    resetForm()
+    await refreshEnvStatus()
+  } finally {
+    submitting.value = false
+  }
+}
+
+function onRemove(id: string) {
+  store.removeCustomProfile(id)
+  message.success('已删除')
+}
+
+onMounted(() => {
+  void refreshEnvStatus()
+})
+watch(managerOpen, (open) => {
+  if (open) void refreshEnvStatus()
+})
+</script>
+
+<style scoped>
+/*
+ * 紧凑文字触发器：贴合对话窗底部工具条的视觉语言 —— 无边框、无底色，
+ * 只保留模型名 + 位置小字 + 下拉箭头。浅色文案适配 .input-bar 的米色背景。
+ */
+.model-selector {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.model-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b5b3e;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.model-selector-trigger:hover {
+  background: #f0e5d2;
+  color: #3d3226;
+}
+
+.model-selector-trigger:focus-visible {
+  outline: 2px solid #e07a2d;
+  outline-offset: 1px;
+}
+
+.model-selector-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-selector-location {
+  flex: 0 0 auto;
+  color: #a08c68;
+  font-size: 12px;
+}
+
+.model-selector-chevron {
+  flex: 0 0 auto;
+  color: #a08c68;
+  font-size: 10px;
+}
+
+.model-manage-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a14f16;
+  font-size: 13px;
+}
+
+.model-hint {
+  max-width: 300px;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8c8c8c;
+}
+
+.model-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+  padding: 2px 0;
+}
+
+.model-option-name {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.model-option-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8c8c8c;
+}
+
+/* 自定义模型管理弹窗 */
+.model-manager {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.manager-section-title {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3d3226;
+}
+
+.manager-section-title:not(:first-child) {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #efe4d0;
+}
+
+.manager-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manager-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #6b5b3e;
+}
+
+.manager-row {
+  display: flex;
+  gap: 10px;
+}
+
+.manager-empty {
+  padding: 10px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a08c68;
+}
+
+.manager-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: 1px solid #efe4d0;
+  border-radius: 6px;
+  background: #fdf9f1;
+}
+
+.manager-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.manager-item-name {
+  font-size: 13px;
+  color: #3d3226;
+}
+
+.manager-item-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #a08c68;
+}
+
+.env-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+  border-bottom: 1px solid #f3ead9;
+  font-size: 12px;
+  color: #6b5b3e;
+}
+
+.env-status-name {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.env-write-row {
+  margin: 12px 0;
+}
+
+.manager-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8c8c8c;
+}
+</style>
+
+
+--- /dev/null
++++ b/cloud_front/tests/local-env-isolation.cjs
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const Module = require('node:module')
+const { Readable } = require('node:stream')
+const vm = require('node:vm')
+const esbuild = require('esbuild')
+const ts = require('typescript')
+
+const root = path.resolve(__dirname, '..')
+const fixture = path.resolve('C:/isolation-fixture')
+const envFile = path.join(fixture, '.env.local')
+const example = path.join(fixture, 'deploy', '.env.example')
+const files = new Map([[example, 'RAG_LLM_API_KEY=\n']])
+const operations = []
+const fakeFs = {
+  existsSync: p => files.has(p),
+  readFileSync: p => { assert(files.has(p)); return files.get(p) },
+  writeFileSync: (p, v) => { operations.push(['write', p]); files.set(p, v) },
+  renameSync: (a, b) => { operations.push(['rename', a, b]); assert(files.has(a)); files.set(b, files.get(a)); files.delete(a) },
+  unlinkSync: p => files.delete(p),
+}
+const built = esbuild.buildSync({
+  entryPoints: [path.join(root, 'vite/localEnvPlugin.ts')], bundle: true, write: false,
+  platform: 'node', format: 'cjs',
+  define: { 'import.meta.url': JSON.stringify(require('node:url').pathToFileURL(path.join(fixture, 'cloud_front/vite/localEnvPlugin.js')).href) },
+})
+const loaded = new Module('isolated-plugin', module)
+loaded.require = id => id === 'node:fs' ? fakeFs : require(id)
+loaded._compile(built.outputFiles[0].text, 'isolated-plugin.cjs')
+const plugin = loaded.exports
+function handlerFor(flag) {
+  if (flag === undefined) delete process.env.CLOUDWIKI_DISABLE_LOCAL_ENV
+  else process.env.CLOUDWIKI_DISABLE_LOCAL_ENV = flag
+  let handler
+  plugin.localEnvPlugin().configureServer({ middlewares: { use(_path, fn) { handler = fn } } })
+  return handler
+}
+async function request(handler, payload) {
+  const req = Readable.from([JSON.stringify(payload)])
+  req.method = 'POST'; req.headers = {}
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('request did not receive a response')), 1000)
+    handler(req, {
+      setHeader() {}, end(body) { clearTimeout(timeout); resolve({ status: this.statusCode, body: JSON.parse(body) }) },
+    })
+  })
+}
+async function main() {
+  assert.equal(handlerFor('1'), undefined)
+  const handler = handlerFor(undefined)
+  assert.equal(typeof handler, 'function')
+  for (const [before, after] of [
+    ['', 'RAG_LLM_API_KEY=new\n'],
+    ['RAG_LLM_API_KEY=old\n', 'RAG_LLM_API_KEY=new\n'],
+    ['# comment\n RAG_LLM_API_KEY = old\nRAG_LLM_API_KEY_EXTRA=keep\n# middle\nRAG_LLM_API_KEY=old2\nOTHER=keep\n', '# comment\nRAG_LLM_API_KEY=new\nRAG_LLM_API_KEY_EXTRA=keep\n# middle\nOTHER=keep\n'],
+  ]) {
+    files.set(envFile, before); operations.length = 0
+    const r = await request(handler, { key: 'RAG_LLM_API_KEY', value: 'new' })
+    assert.equal(r.status, 200); assert(!JSON.stringify(r.body).includes('new'))
+    assert.equal(files.get(envFile), after)
+    assert.deepEqual(operations.map(x => x[0]), ['write', 'rename'])
+    assert.notEqual(operations[0][1], envFile); assert.equal(operations[1][1], operations[0][1]); assert.equal(operations[1][2], envFile)
+  }
+  for (const payload of [null, false, 42, 'text', [], {key:'BAD',value:'x'}, {key:'RAG_LLM_API_KEY',value:' '}, {key:'RAG_LLM_API_KEY',value:'\nx'}]) {
+    const before = files.get(envFile); operations.length = 0
+    assert.equal((await request(handler, payload)).status, 400)
+    assert.equal(files.get(envFile), before); assert.equal(operations.length, 0)
+  }
+  const vue = fs.readFileSync(path.join(root, 'src/components/ModelSelector.vue'), 'utf8')
+  const script = vue.match(/<script\b(?=[^>]*\bsetup\b)(?=[^>]*\blang="ts")[^>]*>([\s\S]*?)<\/script>/)[1]
+  const ast = ts.createSourceFile('component.ts', script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const functions = ast.statements.filter(n => ts.isFunctionDeclaration(n) && ['callLocalEnv', 'refreshEnvStatus'].includes(n.name?.text))
+  assert.equal(functions.length, 2)
+  const code = ts.transpile(functions.map(n => n.getFullText(ast)).join('\n'))
+  const context = { LOCAL_ENV_ENDPOINT: '/fixture', isLocalEnvWritable: true, envWritable: {value:true}, envStatus: {value:{}}, fetch: async () => ({ok:false,status:404,json:async()=>{throw Error('not JSON')}}) }
+  vm.createContext(context); vm.runInContext(code, context)
+  await context.refreshEnvStatus(); assert.equal(context.envWritable.value, false)
+  assert.match(vue, /v-if="!envWritable"/); assert.match(vue, /:disabled="!envWritable"/)
+  console.log('local env isolation: writes, validation, registration and UI unavailability passed')
+}
+main().catch(error => { console.error(error); process.exitCode = 1 })
+
+
+--- /dev/null
++++ b/scripts/test-start-dev-tunnel.ps1
+$ErrorActionPreference = 'Stop'
+$source = Join-Path (Split-Path -Parent $PSScriptRoot) 'start-dev.ps1'
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
+if ($errors.Count -ne 0) { throw "start-dev.ps1 parse failed: $($errors -join '; ')" }
+
+$parameters = @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
+foreach ($name in @('Tunnel', 'NoTunnel')) {
+    if ($parameters -notcontains $name) { throw "Missing parameter: $name" }
+}
+
+$calls = @($ast.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Start-PublicTunnel'
+}, $true))
+if ($calls.Count -ne 1) { throw "Expected exactly one tunnel call, found $($calls.Count)" }
+$call = $calls[0]
+$parent = $call.Parent
+while ($parent -and $parent -isnot [System.Management.Automation.Language.IfStatementAst]) {
+    $parent = $parent.Parent
+}
+if (-not $parent -or $parent.Clauses.Count -ne 1) { throw 'Tunnel call must belong to one if clause' }
+$condition = $parent.Clauses[0].Item1
+$body = $parent.Clauses[0].Item2
+if ($call.Extent.StartOffset -lt $body.Extent.StartOffset -or
+    $call.Extent.EndOffset -gt $body.Extent.EndOffset) { throw 'Tunnel call is not in the if body' }
+
+# Only evaluate a side-effect-free condition and the call to the local stub.
+if (@($condition.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)).Count -ne 0) {
+    throw 'Unexpected command in tunnel condition'
+}
+if ($call.Extent.Text -notmatch '^Start-PublicTunnel\s+-Port\s+\$frontPort$') {
+    throw 'Unexpected tunnel call; refusing to execute extracted expression'
+}
+$testBody = $ast.ParamBlock.Extent.Text + "`n" +
+    'if (' + $condition.Extent.Text + ') { ' + $call.Extent.Text + ' }'
+$invoke = [scriptblock]::Create($testBody)
+function Start-PublicTunnel { param([int]$Port) $script:callCount++ }
+$frontPort = 3000
+$flagBlocks = @($ast.FindAll({
+    param($n)
+    $n -is [System.Management.Automation.Language.IfStatementAst] -and
+        $n.Extent.Text -match 'CLOUDWIKI_DISABLE_LOCAL_ENV'
+}, $true))
+if ($flagBlocks.Count -ne 1) { throw 'Expected one signal assignment block' }
+$flagBlock = $flagBlocks[0]
+if ($flagBlock.Extent.Text -notmatch "(?s)^if \(\`$Tunnel -and -not \`$NoTunnel\) \{\s*\`$env:CLOUDWIKI_DISABLE_LOCAL_ENV = '1'\s*\} else \{\s*\`$env:CLOUDWIKI_DISABLE_LOCAL_ENV = '0'\s*\}$") {
+    throw 'Unexpected signal assignment; refusing to execute'
+}
+$frontStarts = @($ast.FindAll({
+    param($n)
+    $n -is [System.Management.Automation.Language.CommandAst] -and
+        $n.GetCommandName() -eq 'Start-Process' -and
+        ($n.Extent.Text -match 'npm run dev|npx vite preview')
+}, $true))
+if ($frontStarts.Count -ne 2) { throw 'Expected dev and preview frontend launches' }
+foreach ($start in $frontStarts) {
+    if ($flagBlock.Extent.EndOffset -ge $start.Extent.StartOffset) { throw 'Signal set after frontend launch' }
+}
+function Start-Process {
+    param($FilePath, $ArgumentList, $WorkingDirectory, $RedirectStandardOutput, $RedirectStandardError, $WindowStyle, [switch]$PassThru)
+    $script:capturedFlag = $env:CLOUDWIKI_DISABLE_LOCAL_ENV
+}
+$frontDir = 'fixture'; $frontLog = 'fixture'; $frontErr = 'fixture'
+$cases = @(
+    @{ Name = 'default'; Args = @{}; Expected = 0; Flag = '0' },
+    @{ Name = 'Tunnel'; Args = @{ Tunnel = $true }; Expected = 1; Flag = '1' },
+    @{ Name = 'NoTunnel'; Args = @{ NoTunnel = $true }; Expected = 0; Flag = '0' },
+    @{ Name = 'both'; Args = @{ Tunnel = $true; NoTunnel = $true }; Expected = 0; Flag = '0' }
+)
+foreach ($case in $cases) {
+    $script:callCount = 0
+    $arguments = $case.Args
+    & $invoke @arguments
+    if ($script:callCount -ne $case.Expected) {
+        throw "$($case.Name): expected $($case.Expected) calls, got $script:callCount"
+    }
+    foreach ($start in $frontStarts) {
+        $env:CLOUDWIKI_DISABLE_LOCAL_ENV = 'stale'
+        $script:capturedFlag = $null
+        $frontTest = [scriptblock]::Create($ast.ParamBlock.Extent.Text + "`n" + $flagBlock.Extent.Text + "`n" + $start.Extent.Text)
+        & $frontTest @arguments
+        if ($script:capturedFlag -ne $case.Flag) { throw "$($case.Name): frontend signal mismatch" }
+    }
+    Write-Host "$($case.Name): $script:callCount calls"
+}
+Write-Host 'PowerShell AST parse and tunnel switch checks passed.'
+

@@ -1,0 +1,1978 @@
+diff --git a/.gitignore b/.gitignore
+index 2e4dcb6..0701134 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -43,6 +43,9 @@ eval/tmp/
+ eval/.env
+ 
+ ### Local secrets (injected by start-dev.ps1) ###
++# 模型 API key 的唯一存放处：前端「模型管理」写入，start-dev.ps1 注入进程环境。
++.env.local
++# 旧密钥文件已废弃；保留规则防止误建、误提交。
+ .env.dev
+ 
+ ### Local runtime and diagnostics ###
+diff --git a/cloud/src/main/resources/application.yml b/cloud/src/main/resources/application.yml
+index bf23e36..6dc24bc 100644
+--- a/cloud/src/main/resources/application.yml
++++ b/cloud/src/main/resources/application.yml
+@@ -85,7 +85,7 @@ aliYunAi:
+ rag:
+   embedding:
+     # 默认云端 DashScope compatible-mode（qwen3.7-text-embedding-flash）；api-key 经环境变量
+-    # RAG_EMBEDDING_API_KEY 注入（start-dev.ps1 会读取根目录 .env.dev）。
++    # RAG_EMBEDDING_API_KEY 注入（start-dev.ps1 会读取根目录 .env.local）。
+     # 切回本地 Ollama 示例：RAG_EMBEDDING_BASE_URL=http://localhost:11434/v1
+     # RAG_EMBEDDING_MODEL=qwen3-embedding:4b（本地端点无需 api-key）
+     base-url: ${RAG_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+diff --git a/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue b/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue
+index 8af91d3..4e06190 100644
+--- a/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue
++++ b/cloud_front/src/pages/aiAssistant/AiAssistantPage.vue
+@@ -257,7 +257,7 @@
+         </div>
+ 
+         <!-- 输入区 -->
+-        <div class="input-bar">
++        <div class="input-bar" :class="{ 'with-model-selector': isModelSelectorVisible }">
+           <a-textarea
+             v-model:value="inputText"
+             class="input"
+@@ -266,23 +266,26 @@
+             :disabled="streaming"
+             @keydown.enter.exact.prevent="send"
+           />
+-          <a-button
+-            v-if="streaming"
+-            class="stop-btn"
+-            danger
+-            @click="stopStream"
+-          >
+-            停止
+-          </a-button>
+-          <a-button
+-            v-else
+-            type="primary"
+-            class="send-btn"
+-            :disabled="!inputText.trim()"
+-            @click="send"
+-          >
+-            发送
+-          </a-button>
++          <div class="input-toolbar">
++            <ModelSelector />
++            <a-button
++              v-if="streaming"
++              class="stop-btn"
++              danger
++              @click="stopStream"
++            >
++              停止
++            </a-button>
++            <a-button
++              v-else
++              type="primary"
++              class="send-btn"
++              :disabled="!inputText.trim()"
++              @click="send"
++            >
++              发送
++            </a-button>
++          </div>
+         </div>
+       </div>
+ 
+@@ -470,6 +473,8 @@ import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController'
+ import { listFolderTreeUsingGet } from '@/api/wikiFolderController'
+ import { getDocumentWikiVisByIdUsingGet } from '@/api/documentWikiController'
+ import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
++import ModelSelector from '@/components/ModelSelector.vue'
++import { isModelSelectorVisible } from '@/constants/modelProfiles.ts'
+ import AgentLibraryPanel from './AgentLibraryPanel.vue'
+ import { parseCitationSnapshot } from './citationIds'
+ import {
+@@ -1826,6 +1831,32 @@ onMounted(() => {
+   flex: 1;
+ }
+ 
++/*
++ * 云端（选择器不渲染）时工具条透明化，发送/停止按钮直接参与 .input-bar 的 flex 布局，
++ * 保持与改动前完全一致的单行排布，云端布局零变化。
++ */
++.input-toolbar {
++  display: contents;
++}
++
++/* 本地开发：输入框独占一行，下方工具条左侧为模型档位、右侧为发送按钮。 */
++.input-bar.with-model-selector {
++  flex-wrap: wrap;
++}
++
++.input-bar.with-model-selector .input {
++  flex: 1 1 100%;
++}
++
++.input-bar.with-model-selector .input-toolbar {
++  display: flex;
++  flex: 1 1 100%;
++  align-items: center;
++  justify-content: space-between;
++  gap: 10px;
++  min-height: 28px;
++}
++
+ .send-btn {
+   background: #e07a2d;
+   border-color: #e07a2d;
+diff --git a/cloud_front/tsconfig.node.json b/cloud_front/tsconfig.node.json
+index 62268dc..2abbcbc 100644
+--- a/cloud_front/tsconfig.node.json
++++ b/cloud_front/tsconfig.node.json
+@@ -1,6 +1,7 @@
+ {
+   "include": [
+     "vite.config.*",
++    "vite/**/*.ts",
+     "vitest.config.*",
+     "cypress.config.*",
+     "nightwatch.conf.*",
+diff --git a/cloud_front/vite.config.ts b/cloud_front/vite.config.ts
+index daf745b..5fc2a13 100644
+--- a/cloud_front/vite.config.ts
++++ b/cloud_front/vite.config.ts
+@@ -3,12 +3,16 @@ import { fileURLToPath, URL } from 'node:url'
+ import { defineConfig } from 'vite'
+ import vue from '@vitejs/plugin-vue'
+ import vueDevTools from 'vite-plugin-vue-devtools'
++import { localEnvPlugin } from './vite/localEnvPlugin'
+ 
+ // https://vite.dev/config/
+ export default defineConfig({
+   plugins: [
+     vue(),
+     vueDevTools(),
++    // 仅 dev server 生效：把前端「模型管理」填写的 APIKEY 写入项目根 .env.local。
++    // build / preview 不注册端点，见 vite/localEnvPlugin.ts。
++    localEnvPlugin(),
+   ],
+   resolve: {
+     alias: {
+diff --git a/docs/asset-registry.md b/docs/asset-registry.md
+index c55f6e3..c2c899a 100644
+--- a/docs/asset-registry.md
++++ b/docs/asset-registry.md
+@@ -90,6 +90,6 @@
+ 
+ ## 五、相关提醒
+ 
+-- **`.env.dev`**（仓库根目录）含 API 密钥，同样被忽略。**不登记其内容，仅提醒不要误传或误删。**
++- **`.env.local`**（仓库根目录）是模型 API key 的唯一存放处，已被忽略；前端「模型管理」可写入。**不登记其内容，仅提醒不要误传或误删；评测专属配置仍在 `eval/.env`。**
+ - 本清单本身是**文档**，不是访问控制。它不能阻止误删，只能让误删的后果可预判。
+ - 若某项资产需要真正的版本保护，正确做法是**移出忽略范围并提交**（如体积允许），而不是继续留在原地 + 登记。
+diff --git a/eval/README.md b/eval/README.md
+index c57cc16..33fece6 100644
+--- a/eval/README.md
++++ b/eval/README.md
+@@ -58,7 +58,8 @@
+ | `datasets/mhr-rag/` | **另一套数据集，与本节完全隔离**：MultiHop-RAG 609 篇英文新闻 + 2556 题多跳问答，自带 `scripts/` 与 `results/`，只共享 `lib_rag_eval.py` 的打分口径。见该目录的 README |
+ | `tools/review.html` | 人工筛选页（离线可用，进度存 localStorage） |
+ | `tmp/` | 中间产物与缓存，**已 gitignore** |
+-| `.env` | 密钥与模型配置，**已 gitignore**（参照 `.env.dev` 重建） |
++| `.env` | 评测专属配置（DB / URL / 模型名 / EVAL_* 凭据），**已 gitignore** |
++| `../.env.local` | 项目根的模型 API key 唯一存放处（`RAG_LLM_API_KEY` / `RAG_EMBEDDING_API_KEY` / `DEEPSEEK_WEB_API_KEY`），**已 gitignore**；`load_env()` 自动合并并兼容旧名 `LLM_API_KEY` / `EMBEDDING_API_KEY` |
+ 
+ ## 数据格式（JSONL，一行一题）
+ 
+diff --git a/eval/scripts/lib_eval.py b/eval/scripts/lib_eval.py
+index 38728dd..e5a939b 100644
+--- a/eval/scripts/lib_eval.py
++++ b/eval/scripts/lib_eval.py
+@@ -20,6 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
+ EVAL_DIR = os.path.join(ROOT, "eval")
+ TMP_DIR = os.path.join(EVAL_DIR, "tmp")
+ ENV_PATH = os.path.join(EVAL_DIR, ".env")
++LOCAL_ENV_PATH = os.path.join(ROOT, ".env.local")
+ CORPUS = r"F:\AIProject\my\corpus-2026"
+ 
+ UA = {
+@@ -36,10 +37,10 @@ SECTIONS = [
+ ]
+ 
+ 
+-def load_env(path: str = ENV_PATH) -> dict:
++def _parse_env_file(path: str) -> dict:
+     cfg = {}
+     if not os.path.exists(path):
+-        raise SystemExit(f"缺少配置文件 {path}")
++        return cfg
+     for line in open(path, encoding="utf-8"):
+         line = line.strip()
+         if not line or line.startswith("#") or "=" not in line:
+@@ -49,6 +50,29 @@ def load_env(path: str = ENV_PATH) -> dict:
+     return cfg
+ 
+ 
++def load_env(path: str = ENV_PATH) -> dict:
++    """加载配置：eval/.env < 根 .env.local < os.environ（后者优先）。
++
++    模型 API key 统一放在根 .env.local（变量名与云端 GitHub Secrets 对齐），
++    eval/.env 只保留评测专属配置。历史脚本仍用 LLM_API_KEY / EMBEDDING_API_KEY，
++    这里由 RAG_EMBEDDING_API_KEY 兼容填充，调用点无需改动。
++    """
++    if not os.path.exists(path):
++        raise SystemExit(f"缺少配置文件 {path}")
++    cfg = _parse_env_file(path)
++    cfg.update(_parse_env_file(LOCAL_ENV_PATH))
++    for key in list(cfg) + [
++        "RAG_LLM_API_KEY", "RAG_EMBEDDING_API_KEY", "DEEPSEEK_WEB_API_KEY",
++    ]:
++        if key in os.environ:
++            cfg[key] = os.environ[key]
++    dashscope_key = cfg.get("RAG_EMBEDDING_API_KEY") or cfg.get("RAG_LLM_API_KEY") or ""
++    if dashscope_key:
++        cfg.setdefault("LLM_API_KEY", dashscope_key)
++        cfg.setdefault("EMBEDDING_API_KEY", dashscope_key)
++    return cfg
++
++
+ def http_json(url: str, api_key: str, payload: dict, timeout: int = 180, retries: int = 3):
+     """POST JSON，返回 (status, obj_or_text)。带重试与浏览器 UA（绕过 WAF）。"""
+     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+diff --git a/eval/scripts/smoke_test.py b/eval/scripts/smoke_test.py
+index e6d59b2..8a76688 100644
+--- a/eval/scripts/smoke_test.py
++++ b/eval/scripts/smoke_test.py
+@@ -18,21 +18,10 @@ import urllib.request
+ 
+ sys.stdout.reconfigure(encoding="utf-8")
+ 
+-HERE = os.path.dirname(os.path.abspath(__file__))
+-ENV_PATH = os.path.join(os.path.dirname(HERE), ".env")
+-
+-
+-def load_env(path):
+-    cfg = {}
+-    if not os.path.exists(path):
+-        return cfg
+-    for line in open(path, encoding="utf-8"):
+-        line = line.strip()
+-        if not line or line.startswith("#") or "=" not in line:
+-            continue
+-        k, v = line.split("=", 1)
+-        cfg[k.strip()] = v.strip()
+-    return cfg
++# 模型 API key 已迁至项目根 .env.local，统一复用 lib_eval.load_env() 的
++# 合并与旧名兼容逻辑，避免本文件再维护一套独立的 .env 解析。
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from lib_eval import load_env  # noqa: E402
+ 
+ 
+ def post(base_url, path, api_key, payload, timeout=90):
+@@ -122,7 +111,7 @@ def main():
+     ap.add_argument("--only", choices=["chat", "embedding"])
+     args = ap.parse_args()
+ 
+-    cfg = load_env(ENV_PATH)
++    cfg = load_env()
+     llm_base = args.llm_base_url or args.base_url or cfg.get("LLM_BASE_URL", "")
+     emb_base = args.emb_base_url or args.base_url or cfg.get("EMBEDDING_BASE_URL", "")
+     llm_key = cfg.get("LLM_API_KEY", "")
+diff --git a/start-dev.ps1 b/start-dev.ps1
+index 763fa12..9dc4657 100644
+--- a/start-dev.ps1
++++ b/start-dev.ps1
+@@ -156,14 +156,14 @@ if (-not $portsClear) { exit 1 }
+ $javaExe = Find-Java
+ if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
+ 
+-# Load local secrets (.env.dev, git-ignored): each KEY=VALUE line becomes a
++# Load local secrets (.env.local, git-ignored): each KEY=VALUE line becomes a
+ # process env var so the backend jar started below inherits it. Values may be
+ # quoted ("v" or 'v'); blank lines and # comments are skipped. Only variable
+ # NAMES are printed - never the values.
+ function Import-DevEnvFile {
+-    $envFile = Join-Path $root '.env.dev'
++    $envFile = Join-Path $root '.env.local'
+     if (-not (Test-Path $envFile)) {
+-        Write-Host '    NOTE: .env.dev not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
++        Write-Host '    NOTE: .env.local not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
+         return
+     }
+     $loaded = @()
+@@ -182,13 +182,18 @@ function Import-DevEnvFile {
+             $value = $value.Substring(1, $value.Length - 2)
+         }
+         if ($key.Length -eq 0) { continue }
++        # 只注入模型相关的 RAG_*/DEEPSEEK_* 变量。评测专属的 DB_*/EVAL_*
++        # 与 VITE_* 不进入后端进程环境，避免被 Spring relaxed binding 误认。
++        if ($key -notmatch '^(RAG_|DEEPSEEK_)[A-Z0-9_]+$') { continue }
++        # 空值代表「未在此文件配置」，不能覆盖系统用户作用域已有的同名变量。
++        if ($value.Length -eq 0) { continue }
+         Set-Item -Path ("Env:" + $key) -Value $value
+         $loaded += $key
+     }
+     if ($loaded.Count -gt 0) {
+-        Write-Host ("    .env.dev injected env vars: " + ($loaded -join ', '))
++        Write-Host ("    .env.local injected env vars: " + ($loaded -join ', '))
+     } else {
+-        Write-Host '    WARN: .env.dev exists but contains no KEY=VALUE entries.'
++        Write-Host '    WARN: .env.local exists but contains no KEY=VALUE entries.'
+     }
+ }
+ Import-DevEnvFile
+
+--- /dev/null
++++ b/cloud_front/src/components/ModelSelector.vue
+<template>
+  <div v-if="visible" class="model-selector">
+    <a-dropdown :trigger="['click']" placement="topLeft">
+      <button type="button" class="model-selector-trigger" :title="SELECTOR_HINT">
+        <span class="model-selector-name">{{ selected.label }}</span>
+        <span class="model-selector-location">
+          {{ selected.location === 'local' ? '本地' : '云端' }}
+        </span>
+        <DownOutlined class="model-selector-chevron" />
+      </button>
+      <template #overlay>
+        <a-menu :selectedKeys="[selectedId]" @click="onSelect">
+          <a-menu-item-group
+            v-for="group in groups"
+            :key="group.name"
+            :title="group.name"
+          >
+            <a-menu-item v-for="profile in group.profiles" :key="profile.id">
+              <div class="model-option">
+                <span class="model-option-name">{{ profile.label }}</span>
+                <span class="model-option-note">{{ profile.note }}</span>
+              </div>
+            </a-menu-item>
+          </a-menu-item-group>
+          <a-menu-divider />
+          <a-menu-item :key="MANAGE_KEY">
+            <span class="model-manage-entry">
+              <PlusOutlined /> 新增 / 管理模型
+            </span>
+          </a-menu-item>
+          <a-menu-divider />
+          <a-menu-item-group title="检索链路专用 · 不可选">
+            <a-menu-item v-for="item in NON_CHAT_MODELS" :key="item.label" disabled>
+              <div class="model-option">
+                <span class="model-option-name">{{ item.label }}</span>
+                <span class="model-option-note">{{ item.role }}</span>
+              </div>
+            </a-menu-item>
+          </a-menu-item-group>
+          <a-menu-divider />
+          <a-menu-item disabled>
+            <div class="model-hint">{{ SELECTOR_HINT }}</div>
+            <div class="model-hint">{{ CUSTOM_HINT }}</div>
+          </a-menu-item>
+        </a-menu>
+      </template>
+    </a-dropdown>
+
+    <a-modal
+      v-model:open="managerOpen"
+      title="自定义模型与本地密钥"
+      :footer="null"
+      width="560px"
+    >
+      <div class="model-manager">
+        <div class="manager-section-title">新增档位</div>
+        <div class="manager-form">
+          <label class="manager-field">
+            <span>显示名称</span>
+            <a-input v-model:value="form.label" placeholder="如 qwen3:8b" allow-clear />
+          </label>
+          <label class="manager-field">
+            <span>模型 ID</span>
+            <a-input v-model:value="form.model" placeholder="调用时传给 API 的 model 值" allow-clear />
+          </label>
+          <label class="manager-field">
+            <span>Base URL</span>
+            <a-input
+              v-model:value="form.baseUrl"
+              placeholder="http://127.0.0.1:11434/v1"
+              allow-clear
+            />
+          </label>
+          <div class="manager-row">
+            <label class="manager-field">
+              <span>位置</span>
+              <a-select v-model:value="form.location" :options="MODEL_LOCATION_OPTIONS" />
+            </label>
+            <label class="manager-field">
+              <span>提供商</span>
+              <a-select v-model:value="form.provider" :options="MODEL_PROVIDER_OPTIONS" />
+            </label>
+          </div>
+          <label class="manager-field">
+            <span>备注（选填）</span>
+            <a-input v-model:value="form.note" placeholder="用途说明" allow-clear />
+          </label>
+          <label class="manager-field">
+            <span>密钥变量名（选填，只存引用不存值）</span>
+            <a-select v-model:value="form.apiKeyEnv" :options="API_KEY_ENV_OPTIONS" />
+          </label>
+          <label v-if="form.apiKeyEnv" class="manager-field">
+            <span>API Key（选填，写入项目根 .env.local）</span>
+            <a-input-password
+              v-model:value="newModelKey"
+              placeholder="留空则只引用已配置的密钥"
+              autocomplete="off"
+            />
+          </label>
+          <a-button type="primary" block :loading="submitting" @click="submitCustom">
+            添加到列表并选中
+          </a-button>
+        </div>
+
+        <div class="manager-section-title">
+          已添加的自定义模型（{{ customProfiles.length }}）
+        </div>
+        <div v-if="!customProfiles.length" class="manager-empty">
+          暂无。新增后会出现在下拉菜单的「自定义模型」分组。
+        </div>
+        <div v-for="item in customProfiles" :key="item.id" class="manager-item">
+          <div class="manager-item-info">
+            <span class="manager-item-name">{{ item.label }}</span>
+            <span class="manager-item-meta">
+              {{ item.location === 'local' ? '本地' : '云端' }} · {{ item.model }} ·
+              {{ item.baseUrl }}
+            </span>
+            <span class="manager-item-meta">{{ describeCredential(item) }}</span>
+          </div>
+          <a-popconfirm
+            title="删除这个自定义档位？"
+            ok-text="删除"
+            cancel-text="取消"
+            @confirm="onRemove(item.id)"
+          >
+            <a-button danger size="small" type="text">删除</a-button>
+          </a-popconfirm>
+        </div>
+
+        <div class="manager-section-title">本地密钥（项目根 .env.local）</div>
+        <div v-if="!envWritable" class="manager-empty">
+          当前不是本地 dev server，密钥写入端点不可用。请用 npm run dev 启动后在
+          localhost 打开本页面；云端构建不提供该能力。
+        </div>
+        <template v-else>
+          <div v-for="item in LOCAL_ENV_KEYS" :key="item.value" class="env-status-row">
+            <span class="env-status-name">{{ item.value }}</span>
+            <a-tag :color="envStatus[item.value] ? 'green' : 'default'">
+              {{ envStatus[item.value] ? '文件内已配置' : '文件内未配置' }}
+            </a-tag>
+          </div>
+          <div class="manager-row env-write-row">
+            <label class="manager-field">
+              <span>变量名</span>
+              <a-select v-model:value="keyForm.envKey" :options="LOCAL_ENV_KEYS" />
+            </label>
+            <label class="manager-field">
+              <span>密钥值</span>
+              <a-input-password
+                v-model:value="keyForm.value"
+                placeholder="sk-..."
+                autocomplete="off"
+              />
+            </label>
+          </div>
+          <a-button block :loading="savingKey" @click="saveStandaloneKey">
+            保存到 .env.local
+          </a-button>
+          <p class="manager-hint">
+            状态只反映 .env.local 文件本身；系统环境变量里的同名键仍会生效。
+            明文只发给本机 dev server，不保存在浏览器、不进入前端产物；
+            写入后需重启后端与 Agent 才会生效。
+          </p>
+        </template>
+
+        <p class="manager-hint">{{ CUSTOM_HINT }}</p>
+        <p class="manager-hint">{{ SELECTOR_HINT }}</p>
+      </div>
+    </a-modal>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { type MenuProps, message } from 'ant-design-vue'
+import {
+  API_KEY_ENV_OPTIONS,
+  CUSTOM_MODEL_GROUP,
+  LOCAL_ENV_ENDPOINT,
+  LOCAL_ENV_HEADER,
+  LOCAL_ENV_KEYS,
+  describeCredential,
+  isLocalEnvWritable,
+  isModelSelectorVisible,
+  MODEL_LOCATION_OPTIONS,
+  MODEL_PROFILE_GROUPS,
+  MODEL_PROVIDER_OPTIONS,
+  NON_CHAT_MODELS,
+  type CustomModelInput,
+  type ModelProfileGroup,
+} from '@/constants/modelProfiles.ts'
+import { useModelProfileStore } from '@/stores/useModelProfileStore.ts'
+
+const MANAGE_KEY = '__manage-model__'
+const SELECTOR_HINT =
+  '选择仅保存在本地浏览器，供后续评测链读取；后端模型仍由启动环境变量决定，尚未随此按钮切换。'
+const CUSTOM_HINT =
+  '自定义档位只存本浏览器（Python 评测链读不到）；密钥值不存浏览器，统一写入项目根 .env.local。'
+
+interface LocalEnvResponse {
+  ok: boolean
+  keys?: { key: string; configured: boolean }[]
+  error?: string
+}
+
+const visible = isModelSelectorVisible
+const store = useModelProfileStore()
+const selected = computed(() => store.selected)
+const selectedId = computed(() => store.selectedId)
+const customProfiles = computed(() => store.customProfiles)
+
+const groups = computed<ModelProfileGroup[]>(() => {
+  const result = MODEL_PROFILE_GROUPS.map((group) => ({
+    ...group,
+    profiles: [...group.profiles],
+  }))
+  if (customProfiles.value.length) {
+    result.push({ name: CUSTOM_MODEL_GROUP, profiles: customProfiles.value })
+  }
+  return result
+})
+
+const managerOpen = ref(false)
+const form = reactive<CustomModelInput>({
+  label: '',
+  model: '',
+  baseUrl: '',
+  provider: 'ollama',
+  location: 'local',
+  note: '',
+  apiKeyEnv: '',
+})
+const newModelKey = ref('')
+const submitting = ref(false)
+
+const envWritable = ref(isLocalEnvWritable)
+const envStatus = ref<Record<string, boolean>>({})
+const keyForm = reactive({ envKey: LOCAL_ENV_KEYS[0].value, value: '' })
+const savingKey = ref(false)
+
+/** dev server 的本地端点：GET 只取「是否配置」布尔，POST 只发明文值。 */
+async function callLocalEnv(
+  method: 'GET' | 'POST',
+  payload?: { key: string; value: string },
+): Promise<LocalEnvResponse> {
+  if (!LOCAL_ENV_ENDPOINT) throw new Error('当前构建不提供本地密钥端点')
+  const response = await fetch(LOCAL_ENV_ENDPOINT, {
+    method,
+    headers: { 'Content-Type': 'application/json', [LOCAL_ENV_HEADER]: '1' },
+    body: method === 'POST' ? JSON.stringify(payload) : undefined,
+  })
+  let data: LocalEnvResponse
+  try {
+    data = (await response.json()) as LocalEnvResponse
+  } catch {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  if (!response.ok || !data.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+  return data
+}
+
+async function refreshEnvStatus() {
+  if (!envWritable.value) return
+  try {
+    const data = await callLocalEnv('GET')
+    envStatus.value = Object.fromEntries(
+      (data.keys ?? []).map((item) => [item.key, item.configured]),
+    )
+  } catch {
+    // 端点不可达（例如本地 preview 强行显示了组件）时禁用密钥区，不影响档位选择。
+    envWritable.value = false
+  }
+}
+
+/** 返回是否写入成功；明文在请求结束后即清空，不进入任何持久化层。 */
+async function saveEnvKey(key: string, value: string): Promise<boolean> {
+  if (!envWritable.value) {
+    message.warning('当前不是本地 dev server，无法写入密钥')
+    return false
+  }
+  savingKey.value = true
+  try {
+    await callLocalEnv('POST', { key, value })
+    await refreshEnvStatus()
+    message.success(`已写入 .env.local：${key}；重启后端与 Agent 后生效`)
+    return true
+  } catch (error) {
+    message.error(`密钥保存失败：${(error as Error).message}`)
+    return false
+  } finally {
+    savingKey.value = false
+  }
+}
+
+async function saveStandaloneKey() {
+  const value = keyForm.value.trim()
+  if (!value) {
+    message.warning('请填写密钥值')
+    return
+  }
+  const ok = await saveEnvKey(keyForm.envKey, value)
+  if (ok) keyForm.value = ''
+}
+
+function resetForm() {
+  Object.assign(form, {
+    label: '',
+    model: '',
+    baseUrl: '',
+    provider: 'ollama',
+    location: 'local',
+    note: '',
+    apiKeyEnv: '',
+  } satisfies CustomModelInput)
+  newModelKey.value = ''
+}
+
+const onSelect: MenuProps['onClick'] = ({ key }) => {
+  const id = String(key)
+  if (id === MANAGE_KEY) {
+    managerOpen.value = true
+    return
+  }
+  // store 内部按 allProfiles 校验 id，非法 key（含禁用项）会被忽略。
+  store.setSelectedId(id)
+}
+
+async function submitCustom() {
+  if (submitting.value) return
+  const label = form.label.trim()
+  const model = form.model.trim()
+  const baseUrl = form.baseUrl.trim().replace(/\/+$/, '')
+  if (!label || !model || !baseUrl) {
+    message.warning('请填写显示名称、模型 ID 与 Base URL')
+    return
+  }
+  if (!/^https?:\/\//i.test(baseUrl)) {
+    message.warning('Base URL 需以 http:// 或 https:// 开头')
+    return
+  }
+  try {
+    new URL(baseUrl)
+  } catch {
+    message.warning('Base URL 格式不正确')
+    return
+  }
+
+  submitting.value = true
+  try {
+    // 填了 API Key 就先落盘，写入失败则中止新增，避免出现「档位引用了不存在的密钥」。
+    if (form.apiKeyEnv && newModelKey.value.trim()) {
+      const ok = await saveEnvKey(form.apiKeyEnv, newModelKey.value.trim())
+      if (!ok) return
+    }
+    const profile = store.addCustomProfile({
+      label,
+      model,
+      baseUrl,
+      provider: form.provider,
+      location: form.location,
+      note: form.note.trim() || '自定义档位（仅本浏览器）',
+      apiKeyEnv: form.apiKeyEnv || undefined,
+    })
+    store.setSelectedId(profile.id)
+    message.success(`已添加并选中 ${label}`)
+    resetForm()
+    await refreshEnvStatus()
+  } finally {
+    submitting.value = false
+  }
+}
+
+function onRemove(id: string) {
+  store.removeCustomProfile(id)
+  message.success('已删除')
+}
+
+onMounted(() => {
+  void refreshEnvStatus()
+})
+watch(managerOpen, (open) => {
+  if (open) void refreshEnvStatus()
+})
+</script>
+
+<style scoped>
+/*
+ * 紧凑文字触发器：贴合对话窗底部工具条的视觉语言 —— 无边框、无底色，
+ * 只保留模型名 + 位置小字 + 下拉箭头。浅色文案适配 .input-bar 的米色背景。
+ */
+.model-selector {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.model-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b5b3e;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.model-selector-trigger:hover {
+  background: #f0e5d2;
+  color: #3d3226;
+}
+
+.model-selector-trigger:focus-visible {
+  outline: 2px solid #e07a2d;
+  outline-offset: 1px;
+}
+
+.model-selector-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-selector-location {
+  flex: 0 0 auto;
+  color: #a08c68;
+  font-size: 12px;
+}
+
+.model-selector-chevron {
+  flex: 0 0 auto;
+  color: #a08c68;
+  font-size: 10px;
+}
+
+.model-manage-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a14f16;
+  font-size: 13px;
+}
+
+.model-hint {
+  max-width: 300px;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8c8c8c;
+}
+
+.model-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+  padding: 2px 0;
+}
+
+.model-option-name {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.model-option-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8c8c8c;
+}
+
+/* 自定义模型管理弹窗 */
+.model-manager {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.manager-section-title {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3d3226;
+}
+
+.manager-section-title:not(:first-child) {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #efe4d0;
+}
+
+.manager-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manager-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #6b5b3e;
+}
+
+.manager-row {
+  display: flex;
+  gap: 10px;
+}
+
+.manager-empty {
+  padding: 10px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a08c68;
+}
+
+.manager-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: 1px solid #efe4d0;
+  border-radius: 6px;
+  background: #fdf9f1;
+}
+
+.manager-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.manager-item-name {
+  font-size: 13px;
+  color: #3d3226;
+}
+
+.manager-item-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #a08c68;
+}
+
+.env-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+  border-bottom: 1px solid #f3ead9;
+  font-size: 12px;
+  color: #6b5b3e;
+}
+
+.env-status-name {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.env-write-row {
+  margin: 12px 0;
+}
+
+.manager-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8c8c8c;
+}
+</style>
+
+
+--- /dev/null
++++ b/cloud_front/src/constants/modelProfiles.ts
+/**
+ * 模型选择器的模型清单（当前选择的单一事实源）。
+ *
+ * 只收录「生成 / 对话模型」：embedding 与 rerank 模型不能替换问答链路的 LLM，
+ * 误选会造成零切片或重排报错，因此单列在 NON_CHAT_MODELS 中且不可选。
+ *
+ * 凭据契约：档位里只存「密钥变量名」apiKeyEnv，绝不存密钥值。明文由前端管理弹窗
+ * 一次性 POST 给本地 dev server，写入项目根 .env.local（已被 gitignore）；
+ * 后端 / Agent / Python 评测链都从环境变量或该文件读取。
+ *
+ * 自定义档位（用户在界面新增）不入库，只存浏览器 localStorage：
+ * 见 MODEL_CUSTOM_STORAGE_KEY 与 isUsableCustomProfile 的读取校验。
+ */
+
+export type ModelLocation = 'local' | 'cloud'
+export type ModelProvider = 'ollama' | 'deepseek' | 'dashscope' | 'other'
+
+export interface ModelProfile {
+  id: string
+  label: string
+  model: string
+  baseUrl: string
+  provider: ModelProvider
+  location: ModelLocation
+  group: string
+  note: string
+  /** 密钥变量名（引用，不是值）；空或缺省表示无需密钥。 */
+  apiKeyEnv?: string
+}
+
+/** 用户在界面新增档位时填写的字段；id 与 group 由 store 生成。 */
+export type CustomModelInput = Omit<ModelProfile, 'id' | 'group'>
+
+export interface NonChatModel {
+  label: string
+  role: string
+}
+
+/** 浏览器本地保存选中档位的 key；后续评测链如需读取，用同一个 key。 */
+export const MODEL_PROFILE_STORAGE_KEY = 'cloudwiki.selected-model-profile'
+
+/** 用户自定义档位清单的 key（与选中档位分开，避免一份损坏影响另一份）。 */
+export const MODEL_CUSTOM_STORAGE_KEY = 'cloudwiki.custom-model-profiles'
+
+/** 自定义档位在下拉菜单中的分组名。 */
+export const CUSTOM_MODEL_GROUP = '自定义模型'
+
+/** 本地 .env.local 允许写入的键名，与 deploy/.env.example 及云端 GitHub Secrets 对齐。 */
+export const LOCAL_ENV_KEYS: { value: string; label: string }[] = [
+  { value: 'RAG_LLM_API_KEY', label: 'RAG_LLM_API_KEY · 回答生成（DeepSeek）' },
+  { value: 'RAG_EMBEDDING_API_KEY', label: 'RAG_EMBEDDING_API_KEY · DashScope embedding / chat' },
+  { value: 'DEEPSEEK_WEB_API_KEY', label: 'DEEPSEEK_WEB_API_KEY · Agent 联网' },
+]
+
+/** 档位表单可选：不需要密钥，或引用上表中的某个变量名。 */
+export const API_KEY_ENV_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: '不需要密钥（本地 Ollama）' },
+  ...LOCAL_ENV_KEYS,
+]
+
+export const LOCAL_ENV_KEY_NAMES: string[] = LOCAL_ENV_KEYS.map((item) => item.value)
+
+/** 自定义头：dev server 用它挡住跨源简单请求。 */
+export const LOCAL_ENV_HEADER = 'x-cw-local-env'
+
+/**
+ * 写入端点只在 dev server 存在；生产构建把 DEV 折叠成 false，
+ * 端点字符串随之被消除，云端产物里既没有端点也没有调用入口。
+ */
+export const LOCAL_ENV_ENDPOINT: string | null = import.meta.env.DEV ? '/__cw/local-env' : null
+export const isLocalEnvWritable: boolean = LOCAL_ENV_ENDPOINT !== null
+
+export const MODEL_PROVIDER_OPTIONS: { value: ModelProvider; label: string }[] = [
+  { value: 'ollama', label: 'Ollama / 本地推理' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'dashscope', label: 'DashScope' },
+  { value: 'other', label: '其他（OpenAI 兼容端点）' },
+]
+
+export const MODEL_LOCATION_OPTIONS: { value: ModelLocation; label: string }[] = [
+  { value: 'local', label: '本地' },
+  { value: 'cloud', label: '云端' },
+]
+
+/** 列表中只展示变量名，不展示任何密钥值。 */
+export function describeCredential(profile: ModelProfile): string {
+  return profile.apiKeyEnv ? `密钥变量 ${profile.apiKeyEnv}` : '无需密钥'
+}
+
+export const MODEL_PROFILES: ModelProfile[] = [
+  {
+    id: 'local-qwen3-1.7b',
+    label: 'qwen3:1.7b',
+    model: 'qwen3:1.7b',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    provider: 'ollama',
+    location: 'local',
+    group: '本地 · Ollama',
+    note: '基础评测目标，本机已安装（completion / tools / thinking）',
+  },
+  {
+    id: 'cloud-deepseek-flash',
+    label: 'deepseek-flash',
+    model: 'deepseek-flash',
+    baseUrl: 'https://api.deepseek.com',
+    provider: 'deepseek',
+    location: 'cloud',
+    group: '云端 · DeepSeek',
+    note: 'RAG_LLM_FAST_MODEL 默认值；cloud_agent 当前使用',
+    apiKeyEnv: 'RAG_LLM_API_KEY',
+  },
+  {
+    id: 'cloud-deepseek-v4-flash-vision-exp',
+    label: 'deepseek-v4-flash-vision-exp',
+    model: 'deepseek-v4-flash-vision-exp',
+    baseUrl: 'https://api.deepseek.com',
+    provider: 'deepseek',
+    location: 'cloud',
+    group: '云端 · DeepSeek',
+    note: 'RAG_LLM_MODEL 默认值（思考型）',
+    apiKeyEnv: 'RAG_LLM_API_KEY',
+  },
+  {
+    id: 'cloud-qwen3.8-flash',
+    label: 'qwen3.8-flash',
+    model: 'qwen3.8-flash',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    provider: 'dashscope',
+    location: 'cloud',
+    group: '云端 · DashScope',
+    note: 'eval/.env 的 LLM_MODEL；RAG_MULTI_QUERY_MODEL 默认值',
+    apiKeyEnv: 'RAG_EMBEDDING_API_KEY',
+  },
+  {
+    id: 'cloud-qwen3.8-max',
+    label: 'qwen3.8-max',
+    model: 'qwen3.8-max',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    provider: 'dashscope',
+    location: 'cloud',
+    group: '云端 · DashScope',
+    note: '历史答案层实验臂用过，非当前默认配置',
+    apiKeyEnv: 'RAG_EMBEDDING_API_KEY',
+  },
+]
+
+/** 检索链路专用模型：列出来便于核对现状，但不参与对话模型切换。 */
+export const NON_CHAT_MODELS: NonChatModel[] = [
+  { label: 'qwen3.7-text-embedding-flash', role: '云端 embedding' },
+  { label: 'qwen3.7-text-rerank', role: '云端 rerank' },
+  { label: 'qwen3-embedding:4b', role: '本地 embedding' },
+  { label: 'nomic-embed-text:latest', role: '本地 embedding' },
+]
+
+/** 默认使用远程 DeepSeek Flash 档位。 */
+export const DEFAULT_MODEL_PROFILE_ID = 'cloud-deepseek-flash'
+
+export function getModelProfile(id: string): ModelProfile {
+  return MODEL_PROFILES.find((profile) => profile.id === id)
+    ?? MODEL_PROFILES.find((profile) => profile.id === DEFAULT_MODEL_PROFILE_ID)!
+}
+
+/**
+ * localStorage 里的自定义档位是不可信输入：结构损坏、缺字段、id 与内置冲突
+ * 都必须在读取时过滤掉，否则会让选择器白屏或覆盖内置档位。
+ * apiKeyEnv 是可选字段：旧版本档位没有它时仍可用；一旦出现就必须是白名单里的
+ * 变量名，杜绝把任意字符串（更不用说明文密钥）带进调用契约。
+ */
+export function isUsableCustomProfile(value: unknown): value is ModelProfile {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  const providers: string[] = MODEL_PROVIDER_OPTIONS.map((option) => option.value)
+  const baseValid =
+    typeof item.id === 'string' &&
+    item.id.startsWith('custom-') &&
+    typeof item.label === 'string' &&
+    item.label.trim().length > 0 &&
+    typeof item.model === 'string' &&
+    item.model.trim().length > 0 &&
+    typeof item.baseUrl === 'string' &&
+    /^https?:\/\//i.test(item.baseUrl) &&
+    (item.location === 'local' || item.location === 'cloud') &&
+    typeof item.provider === 'string' &&
+    providers.includes(item.provider) &&
+    typeof item.note === 'string' &&
+    typeof item.group === 'string'
+  if (!baseValid) return false
+
+  if (item.apiKeyEnv === undefined) return true
+  if (typeof item.apiKeyEnv !== 'string') return false
+  if (!item.apiKeyEnv) return true
+  return LOCAL_ENV_KEY_NAMES.includes(item.apiKeyEnv)
+}
+
+export interface ModelProfileGroup {
+  name: string
+  profiles: ModelProfile[]
+}
+
+export const MODEL_PROFILE_GROUPS: ModelProfileGroup[] = MODEL_PROFILES.reduce<
+  ModelProfileGroup[]
+>((groups, profile) => {
+  let group = groups.find((item) => item.name === profile.group)
+  if (!group) {
+    group = { name: profile.group, profiles: [] }
+    groups.push(group)
+  }
+  group.profiles.push(profile)
+  return groups
+}, [])
+
+/**
+ * 只在本地显示，云端部署不渲染。
+ * - 本地 dev（vite）：DEV=true，直接显示。
+ * - 云端构建产物（vite build / preview）：DEV=false 且无该变量，组件不会渲染。
+ * - 本地 preview 演示若也要显示，在 cloud_front/.env.local（*.local 已被 gitignore）写：
+ *     VITE_ENABLE_MODEL_SELECTOR=true
+ *   该文件不进版本库，所以云端构建永远拿不到它。
+ * 注意：preview 下即使显示组件，写入端点也不存在，密钥区会自动禁用。
+ */
+export const isModelSelectorVisible: boolean =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_MODEL_SELECTOR === 'true'
+
+
+--- /dev/null
++++ b/cloud_front/src/stores/useModelProfileStore.ts
+import { computed, ref } from 'vue'
+import { defineStore } from 'pinia'
+import {
+  CUSTOM_MODEL_GROUP,
+  DEFAULT_MODEL_PROFILE_ID,
+  MODEL_CUSTOM_STORAGE_KEY,
+  MODEL_PROFILE_STORAGE_KEY,
+  MODEL_PROFILES,
+  getModelProfile,
+  isUsableCustomProfile,
+  type CustomModelInput,
+  type ModelProfile,
+} from '@/constants/modelProfiles.ts'
+
+/** 写 localStorage 失败（隐私模式 / 配额满）时不影响内存态。 */
+function persist(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // 内存中的选择仍然有效。
+  }
+}
+
+/**
+ * 自定义档位：不可信输入，逐项校验并排除与内置档位 id 冲突的项。
+ * 顺带清掉历史上可能写入的 apiKeyMode / apiKeyRef（含明文模式），
+ * 保证浏览器存储里永远只剩变量名引用，不残留任何密钥值。
+ */
+function readCustomProfiles(): ModelProfile[] {
+  try {
+    const raw = window.localStorage.getItem(MODEL_CUSTOM_STORAGE_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const cleaned = parsed
+      .filter(isUsableCustomProfile)
+      .filter((profile) => !MODEL_PROFILES.some((builtin) => builtin.id === profile.id))
+      .map((profile) => {
+        const item = { ...profile } as Record<string, unknown>
+        delete item.apiKeyMode
+        delete item.apiKeyRef
+        return item as unknown as ModelProfile
+      })
+    persist(MODEL_CUSTOM_STORAGE_KEY, JSON.stringify(cleaned))
+    return cleaned
+  } catch {
+    return []
+  }
+}
+
+/** 读回上次选择；无效 id（含已删除的自定义项）或存储不可用时回落到默认档位。 */
+function readStoredId(custom: ModelProfile[]): string {
+  try {
+    const stored = window.localStorage.getItem(MODEL_PROFILE_STORAGE_KEY)
+    if (!stored) return DEFAULT_MODEL_PROFILE_ID
+    return [...MODEL_PROFILES, ...custom].some((profile) => profile.id === stored)
+      ? stored
+      : DEFAULT_MODEL_PROFILE_ID
+  } catch {
+    return DEFAULT_MODEL_PROFILE_ID
+  }
+}
+
+/**
+ * 当前选中的模型档位：内置清单 + 用户自定义清单的唯一事实源。
+ * 任何组件（含后续评测入口）都可以用 useModelProfileStore().selected 读到完整的
+ * baseUrl / model / provider，不需要再各自维护一份模型表。
+ *
+ * 注意：自定义档位只存在本浏览器的 localStorage，Python 评测链读不到；
+ * 若要让评测链使用自定义档位，需另行把该档位同步到评测侧配置（本次未实现）。
+ */
+export const useModelProfileStore = defineStore('modelProfile', () => {
+  const customProfiles = ref<ModelProfile[]>(readCustomProfiles())
+  const allProfiles = computed<ModelProfile[]>(() => [
+    ...MODEL_PROFILES,
+    ...customProfiles.value,
+  ])
+  const selectedId = ref<string>(readStoredId(customProfiles.value))
+  const selected = computed<ModelProfile>(
+    () => allProfiles.value.find((profile) => profile.id === selectedId.value) ?? getModelProfile(DEFAULT_MODEL_PROFILE_ID),
+  )
+
+  function setSelectedId(id: string) {
+    const profile = allProfiles.value.find((item) => item.id === id)
+    if (!profile) return
+    selectedId.value = profile.id
+    persist(MODEL_PROFILE_STORAGE_KEY, profile.id)
+  }
+
+  /** 新增自定义档位，id 带时间戳 + 随机后缀，避免与内置或历史项冲突。 */
+  function addCustomProfile(input: CustomModelInput): ModelProfile {
+    const profile: ModelProfile = {
+      ...input,
+      id: `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      group: CUSTOM_MODEL_GROUP,
+    }
+    customProfiles.value = [...customProfiles.value, profile]
+    persist(MODEL_CUSTOM_STORAGE_KEY, JSON.stringify(customProfiles.value))
+    return profile
+  }
+
+  /** 删除自定义档位；若正选中它则回落到默认档位。内置档位不可删。 */
+  function removeCustomProfile(id: string) {
+    const next = customProfiles.value.filter((profile) => profile.id !== id)
+    if (next.length === customProfiles.value.length) return
+    customProfiles.value = next
+    persist(MODEL_CUSTOM_STORAGE_KEY, JSON.stringify(next))
+    if (selectedId.value === id) setSelectedId(DEFAULT_MODEL_PROFILE_ID)
+  }
+
+  return {
+    selectedId,
+    selected,
+    customProfiles,
+    allProfiles,
+    setSelectedId,
+    addCustomProfile,
+    removeCustomProfile,
+  }
+})
+
+
+--- /dev/null
++++ b/cloud_front/tests/model-profile-default.cjs
+const assert = require('node:assert/strict')
+const path = require('node:path')
+const Module = require('node:module')
+const esbuild = require('esbuild')
+const { createPinia, setActivePinia } = require('pinia')
+
+const frontend = path.resolve(__dirname, '..')
+function load(entry) {
+  const result = esbuild.buildSync({
+    entryPoints: [path.join(frontend, entry)],
+    bundle: true,
+    write: false,
+    platform: 'node',
+    format: 'cjs',
+    external: ['vue', 'pinia'],
+    alias: { '@': path.join(frontend, 'src') },
+    define: {
+      'import.meta.env.DEV': 'true',
+      'import.meta.env.VITE_ENABLE_MODEL_SELECTOR': 'undefined',
+    },
+  })
+  const loaded = new Module(path.join(__dirname, 'in-memory.cjs'), module)
+  loaded.filename = path.join(__dirname, 'in-memory.cjs')
+  loaded.paths = module.paths
+  loaded._compile(result.outputFiles[0].text, loaded.filename)
+  return loaded.exports
+}
+
+const profiles = load('src/constants/modelProfiles.ts')
+const { useModelProfileStore } = load('src/stores/useModelProfileStore.ts')
+const expected = 'cloud-deepseek-flash'
+const local = 'local-qwen3-1.7b'
+
+assert.equal(profiles.DEFAULT_MODEL_PROFILE_ID, expected, 'default ID')
+assert.equal(profiles.getModelProfile('unknown-id').id, expected, 'unknown profile')
+assert.equal(profiles.getModelProfile(local).id, local, 'known local profile')
+
+function makeStore(selected, unavailable = false) {
+  const values = new Map()
+  if (selected !== null) values.set(profiles.MODEL_PROFILE_STORAGE_KEY, selected)
+  global.window = {
+    localStorage: {
+      getItem(key) {
+        if (unavailable) throw new Error('storage unavailable')
+        return values.get(key) ?? null
+      },
+      setItem(key, value) {
+        if (unavailable) throw new Error('storage unavailable')
+        values.set(key, value)
+      },
+    },
+  }
+  setActivePinia(createPinia())
+  return useModelProfileStore()
+}
+
+assert.equal(makeStore(null).selected.id, expected, 'no stored selection')
+assert.equal(makeStore('unknown-id').selected.id, expected, 'invalid stored ID')
+assert.equal(makeStore(null, true).selected.id, expected, 'storage unavailable')
+const saved = makeStore(local)
+assert.equal(saved.selected.id, local, 'valid stored selection')
+saved.selectedId = 'no-longer-present'
+assert.equal(saved.selected.id, expected, 'selection no longer exists')
+
+const store = makeStore(null)
+const custom = store.addCustomProfile({
+  label: 'Test', model: 'test', baseUrl: 'http://localhost',
+  provider: 'other', location: 'local', note: '',
+})
+store.setSelectedId(custom.id)
+assert.equal(store.selected.id, custom.id, 'custom profile selected before deletion')
+store.removeCustomProfile(custom.id)
+assert.equal(store.selected.id, expected, 'selected custom profile deleted')
+assert.equal(store.selectedId, expected, 'default ID selected after deletion')
+
+console.log('Model profile defaults: A1 and A2 passed')
+
+
+--- /dev/null
++++ b/cloud_front/vite/localEnvPlugin.ts
+import { fileURLToPath, URL } from 'node:url'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { Plugin } from 'vite'
+
+/** 本文件位于 cloud_front/vite/，上两级即项目根（与 start-dev.ps1 的 $root 一致）。 */
+const ROOT_DIR = fileURLToPath(new URL('../../', import.meta.url))
+const LOCAL_ENV_FILE = path.join(ROOT_DIR, '.env.local')
+const ENV_EXAMPLE_FILE = path.join(ROOT_DIR, 'deploy', '.env.example')
+
+export const LOCAL_ENV_ENDPOINT = '/__cw/local-env'
+export const LOCAL_ENV_HEADER = 'x-cw-local-env'
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+
+/** 可写入的键名来自云端同一份登记表，避免前端写入任意环境变量或 VITE_ 前缀。 */
+function readAllowedKeys(): Set<string> {
+  if (!fs.existsSync(ENV_EXAMPLE_FILE)) return new Set()
+  return new Set(
+    fs.readFileSync(ENV_EXAMPLE_FILE, 'utf8')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#') && line.includes('='))
+      .map((line) => line.split('=', 1)[0].trim())
+      .filter((key) => key.endsWith('_API_KEY') && !key.startsWith('VITE_'))
+  )
+}
+
+function readLocalEnv(): Map<string, string> {
+  const result = new Map<string, string>()
+  if (!fs.existsSync(LOCAL_ENV_FILE)) return result
+  for (const line of fs.readFileSync(LOCAL_ENV_FILE, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+    const [key, ...rest] = trimmed.split('=')
+    result.set(key.trim(), rest.join('=').trim())
+  }
+  return result
+}
+
+/** upsert 单个键，保留注释、顺序与其余键；先写临时文件再 rename。 */
+function upsertLocalEnv(key: string, value: string): void {
+  const lines = fs.existsSync(LOCAL_ENV_FILE)
+    ? fs.readFileSync(LOCAL_ENV_FILE, 'utf8').split(/\r?\n/)
+    : []
+  let hit = false
+  const next = lines.map((line) => {
+    if (line.trimStart().startsWith(`${key}=`)) {
+      hit = true
+      return `${key}=${value}`
+    }
+    return line
+  })
+  if (!hit) next.push(`${key}=${value}`)
+  const content = next.join('\n').replace(/\s+$/, '') + '\n'
+  const tmp = `${LOCAL_ENV_FILE}.${process.pid}.tmp`
+  try {
+    fs.writeFileSync(tmp, content, 'utf8')
+    fs.renameSync(tmp, LOCAL_ENV_FILE)
+  } finally {
+    if (fs.existsSync(tmp)) fs.unlinkSync(tmp)
+  }
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.statusCode = status
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-store')
+  res.end(JSON.stringify(body))
+}
+
+/**
+ * 仅本机、仅开发页面可调用：
+ * - loopback 排除局域网直接访问；
+ * - Origin 校验挡住恶意网页向 127.0.0.1 发请求（DNS rebinding 类）；
+ * - 自定义头让跨源简单请求无法直达（需预检且预检也会被 Origin 拒绝）。
+ */
+function isTrustedLocalRequest(req: IncomingMessage): boolean {
+  if (!LOOPBACK_ADDRESSES.has(req.socket.remoteAddress ?? '')) return false
+  const origin = String(req.headers.origin ?? '')
+  if (origin && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return false
+  return req.headers[LOCAL_ENV_HEADER] === '1'
+}
+
+async function readBody(req: IncomingMessage): Promise<string> {
+  let data = ''
+  for await (const chunk of req) {
+    data += chunk
+    if (data.length > 4096) throw new Error('body too large')
+  }
+  return data
+}
+
+/**
+ * 浏览器无法写磁盘，但 dev server 是 Node 进程。前端「模型管理」把明文 POST 到这里，
+ * 由它 upsert 到项目根 .env.local（已被 gitignore）；响应只回「是否配置」布尔，不回传值。
+ * apply:'serve' + configureServer 保证 build / preview 不注册该端点，云端产物零端点。
+ */
+export function localEnvPlugin(): Plugin {
+  return {
+    name: 'cloudwiki-local-env',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(LOCAL_ENV_ENDPOINT, (req, res) => {
+        if (!isTrustedLocalRequest(req)) {
+          sendJson(res, 403, { ok: false, error: '仅允许本机开发页面调用' })
+          return
+        }
+        if (req.method === 'GET') {
+          const current = readLocalEnv()
+          const keys = [...readAllowedKeys()].map((key) => ({
+            key,
+            configured: (current.get(key) ?? '').length > 0,
+          }))
+          sendJson(res, 200, { ok: true, keys })
+          return
+        }
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { ok: false, error: 'method not allowed' })
+          return
+        }
+        void (async () => {
+          let raw: string
+          try {
+            raw = await readBody(req)
+          } catch {
+            sendJson(res, 400, { ok: false, error: '请求体过大' })
+            return
+          }
+          let payload: { key?: unknown; value?: unknown }
+          try {
+            payload = JSON.parse(raw || '{}') as { key?: unknown; value?: unknown }
+          } catch {
+            sendJson(res, 400, { ok: false, error: '请求体解析失败' })
+            return
+          }
+          const key = typeof payload.key === 'string' ? payload.key.trim() : ''
+          const value = typeof payload.value === 'string' ? payload.value.trim() : ''
+          if (!readAllowedKeys().has(key)) {
+            sendJson(res, 400, { ok: false, error: '键名不在允许清单内' })
+            return
+          }
+          if (!value || value.length > 512 || /[\r\n]/.test(value)) {
+            sendJson(res, 400, { ok: false, error: '密钥值不合法' })
+            return
+          }
+          try {
+            upsertLocalEnv(key, value)
+          } catch {
+            sendJson(res, 500, { ok: false, error: '写入本地密钥文件失败' })
+            return
+          }
+          sendJson(res, 200, { ok: true, key, configured: true })
+        })()
+      })
+    },
+  }
+}
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/.openspec.yaml
+schema: spec-driven
+created: 2026-11-04
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/README.md
+# add-model-selector
+
+前端模型档位选择器：本地 Ollama 与云端模型清单、构建期显隐、选中状态持久化，为后续本地模型基础评测提供档位读取口
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/design.md
+# Design
+
+## Context
+
+`cloud` / `cloud_agent` 的 LLM 由启动期环境变量 `RAG_LLM_BASE_URL` / `RAG_LLM_API_KEY` / `RAG_LLM_FAST_MODEL` / `RAG_LLM_MODEL` 固定，`application.yml` 注释给出本地 Ollama 切换示例；`cloud_front` 无 `.env` 文件，`import.meta.env` 仅用于 router 的 BASE_URL，`vite.config.ts` 注明云端走 `preview` 打包产物且 `server.host: '0.0.0.0'` + `allowedHosts: true`。`AiAssistantPage.vue` 的 `.input-bar` 是单行 flex，项目已全局 `app.use(Antd)`。本机 Ollama 已安装 `qwen3:1.7b` 及两个 embedding 模型。
+
+密钥现状经取证：根 `.env.dev` 只有 `RAG_EMBEDDING_API_KEY` / `DEEPSEEK_WEB_API_KEY`；`eval/.env` 有 14 个键，其中 `LLM_API_KEY` / `EMBEDDING_API_KEY` 与前者实测同值（同一把 DashScope key 的三份副本）；系统用户级环境变量另有 `RAG_LLM_API_KEY`。`start-dev.ps1` 的 `Import-DevEnvFile` 逐行 `Set-Item Env:<KEY>` 注入进程环境；`lib_eval.load_env()` 只读 `eval/.env` 到 dict，`smoke_test.py` 又自带一份独立解析；`prepare_keys.py` 会往 `eval/.env` 写回 `EVAL_*_API_KEY`。云端由 GitHub Actions Secrets 生成服务器 `.env`，变量名登记表为入库的 `deploy/.env.example`。
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- 给本机一个可见、可切换、可持久化的模型档位入口，并让后续评测链有唯一读取口。
+- 用户不写代码即可新增、查看、删除自定义模型档位，且不影响内置档位。
+- 选择器贴合对话窗视觉语言：紧凑文字触发器，位于提问动作附近，不占用全局导航。
+- 云端部署零可见变化、零接口变化；显隐开关不能被误判为恒 false 的假阳性。
+- 模型 API key 在本地只存一份、只用一个名字；前端界面填写的 key 能被可靠「记忆」到本地文件，并被后端启动脚本与 Python 评测链读到。
+- 明文密钥不进入浏览器存储、不进入前端产物、不进入版本库；写入能力在云端构建中完全不存在。
+
+**Non-Goals:**
+
+- 不实现运行时按请求切换后端模型（属改请求契约，需另行 L2 change）。
+- 不搭建 BrowseComp-ZH 评测链、不写判分、不跑模型、不做微调。
+- 不评测云端模型效果；云端模型仅列出以便核对现状。
+- 不实现自定义档位导出为评测侧配置文件（用户选择「界面里直接新增/删除」；档位仍只存浏览器）。
+- 不把本地 `.env.local` 与云端 GitHub Secrets 打通 —— 两者只统一变量名，值各自独立。
+- 不引入新依赖；不改发送按钮、输入框与流式交互逻辑；不改 CI / compose / 生产接口。
+
+## Decisions
+
+1. **显隐用双条件 `import.meta.env.DEV || import.meta.env.VITE_ENABLE_MODEL_SELECTOR === 'true'`，而非单一 `DEV`。**
+   理由：云端走正式构建 + preview，本地 preview 演示同样 `DEV=false`；只看 `DEV` 会误隐藏。构建期静态折叠，云端无该变量时为 false。开启方式写入 `cloud_front/.env.local`（`*.local` 已忽略），云端构建拿不到。
+
+2. **模型清单作为单一事实源，每项自带 `baseUrl` + `model`。**
+   理由：后续评测 runner 按档位调用；两处各维护一份表会出现「前端切了、评测没切」的假对照。
+
+3. **embedding / rerank 模型列出但禁用。**
+   理由：不能替换问答链路 LLM，误选会造成零切片或重排报错；列出便于核对现状。
+
+4. **状态用 pinia + localStorage，选中档位 key 为 `cloudwiki.selected-model-profile`。**
+   理由：与项目 store 风格一致；刷新保持；读取校验 id 有效性，无效回落默认。
+
+5. **默认档位 = 远程 `deepseek-flash`（`cloud-deepseek-flash`）。** 保留已有有效选择；无有效选择及删除当前自定义档位时回落该默认值。本地 `qwen3:1.7b` 仍为可选的基础评测目标。
+
+6. **挂载在 AI 助手对话窗口 `.input-bar` 底部工具条，而非全局头部。** 档位是关于「这一轮对话用什么模型」的上下文。全局头部最终不改动。
+
+7. **工具条用 `display: contents` 作为云端回落，保证布局零变化。** 仅 `with-model-selector` class 存在时切换为两行。
+
+8. **触发器用无边框原生 button + `placement="topLeft"` 向上展开。** 贴合对话窗紧凑文字形态，避免视口底部裁切。
+
+9. **界面明示「后端尚未随按钮切换」。** 最重要的防误导边界。
+
+10. **自定义档位存独立 localStorage key `cloudwiki.custom-model-profiles`。** 两份数据生命周期与校验规则不同；代价是 Python 评测链读不到，界面双处明示。
+
+11. **自定义清单按不可信输入逐项校验，删除当前选中项时回落默认。** `isUsableCustomProfile` 校验字段完整性、`http(s)` 协议、`custom-` 前缀、枚举值；非数组或 JSON 损坏整体回落空列表。
+
+12. **新增与删除集中在同一个管理弹窗。** 避免菜单项内联删除与 `a-menu-item` 选中事件冲突。
+
+13. **档位只存 `apiKeyEnv` 变量名引用，删除 `apiKeyMode` / `apiKeyRef` 及 literal 明文模式。**
+    理由：浏览器 localStorage 可被 XSS、扩展、本机其他用户、浏览器同步读走；且 Python 评测链读不到浏览器存储，存明文既不解决统一问题又新增泄露面。内置云端档位按实际凭据登记 `RAG_LLM_API_KEY` / `RAG_EMBEDDING_API_KEY`，本地 Ollama 无字段。`isUsableCustomProfile` 只接受白名单变量名，拒绝明文；store 读取时清洗历史 `apiKeyMode` / `apiKeyRef` 并回写，确保浏览器里不残留任何密钥值。
+
+14. **密钥合并范围 = 只合并模型 API key，评测专属配置留 `eval/.env`。**
+    理由：`eval/.env` 14 个键里只有 5 个是凭据类，其余是 DB / URL / 模型名；`prepare_keys.py` 还会写回 `EVAL_*_API_KEY` 到该文件。全量合并会让 `DB_*` / `EVAL_*` 被注入后端进程环境 —— 项目已被 `SERVER__PORT` 被 Spring relaxed binding 误认成 `server.port` 坑过。因此 `.env.local` 只放 `RAG_LLM_API_KEY` / `RAG_EMBEDDING_API_KEY` / `DEEPSEEK_WEB_API_KEY`（以 `deploy/.env.example` 为白名单），`eval/.env` 删除两份重复 key 后保留 12 个评测专属键，`prepare_keys.py` 无需改动。
+
+15. **「前端写入 .env」通过 Vite dev server 代写，而不是浏览器直接写文件。**
+    理由：浏览器 JS 没有任意路径磁盘权限，File System Access API 需每次用户手势、仅 Chromium、拿不到固定路径。Vite dev server 是 Node 进程且前端本就与它同源通信，用 `configureServer` 挂一个 `POST /__cw/local-env` 即可。`LOCAL_ENV_ENDPOINT` 写成 `import.meta.env.DEV ? '/__cw/local-env' : null`，生产构建折叠为 `null`，端点字符串一并从产物消失（实测三种构建均 0 命中）。
+
+16. **写入端点四层防护 + 白名单 + 原子 upsert。**
+    理由：`vite.config.ts` 监听 `0.0.0.0` 且 `allowedHosts: true`，能写磁盘的端点必须收紧。校验 `remoteAddress` 仅 loopback（挡局域网）、`Origin` 仅 localhost/127.0.0.1（挡恶意网页向 127.0.0.1 发请求 / DNS rebinding）、自定义头 `x-cw-local-env`（挡跨源简单请求）；键名白名单从 `deploy/.env.example` 动态解析（拒绝 `VITE_*`、`DB_PASSWORD`、任意未登记键）；值拒绝空、换行注入、>512 字符；写临时文件再 `rename` 以保留注释与其余键。响应只回 `{ok, key, configured}`，`GET` 只回布尔状态，绝不回传明文。
+
+17. **`start-dev.ps1` 加注入白名单与空值跳过。**
+    理由：`.env.local` 只注入 `^(RAG_|DEEPSEEK_)[A-Z0-9_]+$`，保留原有 `RAG_*` 覆盖能力，同时排除会被 relaxed binding 误认的键。关键回归：系统用户级环境变量已提供 `RAG_LLM_API_KEY`（实测 35 位），若把文件中留空的同名键注入进程环境，会把系统值覆盖成空并导致 `/ask` 报「LLM 未配置」；因此 `.env.local` 不登记空键，脚本也跳过空值。
+
+18. **`lib_eval.load_env()` 统一优先级 `os.environ` > 根 `.env.local` > `eval/.env`，并填充旧名别名。**
+    理由：`lib_eval.py:103` 用 `cfg["LLM_API_KEY"]` 直接索引、20+ 脚本调用 `load_env()`，逐个改调用点风险大且易漂移。由 `load_env()` 从 `RAG_EMBEDDING_API_KEY` 自动 `setdefault` 出 `LLM_API_KEY` / `EMBEDDING_API_KEY`，历史脚本零改动；`smoke_test.py` 删掉自带的独立解析改为复用同一函数，避免合并后静默读不到密钥。别名用 `setdefault`，旧配置里若仍有旧名则旧名优先（向后兼容）。
+
+19. **先补 gitignore，再写密钥文件。** 实测 `git check-ignore -v .env.local` 在改动前返回 exit 1 —— 根 `.gitignore` 只有 `.env.dev` / `eval/.env`，`*.local` 规则在 `cloud_front/.gitignore` 里只覆盖前端子目录。若不先补规则，一次 `git add -A` 就会把新密钥文件推上去。
+
+## Risks / Trade-offs
+
+- [按钮被误认为已切换后端模型] → title 与菜单底部固定提示；本次仍未改变请求契约。
+- [自定义档位被误认为评测链可用] → 菜单与弹窗双处明示；档位仍只存浏览器。
+- [显隐开关恒 false 假阳性] → 三态变异检验：无变量 `Kt=!1` → 注入变量 `Kt=!0` → 恢复 `Kt=!1`（压缩变量名历次为 `LWe` / `At` / `Rt` / `Kt`）。
+- [端点残留在云端产物] → `LOCAL_ENV_ENDPOINT` 生产折叠为 `null`；三种构建产物端点字符串 0 命中；preview 实测 `POST` 返回 404 且响应不是端点 JSON。
+- [越权或非法输入写坏 `.env.local`] → 四层防护 + 白名单 + 原子写；31 项端到端用例覆盖缺头、恶意 Origin、`VITE_*`、`DB_PASSWORD`、未登记键、换行注入、空值、超长值、错误方法，且验证「拒绝时文件未改动」。
+- [系统用户级同名变量被空值覆盖] → 见决策 17；`.env.local` 不登记空键，脚本跳过空值。
+- [历史评测脚本读不到迁移后的密钥] → 旧名别名 + `smoke_test.py` 复用；实测 `load_env()` 17 个键齐全、别名同源、评测配置仍在、`os.environ` 覆盖生效。
+- [根 `.env.local` 误入库] → 已补 `.gitignore:47` 并用 `git check-ignore` 复核命中。
+- [写入后误以为立即生效] → 界面明示「重启后端与 Agent 后生效」；`start-dev.ps1` 只在启动期注入，Python 评测链每次重跑重读无此问题。
+- [状态显示误导] → 密钥区「已配置/未配置」注明只反映 `.env.local` 文件本身，系统环境变量同名键仍会生效。
+- [删除 `.env.dev` 断链] → 迁移前逐字节备份到工作区外；`eval/tmp/rerank-probe.py` 等临时脚本仍引用旧路径，属可接受的本地临时资产失效，已在交付说明中列明。
+
+## Migration Plan
+
+1. 迁移前把 `.env.dev`、`eval/.env`、`start-dev.ps1`、`lib_eval.py` 等九个将改动文件逐字节备份到工作区外 `/tmp/cloudwiki-env-backup-20261104/`。
+2. 先补根 `.gitignore` 的 `.env.local`，再由脚本校验三份同源后生成根 `.env.local`；精简 `eval/.env` 的两行重复 key；删除旧 `.env.dev`。
+3. 改加载链与写入端点，跑类型检查、构建、端到端验证；真实 `.env.local` 在写入验证中用占位串，验证结束逐字节恢复。
+4. 云端零迁移：CI、compose、`application.yml` 的 `${...}` 绑定与服务器 `.env` 均不改动，变量名本来就一致。
+5. 回滚：从备份恢复 `.env.dev` / `eval/.env`，撤回源码与文档改动，删除 `.env.local` 与新增前端文件；无需回退数据库或部署配置。
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/proposal.md
+# Proposal
+
+## Why
+
+后续 BrowseComp-ZH 基础评测只评测本机 Ollama `qwen3:1.7b`，需要一个可查看、可切换、可持久化的模型档位入口；当前后端 LLM 完全由启动期环境变量固定，前端没有模型清单，也没有可被评测链读取的统一档位事实源。内置清单无法覆盖用户后续自行安装/接入的模型，因此还需要一个不写代码即可新增与删除档位的界面入口。
+
+同时，本地密钥存放长期混乱：同一把 DashScope key 以三个名字存在三处 —— 根 `.env.dev` 的 `RAG_EMBEDDING_API_KEY`、`eval/.env` 的 `LLM_API_KEY` 与 `EMBEDDING_API_KEY`；此外系统用户级环境变量还单独提供了 `RAG_LLM_API_KEY`。云端则是 GitHub Actions Secrets → 服务器 `/opt/cloudwiki/.env`，变量名以入库的 `deploy/.env.example` 为登记表。用户明确提出「在前端会话界面存进去的 APIKEY 也能被记忆到 .env」，并拍板：**保留现有 `RAG_*` 变量名、密钥合并到一份项目根 `.env.local`、评测专属非密钥配置留在 `eval/.env`**。
+
+## What Changes
+
+- 新增前端模型档位清单常量：列出本机 Ollama 与云端 DeepSeek / DashScope 的对话（生成）模型，每项带 `baseUrl` / `model` / `provider` / `location`；embedding 与 rerank 模型单列且不可选。
+- 在 AI 助手对话窗口的 `.input-bar` 底部工具条新增模型选择下拉：无边框紧凑文字触发器（模型名 + 本地/云端小字 + 下拉箭头），向上展开，分组展示，默认选中远程 `deepseek-flash`，选择持久化到 localStorage。
+- 新增自定义模型档位的界面入口与「新增 / 管理模型」弹窗：可填写名称、模型 ID、Base URL、位置、提供商、备注与**密钥变量名**；新增后立即选中，已添加项可删除，删除当前选中项回落默认档位；内置档位不可编辑、不可删除。
+- 档位中的凭据字段统一为 `apiKeyEnv`（**只存变量名引用，绝不存密钥值**）；内置云端档位按其实际凭据登记对应变量名。自定义清单按不可信输入逐项校验，并清洗历史版本可能残留的明文凭据字段。
+- 构建期显隐规则：本地 dev 显示；标准生产构建 / preview 不渲染；本地 preview 可用未入库的 `cloud_front/.env.local` 显式开启。云端不渲染时输入栏工具条以 `display: contents` 回落，保证云端布局零可见变化。
+- **新增本地密钥统一文件**：项目根 `.env.local`（已补 gitignore）只存放模型 API key，变量名与云端 Secrets / `deploy/.env.example` 对齐；`eval/.env` 只保留评测专属的 DB / URL / 模型名 / `EVAL_*` 凭据；删除旧 `.env.dev`（迁移前备份到工作区外）。
+- **新增仅 dev 生效的写入端点**：浏览器无法写磁盘，由 Vite dev server 的 `configureServer` 插件把管理弹窗提交的明文 upsert 到根 `.env.local`；键名白名单取自 `deploy/.env.example`，校验 loopback / Origin / 自定义头 / 值合法性与长度，原子写保留注释和其余键；`GET` 只返回「是否配置」布尔，不回传值。`apply: 'serve'` 保证 build / preview 不注册端点。
+- **统一本地加载链**：`start-dev.ps1` 改读根 `.env.local`，只注入 `RAG_*` / `DEEPSEEK_*` 并跳过空值（避免覆盖系统用户级同名变量）；`lib_eval.load_env()` 改为 `os.environ` 优先 → 根 `.env.local` → `eval/.env`，并自动填充旧名 `LLM_API_KEY` / `EMBEDDING_API_KEY`，使全部历史脚本零改动；`smoke_test.py` 不再自带独立解析，复用同一函数。
+- 同步更正现役注释：`application.yml` 的密钥注入说明、`docs/asset-registry.md` 的无版本保护资产登记、`eval/README.md` 的配置表。
+- 明确边界：本次不改变后端按请求选择模型、不改任何生产请求契约；前端档位只存本地偏好，界面明示「后端尚未随按钮切换」。密钥写入仅本机开发期可用，云端 GitHub Secrets 是另一份物理存储，**只统一变量名、不统一密钥值**；写入后需重启后端与 Agent 才生效，界面明示。
+
+## Capabilities
+
+### New Capabilities
+
+- `model-profile-selector`: 前端模型档位清单、分组展示、选择持久化、界面新增与删除自定义档位、对话输入栏内的紧凑呈现、云端隐身与布局回落，以及供后续评测链读取的档位与凭据引用契约。
+- `local-env-secrets`: 本地模型密钥的单文件存放与统一变量名、仅开发期的写入端点、跨本地运行时（启动脚本 / Python 评测链）的一致加载顺序、越权与非法输入拒绝、云端隔离。
+
+### Modified Capabilities
+
+无。全局头部布局（`wiki-layout`）与 AI 助手（`ai-assistant-chat`）的既有需求不变；发送 / 停止按钮与输入框交互保持原样。`cloud` / `cloud_agent` 的 `${RAG_*}` 绑定、`deploy/`、CI workflow 与 `docker-compose.yml` 均不改动。
+
+## Impact
+
+L1 标准流程。前端侧：`cloud_front/` 新增 4 个文件（常量、store、组件、`vite/localEnvPlugin.ts`），修改 `vite.config.ts` 与 `AiAssistantPage.vue`，`GlobalHeader.vue` 无改动。本地链路侧：修改 `.gitignore`、`start-dev.ps1`、`eval/scripts/lib_eval.py`、`eval/scripts/smoke_test.py` 及三处文档注释；新增本地不入库的根 `.env.local`，精简本地不入库的 `eval/.env`，删除本地不入库的旧 `.env.dev`（迁移前已逐字节备份到工作区外 `/tmp/cloudwiki-env-backup-20261104/`）。
+
+可明确排除生产接口、数据库、CI/CD、公开 API 与权限模型影响：新增端点由 `apply: 'serve'` 与 `configureServer` 限定在开发期，preview 实测返回 404、生产产物无端点字符串；云端构建不依赖任何未入库文件；密钥值只落在已 gitignore 的本机文件。回滚：恢复备份的 `.env.dev` 与 `eval/.env`、撤回上述源码与文档改动、删除新增文件与根 `.env.local`；无需回退数据库或部署配置。
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/specs/local-env-secrets/spec.md
+# Spec Delta
+
+## Purpose
+
+Consolidates local model API keys into one gitignored project-root file using the same variable names as the cloud deployment, lets the local development UI write a key into that file, and makes the local startup script and the Python evaluation runner resolve configuration through one consistent order. Cloud secrets remain a separate physical store.
+
+## ADDED Requirements
+
+### Requirement: Single local secrets file with unified variable names
+
+The system SHALL keep model API keys in exactly one local file at the project root, and that file SHALL be ignored by Git. Its variable names SHALL match the names registered in the deployment environment example, so that local and cloud deployments differ only in values, not in names. Configuration that is specific to the evaluation runner — database connection settings, base URLs, model names, and evaluation API keys — SHALL remain in the evaluation environment file. The obsolete local secrets file SHALL be removed after its contents are migrated.
+
+#### Scenario: One key, one name
+- **WHEN** a developer inspects the local configuration files
+- **THEN** each model API key appears once, under its deployment-registered variable name
+- **AND** the evaluation environment file contains only evaluation-specific configuration
+
+#### Scenario: Secrets file is never tracked
+- **WHEN** Git evaluates the project-root local secrets file
+- **THEN** the ignore rules match that path and the file cannot be committed by a broad add command
+
+#### Scenario: Existing keys survive migration
+- **WHEN** the migration reads the obsolete local secrets file and the evaluation environment file
+- **THEN** it verifies the duplicated key values are identical before creating the new file
+- **AND** no key value is lost by the migration
+
+### Requirement: Development-only local write endpoint
+
+The system SHALL expose a local endpoint during development that accepts a model API key value and upserts it into the project-root local secrets file. The endpoint SHALL be registered only for the development server; a production build or a preview server SHALL NOT expose it. The front-end SHALL derive the endpoint from a development-only constant that is eliminated from production artifacts. Writing a key SHALL preserve comments, ordering, and all other keys in the file, and SHALL be performed through an atomic replacement.
+
+#### Scenario: Key is written and readable downstream
+- **WHEN** a developer submits a valid key through the local development UI
+- **THEN** the key is upserted into the project-root local secrets file
+- **AND** the evaluation configuration loader resolves that same value on its next invocation
+
+#### Scenario: Preview has no endpoint
+- **WHEN** the built frontend is served by the preview server and the local endpoint path is requested
+- **THEN** the response is not the endpoint's JSON payload and the endpoint is unavailable
+
+#### Scenario: Production artifact has no endpoint
+- **WHEN** a standard production build is produced
+- **THEN** its assets contain no local endpoint string and no callable write entry point
+
+#### Scenario: Other keys and comments survive a write
+- **WHEN** a key is written into an existing local secrets file
+- **THEN** all comments and all other key-value lines remain intact
+- **AND** the written key appears exactly once with no duplicate line
+
+### Requirement: Rejection of untrusted local writes
+
+The local write endpoint SHALL accept only loopback connections whose Origin is a localhost address and whose request carries a designated custom header. It SHALL accept only key names present in the deployment environment example's model API key allowlist, and SHALL reject `VITE_`-prefixed names, evaluation-specific names, and any unregistered name. It SHALL reject empty values, values containing line breaks, and values above the documented length limit. Status responses SHALL contain only boolean configuration state and SHALL NOT echo the key value.
+
+#### Scenario: Untrusted requests are refused
+- **WHEN** a request lacks the custom header, carries a foreign Origin, or arrives from a non-loopback address
+- **THEN** the endpoint refuses the request and the secrets file is unchanged
+
+#### Scenario: Disallowed names and malformed values are refused
+- **WHEN** a request contains an unregistered key name, a `VITE_` name, a line break, an empty value, or an overlong value
+- **THEN** the endpoint returns a client error and the secrets file is unchanged
+
+#### Scenario: No plaintext in responses
+- **WHEN** a read or write request succeeds
+- **THEN** the response contains only the allowlisted names and their configured booleans, never a key value
+
+### Requirement: Consistent local configuration loading
+
+The development startup script SHALL read the project-root local secrets file and inject only model-related `RAG_*` and `DEEPSEEK_*` variables into the backend and agent process environments, skipping empty values so that a system-level variable of the same name is not overwritten. The Python evaluation configuration loader SHALL resolve values in the order of process environment, then the project-root local secrets file, then the evaluation environment file. It SHALL populate the historical `LLM_API_KEY` and `EMBEDDING_API_KEY` names from the unified DashScope key so existing scripts continue to work unchanged. Evaluation scripts that previously parsed the evaluation environment file themselves SHALL use the shared loader instead.
+
+#### Scenario: Startup injection respects system variables
+- **WHEN** the local secrets file omits a model key that is present in the system user environment
+- **THEN** the startup script does not inject an empty override and the system value remains effective
+
+#### Scenario: Startup injection is scoped
+- **WHEN** the local secrets file contains any non-model variable
+- **THEN** the startup script does not inject it into the backend process environment
+
+#### Scenario: Historical scripts keep working
+- **WHEN** an existing evaluation script calls the shared configuration loader
+- **THEN** it receives both the unified `RAG_*` names and the historical `LLM_API_KEY` / `EMBEDDING_API_KEY` aliases
+- **AND** all evaluation-specific settings are still present
+
+#### Scenario: Process environment takes precedence
+- **WHEN** a model key is set in the process environment and also present in the local secrets file
+- **THEN** the loader resolves the process environment value
+
+### Requirement: Cloud isolation and no plaintext leakage
+
+Cloud deployment secrets SHALL continue to originate from CI secrets and the server-side environment file; the local secrets file SHALL NOT be uploaded, referenced by deployment configuration, or required by a cloud build. No API key value SHALL be written into browser storage, a committed file, a build artifact, or an evaluation result. The UI SHALL state that writing a key locally requires restarting the backend and agent, and that cloud builds do not provide the local write capability.
+
+#### Scenario: Cloud build is independent of local secrets
+- **WHEN** a cloud build runs without any project-root local secrets file
+- **THEN** the build succeeds and the deployed configuration is unchanged
+
+#### Scenario: Restart notice
+- **WHEN** a developer saves a key through the local development UI
+- **THEN** the UI states that the backend and agent must be restarted before the new value takes effect
+
+#### Scenario: No value in browser or artifact
+- **WHEN** a key is submitted from the management dialog
+- **THEN** the value appears only in the gitignored local secrets file
+- **AND** it is absent from browser storage, response bodies, and production assets
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/specs/model-profile-selector/spec.md
+# Spec Delta
+
+## Purpose
+
+Gives local developers one persistent place to view and select the model profiles configured for this project (local Ollama and cloud providers), lets them add and remove their own profiles from the UI, keeps the deployed cloud interface unchanged, and supplies a single source of truth that a later evaluation run can read instead of maintaining a second model inventory. Credentials are represented only by variable-name references, never by values stored in the browser.
+
+## ADDED Requirements
+
+### Requirement: Local-only selector visibility
+
+The system SHALL render the model profile selector in the AI assistant chat composer's input bar only in local development mode, or when the explicitly documented local opt-in build variable is set to true. The system SHALL NOT render the selector in a standard production build, and SHALL NOT require any untracked configuration file in order to build for deployment.
+
+#### Scenario: Local development mode
+- **WHEN** a developer opens the application through the local development server
+- **THEN** the chat composer input bar shows the selector with the currently selected profile
+
+#### Scenario: Standard cloud build
+- **WHEN** the frontend is built without the local opt-in variable and served from the production build
+- **THEN** the chat composer input bar does not render the selector and no selector state is injected into the page
+
+#### Scenario: Local opt-in outside development mode
+- **WHEN** the local opt-in variable is set to true in the gitignored local environment file
+- **THEN** the selector is rendered even outside development mode
+- **AND** a cloud build still succeeds without that file
+
+### Requirement: Compact composer-integrated presentation
+
+The selector SHALL appear as a borderless text trigger inside the composer's bottom toolbar, showing the selected model name, a local/cloud hint, and a dropdown chevron. Its dropdown SHALL open upward so that it is not clipped at the bottom of the viewport. When the selector is not rendered, the composer SHALL keep its original single-row input-and-send layout.
+
+#### Scenario: Compact trigger in the bottom toolbar
+- **WHEN** a developer views the chat composer in local development mode
+- **THEN** the bottom toolbar shows a borderless text trigger with the selected model name and a chevron
+- **AND** activating the trigger opens the profile menu upward
+
+#### Scenario: Cloud build keeps the original composer layout
+- **WHEN** the selector is not rendered in a standard production build
+- **THEN** the text input and the send/stop button remain on the same row as before the change
+- **AND** the send/stop button behaviour is unchanged
+
+### Requirement: Model profile inventory and grouping
+
+The selector SHALL present the configured chat/generation model profiles grouped by location and provider, each showing its model name and a short note about its current role. Every selectable profile SHALL carry a base URL and a model identifier. Embedding and rerank models SHALL be listed as read-only, non-selectable entries. User-defined profiles SHALL appear in a separate custom group and built-in profiles SHALL remain read-only.
+
+#### Scenario: Grouped inventory
+- **WHEN** a user opens the selector dropdown
+- **THEN** selectable profiles appear under local and cloud groups, and embedding/rerank models appear in a disabled group
+
+#### Scenario: Non-chat model cannot be selected
+- **WHEN** a user attempts to choose a disabled embedding or rerank entry
+- **THEN** the selected profile remains unchanged
+
+### Requirement: User-defined model profiles
+
+The system SHALL provide an "add / manage models" entry in the selector menu that opens a dialog where a user can add a custom profile by supplying a display name, model identifier, base URL, location, provider, an optional note, and an optional credential variable name. The system SHALL validate the required fields and require an `http://` or `https://` base URL, SHALL reject invalid input without creating a profile, and SHALL add the new profile to the custom group and select it. Custom profiles SHALL be removable individually, and built-in profiles SHALL NOT be removable. Custom profiles SHALL be persisted separately from the selected profile identifier in browser local storage, and SHALL be validated on read so that malformed, non-array, or conflicting entries are discarded without error. The system SHALL state in the UI that custom profiles exist only in the local browser and are not readable by the Python evaluation runner.
+
+#### Scenario: Add a custom profile
+- **WHEN** a user fills in a display name, model identifier, and a valid `http(s)` base URL and submits the dialog
+- **THEN** the profile appears in the custom group and becomes the selected profile
+- **AND** it remains after a page reload
+
+#### Scenario: Invalid input is rejected
+- **WHEN** a user submits the dialog with a missing required field or a base URL that is not a valid `http(s)` URL
+- **THEN** no profile is created and the user sees a validation message
+
+#### Scenario: Remove a custom profile
+- **WHEN** a user confirms removal of a custom profile
+- **THEN** that profile disappears from the menu and from stored custom profiles
+- **AND** if it was selected, the selection falls back to the default remote `deepseek-flash` profile (`cloud-deepseek-flash`)
+- **AND** built-in profiles remain unchanged and cannot be removed
+
+#### Scenario: Malformed stored custom profiles
+- **WHEN** browser local storage contains malformed entries, a non-array value, or entries with invalid fields
+- **THEN** invalid entries are discarded, valid entries are kept, and the selector renders without error
+
+#### Scenario: Custom profiles are local-only
+- **WHEN** a user views the selector menu or the management dialog
+- **THEN** the UI states that custom profiles are stored only in this browser and are not readable by the Python evaluation runner
+
+### Requirement: Credentials are references, never values
+
+A model profile SHALL record credentials only as an optional `apiKeyEnv` field holding the name of an allowed environment variable. The system SHALL NOT store any API key value in browser local storage, in the profile inventory, or in any front-end artifact. The allowed names SHALL be the model API key names registered in the deployment environment example. When custom profiles are read from local storage, the system SHALL discard any legacy plaintext credential fields and write back the cleaned list. The system SHALL reject a custom profile whose `apiKeyEnv` is not empty and not one of the allowed names.
+
+#### Scenario: Built-in cloud profile carries a reference
+- **WHEN** a built-in cloud profile is displayed in the management dialog
+- **THEN** it shows only a variable name such as `RAG_LLM_API_KEY` and no key value
+
+#### Scenario: Plaintext in stored data is rejected
+- **WHEN** stored custom profiles contain a plaintext-looking `apiKeyEnv` or a legacy literal credential field
+- **THEN** the invalid profile is discarded or the legacy field is removed from memory and from local storage
+
+#### Scenario: Reference is validated on read
+- **WHEN** a stored custom profile has an `apiKeyEnv` that is not in the allowed name list
+- **THEN** that profile is filtered out and the selector still renders without error
+
+### Requirement: Local API key entry in the management dialog
+
+In local development mode the management dialog SHALL offer a local secrets section that lists the allowed model API key names with a configured/not-configured boolean state, and SHALL allow the user to submit a key value which is written to the project-root local secrets file. The dialog SHALL state that the state reflects only that file, that the value is not kept in the browser or shipped in the front-end artifact, and that the backend and agent must be restarted before the new value takes effect. When the development-only write endpoint is unavailable, the dialog SHALL disable this section instead of pretending the value was saved. If a user supplies a key while adding a custom profile and the write fails, the system SHALL NOT create that profile.
+
+#### Scenario: Save a key from the dialog
+- **WHEN** a developer selects an allowed variable name, enters a key value, and confirms saving
+- **THEN** the value is written to the project-root local secrets file and the configured state is refreshed
+- **AND** the dialog shows the restart notice
+
+#### Scenario: Endpoint unavailable outside development mode
+- **WHEN** the selector is displayed outside development mode and no local write endpoint exists
+- **THEN** the local secrets section is disabled and explains that cloud builds do not provide this capability
+
+#### Scenario: Failed write does not create a dangling profile
+- **WHEN** a user supplies a key while adding a custom profile and the write endpoint rejects it
+- **THEN** no custom profile is created and the user sees an error message
+
+### Requirement: Persistent selection as a single source of truth
+
+The system SHALL persist the selected profile identifier in browser local storage under one documented key and SHALL restore it on reload. An invalid or unavailable stored value SHALL fall back to the default remote `deepseek-flash` profile without error. Any consumer, including a later evaluation entry point, SHALL be able to read the complete selected profile (base URL, model identifier, provider, location, credential variable name) from that single source rather than maintaining a second inventory.
+
+#### Scenario: Selection survives reload
+- **WHEN** a user selects a profile and reloads the page
+- **THEN** the selector shows the same selected profile
+
+#### Scenario: Invalid stored value
+- **WHEN** the stored identifier matches no profile, or storage access fails
+- **THEN** the selector falls back to the default remote `deepseek-flash` profile (`cloud-deepseek-flash`) without error
+
+#### Scenario: Evaluation consumer reads the same profile
+- **WHEN** a later evaluation entry point reads the current selection
+- **THEN** it obtains the same profile including its base URL, model identifier, and credential variable name
+
+### Requirement: Selection does not change the backend model
+
+The selector SHALL only record a local preference and SHALL NOT alter any backend request, model endpoint, or response contract. The system SHALL state in the selector UI that the backend model remains determined by startup environment variables. The default selection SHALL be the remote `deepseek-flash` profile (`cloud-deepseek-flash`).
+
+#### Scenario: Switching profile leaves the backend unchanged
+- **WHEN** a user switches the selected profile
+- **THEN** no backend request field changes and the backend keeps its startup-configured model
+- **AND** the selector displays the notice that the backend has not been switched
+
+#### Scenario: Default profile
+- **WHEN** no valid stored selection exists
+- **THEN** the selected profile is the remote `deepseek-flash` profile (`cloud-deepseek-flash`)
+
+
+--- /dev/null
++++ b/openspec/changes/add-model-selector/tasks.md
+# Tasks
+
+固定前提：本 change 属 L1 标准流程，任务分支 `feature/model-selector开发` 从 `origin/main` 派生。前三轮只改 `cloud_front/`；本轮按用户拍板扩展到本地密钥统一链路（`.gitignore` / 根 `.env.local` / `eval/.env` / `start-dev.ps1` / `eval/scripts/` / `vite.config.ts` / 三处文档注释），仍可排除生产接口、数据库、CI/CD、公开 API 与权限模型影响。验证命令从 `cloud_front/` 或仓库根运行；`dist/`、`tmp/` 被 gitignore，构建产物不作为交付物。问题编号由 issue tracker 实际产生后附对应项，本次未产生。回滚办法见第 4 组与第 6 组。
+
+## 1. 模型清单与显隐常量
+
+- [x] 1.1 新增 `cloud_front/src/constants/modelProfiles.ts`，列出本地/云端对话模型并单列不可选的 embedding/rerank 模型，每项带 `baseUrl` + `model`。验证：逐项核对 `application.yml`、`cloud_agent/application.yml`、`eval/.env` 与本机 Ollama `/api/tags`；实测 5 个可选档位 + 4 个不可选检索模型。
+- [x] 1.2 定义双条件显隐、localStorage key 与原默认档位（后续默认值变更见 7.1）。验证：`npm run type-check` 退出 0；`*.local` 已被忽略。
+- [x] 1.3 新增自定义档位契约与 `isUsableCustomProfile` 校验；本轮改为只接受白名单 `apiKeyEnv`、拒绝明文。验证：第 5 组 T9/T10 覆盖合法/非法输入与明文拒绝。
+
+## 2. 状态层与选择器组件
+
+- [x] 2.1 新增 `useModelProfileStore.ts`：读取校验 id、无效回落默认、写入 try/catch；本轮增加历史明文凭据字段清洗并回写。验证：T1/T7/T8/T11 覆盖。
+- [x] 2.2 新增 `ModelSelector.vue`：分组下拉、本地/云端标签、禁用不可选项、界面明示后端未随按钮切换。验证：`npm run build-only` 退出 0；`app.use(Antd)` 全局注册可用。
+- [x] 2.3 触发器改为紧凑文字形态 + `placement="topLeft"` 向上展开。验证：dev server 返回源码含 `model-selector-trigger`。
+
+## 3. 对话输入栏挂载、云端布局回落与显隐变异检验
+
+- [x] 3.1 从 `GlobalHeader.vue` 摘除挂载与 import（最终无改动），改在 `AiAssistantPage.vue` 的 `.input-bar` 内新增 `.input-toolbar`。验证：`grep -n "ModelSelector"` 在 `GlobalHeader.vue` 无残留；类型检查退出 0。
+- [x] 3.2 显隐三态变异检验（本轮重跑）。验证：无变量 `Kt=!1` → 注入 `VITE_ENABLE_MODEL_SELECTOR=true` `Kt=!0` → 恢复 `Kt=!1`；三种构建产物端点字符串命中数均为 0。常量名随压缩重命名，历次为 `LWe` / `At` / `Rt` / `Kt`。
+- [x] 3.3 切分支与改动后的目录树完整性复核。验证：旧分支 329/329、新分支 324/324 tracked/disk 对照，`git status --short` 无成片 ` D`。
+- [x] 3.4 云端布局回落 `display: contents`，仅 `with-model-selector` 时两行。验证：云端 CSS 产物含 `display:contents` 与 `with-model-selector`；发送 / 停止按钮绑定未改动。
+
+## 4. 工件校验与回滚
+
+- [x] 4.1 `openspec status --change add-model-selector` 与 `openspec validate add-model-selector --strict` 退出 0。验证：status `Progress: 4/4 artifacts complete`；validate 输出 `Change 'add-model-selector' is valid`，exit=0。
+- [ ] 4.2 回滚预案（不执行）：恢复工作区外备份的 `.env.dev` / `eval/.env` / 源码，撤回文档注释，删除 `.env.local`、`vite/localEnvPlugin.ts` 与 3 个前端新增文件，移除 `AiAssistantPage.vue` 的挂载/import/工具条样式。验证：回滚后 `npm run type-check` 退出 0 且云端构建产物无选择器与端点痕迹。
+
+## 5. 用户自定义模型档位
+
+- [x] 5.1 常量层独立存储 key、自定义分组、下拉选项与不可信输入校验。验证：T5/T6/T9 覆盖损坏数据与非数组回落。
+- [x] 5.2 store 暴露 `customProfiles` / `allProfiles` / `addCustomProfile` / `removeCustomProfile`，删除选中项回落默认。验证：T1–T4、T7–T8。
+- [x] 5.3 管理弹窗表单含名称 / 模型 ID / Base URL / 位置 / 提供商 / 备注，提交校验必填与 `http(s)`；已添加列表带 `a-popconfirm` 二次确认删除。验证：`npm run type-check` 与 `build-only` 均退出 0。
+- [x] 5.4 界面双处明示「自定义档位只存本浏览器，Python 评测链读不到」。验证：菜单底部 `model-hint` 与弹窗 `manager-hint` 各一处引用 `CUSTOM_HINT`。
+- [x] 5.5 用真实编译产物跑功能与变异检验（`tmp/verify-model-store.cjs`，被 gitignore，自清理 bundle）。验证：本轮 13/13 checks passed，exit=0（含 T10 白名单变量名、T11 旧明文清洗、T12 生产端点折叠、T13 内置档位只带引用）。
+
+## 6. 本地密钥统一与前端写入（本轮新增）
+
+- [x] 6.1 迁移前取证与备份。验证：确认 `RAG_EMBEDDING_API_KEY` / `LLM_API_KEY` / `EMBEDDING_API_KEY` 三份同源；系统用户级环境变量确有 `RAG_LLM_API_KEY`；9 个将改动文件逐字节备份到 `/tmp/cloudwiki-env-backup-20261104/` 并 `cmp` 校验。
+- [x] 6.2 补根 `.gitignore:47` 的 `.env.local` 规则（**先补规则再写文件**）。验证：`git check-ignore -v .env.local` 命中 `.gitignore:47`；对照 `cloud_front/.env.local` 仍由子目录 `*.local` 覆盖。
+- [x] 6.3 生成根 `.env.local`（2 个有值键，不登记空键）、精简 `eval/.env`（删 2 行重复 key，保留 12 个评测专属键）、删除旧 `.env.dev`。验证：三份同源断言通过；两文件键名清单复核；旧文件已删除且备份在位。
+- [x] 6.4 改 `start-dev.ps1`：路径 `.env.dev` → `.env.local`，注入白名单 `^(RAG_|DEEPSEEK_)[A-Z0-9_]+$`，跳过空值。验证：带命中数断言的替换脚本 5 处全部命中；`application.yml` / `asset-registry.md` / `eval/README.md` 注释同步。
+- [x] 6.5 改 `lib_eval.load_env()` 为 `os.environ` > 根 `.env.local` > `eval/.env` 并填充旧名别名；`smoke_test.py` 复用同一函数。验证：`py_compile` 通过；`load_env()` 17 键齐全、别名同源、评测配置仍在、`os.environ` 覆盖生效；`prepare_keys.py` 无需改动（仍写 `eval/.env` 的评测专属凭据）。
+- [x] 6.6 新增 `cloud_front/vite/localEnvPlugin.ts` 并在 `vite.config.ts` 注册；前端管理弹窗增加密钥变量名下拉、API Key 输入、状态列表与保存按钮，明文只 POST、不落浏览器存储。验证：`npm run type-check` / `build-only` 退出 0；生产产物端点字符串 0 命中。
+- [x] 6.7 端点端到端验证（`tmp/verify-local-env-endpoint.cjs`，真实插件 + 临时 http server + 占位串写入 + 逐字节恢复）。验证：31/31 passed，含缺头/恶意 Origin/非法键/换行注入/空值/超长值/错误方法的拒绝且文件未改动、写入不回传明文、注释与其他键保留、无重复行、`Python load_env()` 读到新写入值（写入→读取闭环）、真实 `.env.local` 逐字节恢复。
+- [x] 6.8 preview 端点变异检验（`tmp/verify-preview-endpoint.mjs`）。验证：preview `POST /__cw/local-env` 返回 404、响应不是端点 JSON，exit=0。
+- [x] 6.9 OpenSpec 工件同步：新增 `local-env-secrets` capability delta，`model-profile-selector` spec 增补凭据引用与密钥录入需求，proposal / design / tasks 重写。验证：`openspec validate add-model-selector --strict` 退出 0。
+
+## 实测记录
+
+- `npm run type-check`：exit 0
+- `npm run build-only`：exit 0（10.68s / 10.90s，另有 chunk >500 kB 的既有告警，与本次改动无关）
+- 显隐三态变异：A 无变量 `Kt=!1` → B 注入变量 `Kt=!0` → C 恢复 `Kt=!1`；端点字符串命中 0 / 0 / 0
+- 生产产物：`__cw/local-env` 命中 0 个文件；preview POST 端点 404
+- store 契约：`node tmp/verify-model-store.cjs` → 13/13 passed
+- 端点端到端：`node tmp/verify-local-env-endpoint.cjs` → 31/31 passed，`.env.local` 逐字节恢复
+- Python 加载链：`py_compile` OK；`load_env()` 17 键、别名同源、评测配置仍在、`os.environ` 覆盖生效
+- `git check-ignore -v .env.local`：命中 `.gitignore:47:.env.local`
+- `openspec validate add-model-selector --strict`：exit 0，`Change 'add-model-selector' is valid`
+- `openspec status --change add-model-selector`：`Progress: 4/4 artifacts complete`
+- 本轮**未启动**后台开发服务（用户此前已取消 `start-dev.ps1` 后台任务）；验证均通过独立临时进程完成，用完即停
+
+## 7. 默认档位调整
+
+- [ ] 7.1 将常量与档位查询回落调整为远程 `cloud-deepseek-flash`。固定验收：默认 ID 和未知 ID 查询均指向 `cloud-deepseek-flash`；已知 ID 查询不变。回滚：恢复常量与查询回落。
+- [ ] 7.2 将状态层回落统一为该默认值。固定验收：无存储、无效 ID、存储不可用、删除当前自定义档位及选中项失效时均回落 `cloud-deepseek-flash`；有效已保存选择保持不变。不修改后端模型选择契约。回滚：恢复状态层回落。
+- [ ] 7.3 验证默认行为。固定验收：自动化断言覆盖 7.1、7.2 所列情形并通过；`npm run type-check` 退出 0。回滚：移除新增验证代码。
+- [ ] 7.4 修复本次 Vite 插件接入导致的类型检查错误。固定验收：在 `cloud_front` 运行 `npm run type-check` 和 `npm run build-only` 均退出 0；开发插件仍仅在 dev server 注册，preview 不提供写入端点。回滚：恢复 Vite 配置与 Node TypeScript 配置。
+

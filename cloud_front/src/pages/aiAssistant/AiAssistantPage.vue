@@ -257,7 +257,7 @@
         </div>
 
         <!-- 输入区 -->
-        <div class="input-bar">
+        <div class="input-bar" :class="{ 'with-model-selector': isModelSelectorVisible }">
           <a-textarea
             v-model:value="inputText"
             class="input"
@@ -266,23 +266,26 @@
             :disabled="streaming"
             @keydown.enter.exact.prevent="send"
           />
-          <a-button
-            v-if="streaming"
-            class="stop-btn"
-            danger
-            @click="stopStream"
-          >
-            停止
-          </a-button>
-          <a-button
-            v-else
-            type="primary"
-            class="send-btn"
-            :disabled="!inputText.trim()"
-            @click="send"
-          >
-            发送
-          </a-button>
+          <div class="input-toolbar">
+            <ModelSelector />
+            <a-button
+              v-if="streaming"
+              class="stop-btn"
+              danger
+              @click="stopStream"
+            >
+              停止
+            </a-button>
+            <a-button
+              v-else
+              type="primary"
+              class="send-btn"
+              :disabled="!inputText.trim()"
+              @click="send"
+            >
+              发送
+            </a-button>
+          </div>
         </div>
       </div>
 
@@ -470,6 +473,8 @@ import { listVisibleSpaceUsingGet } from '@/api/wikiSpaceController'
 import { listFolderTreeUsingGet } from '@/api/wikiFolderController'
 import { getDocumentWikiVisByIdUsingGet } from '@/api/documentWikiController'
 import DocumentWikiContentViewer from '@/components/DocumentWikiContentViewer.vue'
+import ModelSelector from '@/components/ModelSelector.vue'
+import { isModelSelectorVisible } from '@/constants/modelProfiles.ts'
 import AgentLibraryPanel from './AgentLibraryPanel.vue'
 import { parseCitationSnapshot } from './citationIds'
 import {
@@ -1824,6 +1829,32 @@ onMounted(() => {
 
 .input {
   flex: 1;
+}
+
+/*
+ * 云端（选择器不渲染）时工具条透明化，发送/停止按钮直接参与 .input-bar 的 flex 布局，
+ * 保持与改动前完全一致的单行排布，云端布局零变化。
+ */
+.input-toolbar {
+  display: contents;
+}
+
+/* 本地开发：输入框独占一行，下方工具条左侧为模型档位、右侧为发送按钮。 */
+.input-bar.with-model-selector {
+  flex-wrap: wrap;
+}
+
+.input-bar.with-model-selector .input {
+  flex: 1 1 100%;
+}
+
+.input-bar.with-model-selector .input-toolbar {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 28px;
 }
 
 .send-btn {

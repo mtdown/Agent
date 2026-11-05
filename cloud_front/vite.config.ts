@@ -3,12 +3,16 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import { localEnvPlugin } from './vite/localEnvPlugin'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
+    // 仅 dev server 生效：把前端「模型管理」填写的 APIKEY 写入项目根 .env.local。
+    // build / preview 不注册端点，见 vite/localEnvPlugin.ts。
+    localEnvPlugin(),
   ],
   resolve: {
     alias: {

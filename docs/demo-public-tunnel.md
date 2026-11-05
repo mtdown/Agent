@@ -5,10 +5,13 @@
 ## 0. 一键启动
 
 ```powershell
-# 一键：起服务 + 自动起 cloudflared 隧道（默认行为，不用加参数）
+# 默认只启动服务，不启动临时公网隧道
 powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 
-# 只在本机 / 局域网用，不暴露公网
+# 显式开启 cloudflared 临时公网隧道
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Tunnel
+
+# 明确关闭隧道；与 -Tunnel 同时指定时优先关闭
 powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -NoTunnel
 ```
 
@@ -40,7 +43,8 @@ Close this window directly to KEEP everything running
 
 | 参数 | 作用 |
 |---|---|
-| `-NoTunnel` | **只走局域网，不暴露公网**（日常开发用这个） |
+| `-Tunnel` | 显式开启临时公网隧道（默认关闭） |
+| `-NoTunnel` | 关闭临时公网隧道；与 `-Tunnel` 同时指定时优先 |
 | `-Preview` | **公网演示建议加**：先打包再提供服务，而不是跑 dev server |
 | `-NoPause` | 末尾不等回车、不停服务（父脚本调用时用，手动启动不用加） |
 
@@ -52,13 +56,12 @@ Vite 开发服务器是**未打包**的：浏览器要按模块发**几百个独
 `-Preview` 会先 `npm run build`，再用 `vite preview` 提供打包产物，请求数从几百降到个位数：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Preview
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Tunnel -Preview
 ```
 
 代价：改代码后要重跑脚本（热更新失效），纯演示场景无所谓。
 
-⚠️ 默认行为是**暴露到公网**：账号 `admin / 12345678` 会被放到公网上。
-日常开发请加 `-NoTunnel`，或演示结束后在启动窗口按回车（或跑 `.\stop-dev.ps1`）。
+⚠️ 使用 `-Tunnel` 时账号 `admin / 12345678` 会被放到公网上。演示结束后在启动窗口按回车（或跑 `.\stop-dev.ps1`）。
 
 ### 慢 / 打不开的排查顺序
 
@@ -76,11 +79,11 @@ powershell -ExecutionPolicy Bypass -File .\start-main-dev.ps1
 
 | 参数 | 作用 |
 |---|---|
-| `-NoTunnel` | 不起公网隧道（**默认会起**，和 `start-dev.ps1` 一致） |
+| `-NoTunnel` | 向所运行分支的 `start-dev.ps1` 传递关闭隧道参数 |
 | `-Stay` | **不切回 main 分支**，在当前分支启动 |
 
 ⚠️ 不加 `-Stay` 时该脚本会 `git checkout main` 并拉取最新代码 —— 演示尚未合入 main 的功能时
-务必带 `-Stay`。启动后的回车全停、隧道展示与 `start-dev.ps1` 完全一致。
+务必带 `-Stay`。该脚本不支持透传 `-Tunnel`；所运行分支的 `start-dev.ps1` 决定默认隧道行为。当前版本默认关闭；需要临时隧道时直接使用上面的 `start-dev.ps1 -Tunnel` 命令。
 
 验收完想单独回收服务：
 

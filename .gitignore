@@ -43,6 +43,9 @@ eval/tmp/
 eval/.env
 
 ### Local secrets (injected by start-dev.ps1) ###
+# 模型 API key 的唯一存放处：前端「模型管理」写入，start-dev.ps1 注入进程环境。
+.env.local
+# 旧密钥文件已废弃；保留规则防止误建、误提交。
 .env.dev
 
 ### Local runtime and diagnostics ###
