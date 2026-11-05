@@ -121,7 +121,9 @@ services:
     container_name: cw-nginx
     restart: unless-stopped
     ports:
-      # 备案通过前用 8080；备案通过后改成 "80:80" 并追加 "443:443"
+      # 宿主机对外端口由 .env 的 HTTP_PORT 决定（备案通过前 8080，备案通过后 80）。
+      # 容器内 Nginx 固定监听 8080，映射始终是 <宿主机端口> -> 容器 8080；
+      # 只改宿主机侧即可，不要把容器侧端口也改成 80，否则该端口无人监听。
       - "${HTTP_PORT:-8080}:8080"
     volumes:
       - ./dist:/usr/share/nginx/html:ro

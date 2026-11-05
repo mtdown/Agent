@@ -8,9 +8,9 @@
 
 ```
 浏览器/手机
-    │  http://服务器:8080
+    │  http://cloudwiki.club（备案通过后走默认 80）
     ▼
-Nginx 容器（托管前端 dist，转发 /api）
+Nginx 容器（容器内监听 8080，托管前端 dist，转发 /api）
     │  内网
     ▼
 后端容器（Spring Boot 8123，context-path=/api）
@@ -19,7 +19,7 @@ Nginx 容器（托管前端 dist，转发 /api）
     ├──► Redis 7 容器（session + Sa-Token，设密码）
     └──► Agent 容器（8124，仅容器内网；共享内部密钥）
 
-对外只暴露 8080（备案后改 80/443）。
+对外只暴露 80（宿主机 80 -> 容器 8080；备案前为 8080）。HTTPS 另行立项。
 3306 / 6379 / 8123 / 8124 一律不映射到宿主机，数据库、缓存与 Agent 不暴露公网。
 ```
 
@@ -184,14 +184,58 @@ docker compose exec mysql mysql -uroot -p"$DB_PASSWORD" picture \
   -e "UPDATE user SET userRole='admin' WHERE userAccount='你的账号'"
 ```
 
-## 备案通过后切 80/443
+## 备案通过后切默认 80 端口
 
-1. 改 `/opt/cloudwiki/.env`：`HTTP_PORT=80`
-2. 改 `deploy/docker-compose.yml` 的 ports 为 `"80:80"` 并追加 `"443:443"`
-3. 在服务器上执行 `certbot --nginx` 申请免费证书（自动续期）
-4. `cd /opt/cloudwiki && bash deploy.sh`
+> 备案信息：网站备案号 `渝ICP备2026028042号-1`，域名 `cloudwiki.club`。
+> 备案号已按《非经营性互联网信息服务备案管理办法》放在全局 footer 的底部居中位置，
+> 并链接至 `http://beian.miit.gov.cn/`（`cloud_front/src/layouts/BasicLayout.vue`）。
 
-### 个人文本文件分段上传
+### 现状与断点
+
+DNS 解析早已生效（`@` 与 `www` 的 A 记录都指向已备案 ECS，权威 DNS 为阿里云万网），
+因此通知中「30 天内解析到阿里云内地服务器」已满足，**不需要再改 DNS**。
+实测 `http://cloudwiki.club` 超时、而带 `:8080` 返回 200 —— 断点在宿主机端口：
+备案前为避开 80/443 拦截用的是 8080，备案通过后必须切回默认 80。
+
+端口由**单一来源**控制：`/opt/cloudwiki/.env` 的 `HTTP_PORT`。
+`docker-compose.yml` 的映射是 `"${HTTP_PORT:-8080}:8080"`、`nginx.conf` 容器内固定 `listen 8080`，
+所以只需把宿主机侧改成 80，映射自然变成 `80 -> 容器 8080`。
+**不要把容器侧端口也改成 80**：容器内 80 无人监听，会直接拒绝连接。
+
+### 执行顺序（不能颠倒）
+
+1. **先在阿里云 ECS 安全组入方向放行 TCP 80**（来源 `0.0.0.0/0`）。
+   若先部署后放行，站点会在默认端口上短暂不可用。
+2. 确认备案信息同步完成（通知建议收到通知 7 小时后）。
+3. **永久修复落在 Git**：`.github/workflows/deploy.yml` 生成 `.env` 时写入 `HTTP_PORT=80`。
+   CI 每次部署都会重新生成 `.env`，**只在服务器上手改 `.env` 会在下次部署被覆盖回去**，不算修复。
+4. 把改动合并到 `main`（或 `feature/deploy-cicd开发`）触发 Actions；`deploy.sh` 会重建容器使新映射生效。
+5. 验证：
+
+```bash
+curl -I http://cloudwiki.club/                       # 期望 200
+curl -s -o /dev/null -w '%{http_code}\n' \
+  http://cloudwiki.club/api/user/get/login           # 期望非 000/502/503
+```
+
+   并在浏览器确认首页底部备案号可见、链接可点。
+
+### 回滚
+
+把 `deploy.yml` 里的 `HTTP_PORT` 改回 8080 并重新部署即可恢复 `:8080` 访问；
+前端 footer 与本文档为纯文本改动，单独 `git revert` 即可。DNS 与服务器 `.env` 未被本变更触碰。
+
+### HTTPS（另行立项，本次未实施）
+
+当前 `nginx.conf` 没有 443 的 server 块、compose 未映射 443、证书也未挂载进容器，
+宿主机上的证书工具看不到容器内 bind mount 的 Nginx 配置。
+常规签发命令在此结构下不会生效，需先设计证书挂载与 443 server 块，再单独立项。
+
+### 公安备案
+
+网站开通之日起 30 日内，到实际经营地/个人常住地公安机关另行办理，与 ICP 备案不是同一流程。
+
+## 个人文本文件分段上传
 
 Cloud 的 `/api/agent/personal-file-uploads` 使用当前登录会话，每次请求重新鉴权。POST JSON `{ "path": "notes/a.txt", "mode": "create|overwrite|append", "size": 123 }` 创建会话，size 是本次上传的 UTF-8 字节数（0 至 50 MiB）。响应的 `uploadId` 是临时令牌；PUT `/{uploadId}/segments?offset=0` 以 `application/octet-stream` 按字节偏移顺序发送非空分段，每段最多 1 MiB。不得重发或跳段；客户端收到失败或断线时应取消并重新开始。POST `/{uploadId}/commit` 仅在字节完整且 UTF-8 合法时原子提交，覆盖和追加以创建会话时的文件版本检查冲突，最终文件最多 50 MiB。DELETE `/{uploadId}` 取消。不要将磁盘路径作为 API 参数；path 是用户空间内相对路径。令牌不能跨用户使用。空文件可直接提交。
 
