@@ -1,6 +1,10 @@
-# site-access-and-filing Delta
+# site-access-and-filing Specification
 
-## ADDED Requirements
+## Purpose
+
+定义已备案域名在生产环境的默认 HTTP 访问端口由单一变量控制的行为契约，以及首页底部展示完整 ICP 备案号并链接工信部的要求；同时约束部署文档中端口切换的操作顺序，避免备案后切换端口时站点不可用或合规信息缺失。
+
+## Requirements
 
 ### Requirement: 备案域名的默认 HTTP 访问由单一端口变量控制
 
