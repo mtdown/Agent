@@ -1,11 +1,11 @@
-# ============================================================
+﻿# ============================================================
 #  start-dev.ps1 - one-click start for backend + frontend (dev)
 #  Usage:  powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 #  Starts: Spring Boot backend (127.0.0.1:8123) + Vite dev server
 #          (0.0.0.0:3000, LAN accessible). Logs go to tmp/dev-backend.log
 #          and tmp/dev-frontend.log.
 #
-#  Public tunnel (cloudflared quick tunnel) is ON by default; the
+#  Public tunnel (cloudflared quick tunnel) is OFF by default; the
 #  public URL is scraped from the cloudflared log and shown in a
 #  green box together with the local port it forwards. Front and
 #  back share one port (the vite dev server proxies /api to 8123),
@@ -21,7 +21,8 @@
 #    - Close window -> everything keeps running (recover later
 #      with .\stop-dev.ps1).
 #
-#  -NoTunnel  stay on the LAN only, do not expose anything publicly
+#  -Tunnel    enable the temporary public tunnel
+#  -NoTunnel  stay on the LAN only; takes precedence over -Tunnel
 #  -Preview   build first and serve the bundle instead of the dev
 #             server (far fewer requests through the tunnel)
 #  -NoPause   do not wait for Enter at the end (used by parent
@@ -32,7 +33,9 @@
 #        non-ASCII message text can be misdecoded at parse time.
 # ============================================================
 param(
-    # -NoTunnel / : stay on the LAN only (no public exposure)
+    # -Tunnel: explicitly enable the public tunnel
+    [switch]$Tunnel,
+    # -NoTunnel: stay on the LAN only, even when -Tunnel is set
     [switch]$NoTunnel,
     # -Preview: build first and serve the bundle instead of the dev server.
     [switch]$Preview,
@@ -156,14 +159,14 @@ if (-not $portsClear) { exit 1 }
 $javaExe = Find-Java
 if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
 
-# Load local secrets (.env.dev, git-ignored): each KEY=VALUE line becomes a
+# Load local secrets (.env.local, git-ignored): each KEY=VALUE line becomes a
 # process env var so the backend jar started below inherits it. Values may be
 # quoted ("v" or 'v'); blank lines and # comments are skipped. Only variable
 # NAMES are printed - never the values.
 function Import-DevEnvFile {
-    $envFile = Join-Path $root '.env.dev'
+    $envFile = Join-Path $root '.env.local'
     if (-not (Test-Path $envFile)) {
-        Write-Host '    NOTE: .env.dev not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
+        Write-Host '    NOTE: .env.local not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
         return
     }
     $loaded = @()
@@ -182,13 +185,18 @@ function Import-DevEnvFile {
             $value = $value.Substring(1, $value.Length - 2)
         }
         if ($key.Length -eq 0) { continue }
+        # 只注入模型相关的 RAG_*/DEEPSEEK_* 变量。评测专属的 DB_*/EVAL_*
+        # 与 VITE_* 不进入后端进程环境，避免被 Spring relaxed binding 误认。
+        if ($key -notmatch '^(RAG_|DEEPSEEK_)[A-Z0-9_]+$') { continue }
+        # 空值代表「未在此文件配置」，不能覆盖系统用户作用域已有的同名变量。
+        if ($value.Length -eq 0) { continue }
         Set-Item -Path ("Env:" + $key) -Value $value
         $loaded += $key
     }
     if ($loaded.Count -gt 0) {
-        Write-Host ("    .env.dev injected env vars: " + ($loaded -join ', '))
+        Write-Host ("    .env.local injected env vars: " + ($loaded -join ', '))
     } else {
-        Write-Host '    WARN: .env.dev exists but contains no KEY=VALUE entries.'
+        Write-Host '    WARN: .env.local exists but contains no KEY=VALUE entries.'
     }
 }
 Import-DevEnvFile
@@ -233,6 +241,13 @@ $agentProc = Start-Process -FilePath $javaExe `
     -RedirectStandardError $agentErr `
     -WindowStyle Hidden -PassThru
 Write-Host "    Agent PID: $($agentProc.Id) (log: $agentLog)"
+
+# Prevent local key endpoint registration when the temporary tunnel is enabled.
+if ($Tunnel -and -not $NoTunnel) {
+    $env:CLOUDWIKI_DISABLE_LOCAL_ENV = '1'
+} else {
+    $env:CLOUDWIKI_DISABLE_LOCAL_ENV = '0'
+}
 
 $frontLog = Join-Path $tmpDir 'dev-frontend.log'
 $frontErr = Join-Path $tmpDir 'dev-frontend.err.log'
@@ -383,12 +398,11 @@ function Start-PublicTunnel {
 }
 
 $publicUrl = $null
-if (-not $NoTunnel) {
-    # Default is ON: the site is exposed via cloudflared. Use -NoTunnel
-    # to keep it on the LAN only.
+if ($Tunnel -and -not $NoTunnel) {
+    # Explicit opt-in; -NoTunnel takes precedence.
     $publicUrl = Start-PublicTunnel -Port $frontPort
 } else {
-    Write-Host 'Public tunnel disabled (-NoTunnel) - LAN access only.'
+    Write-Host 'Public tunnel disabled - LAN access only.'
 }
 Write-Host ''
 if ($publicUrl) {

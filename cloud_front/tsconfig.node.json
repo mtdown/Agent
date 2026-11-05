@@ -1,6 +1,7 @@
 {
   "include": [
     "vite.config.*",
+    "vite/**/*.ts",
     "vitest.config.*",
     "cypress.config.*",
     "nightwatch.conf.*",

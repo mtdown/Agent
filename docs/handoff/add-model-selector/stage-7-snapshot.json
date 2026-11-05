@@ -1,0 +1,28 @@
+{
+  "base": "f5ecb69bc2ccc292c44fa7ea1ee372abaa34f612",
+  "files": {
+    ".gitignore": "d9011cbfd58f54ee6c55cdc0c075247f67043cbc3a27cc130ab9f40e6886b0d0",
+    "cloud/src/main/resources/application.yml": "5d9c17eacd0417130b24de93348ff9b6277064f9e3203f863fcef41355f2a6fb",
+    "cloud_front/src/components/ModelSelector.vue": "f3b1b1a5876f411a08281c50a5a7ae0acd37cd272b448b928358ed99b6e88a1a",
+    "cloud_front/src/constants/modelProfiles.ts": "9ebff61c82097e20d69a9160b5b8da742b30153af0ebee65ef61fc109db3f26b",
+    "cloud_front/src/pages/aiAssistant/AiAssistantPage.vue": "fd68320c41c036556cf3f76cbc35c922f8c2da1e7b6412e8cd40162c9b22f50a",
+    "cloud_front/src/stores/useModelProfileStore.ts": "6f66bbf9bdea69816d6c89419e334cc312c223533d5c3594fac4a0f1c34a32b5",
+    "cloud_front/tests/model-profile-default.cjs": "f446972066fe0f0e91e239577429874f27fee152174fd94a331dd004d947a3e8",
+    "cloud_front/tsconfig.node.json": "72af3ef0cae372dcad4cc1b59575e390d0ef3419cdd445eb041fbb9bdb49236e",
+    "cloud_front/vite.config.ts": "ed6507d1d06ac743a55e90eb7b8ea921f0c4a98146ce6d37497d7d90c7ab632a",
+    "cloud_front/vite/localEnvPlugin.ts": "0ad23160aafd8e7de505d623f80420ee072f924d17abd68df9260f05fed0bca2",
+    "docs/asset-registry.md": "1838e0b4762ec6db29321869a7304bc36daeaaef4a8edfbb8b48594f5e5a0e3e",
+    "eval/README.md": "5798c7c02e8aebc7510f4193d5cbb2a6ff415a43ef2a5528f63f0524fddd9ef0",
+    "eval/scripts/lib_eval.py": "da4494543273a5128d5426cea1c162f6e938c57785aeea666d15df520def64e4",
+    "eval/scripts/smoke_test.py": "b98a082f5cc7c3d8b7038bcb13aef70fcd82ed6b46073ab39947dd9e15e9879b",
+    "openspec/changes/add-model-selector/.openspec.yaml": "a08047dcdac0dd253523541df7ae20de4903ab5e6894afe95ed1ff269079bd22",
+    "openspec/changes/add-model-selector/README.md": "330d65dad3b8412e1a81576f80928806e3236993461abfefdee25e39a0288a8d",
+    "openspec/changes/add-model-selector/design.md": "49cbc66a3f420ca586750eb36bbf5625f7df56285fad9d57bae17fa771f9e368",
+    "openspec/changes/add-model-selector/proposal.md": "8f3433a601ec520c437e99b8adb52f6a29c25bd949e6d9e68c19455a759efd81",
+    "openspec/changes/add-model-selector/specs/local-env-secrets/spec.md": "1c09fdaaa753a9c7b2eddae3e9a95787e8eb77b0041671a3915ded5a0c004748",
+    "openspec/changes/add-model-selector/specs/model-profile-selector/spec.md": "a622ba7b1c148a10ca8b6dc77722ea1ffd487ad2648566c41ce65f29be5c9825",
+    "openspec/changes/add-model-selector/tasks.md": "1531672b89bccc7117c882633f3fe6508a29c9da552b948a672213f62ae202b1",
+    "start-dev.ps1": "9c0305089a8064e68eeb2c0a08dbbe2190c37de68ae61e2252679433933370f4"
+  },
+  "patch_sha256": "bb5273c822654c2260ed52514c8d26e6b6012af77194329879011790ffd2110a"
+}

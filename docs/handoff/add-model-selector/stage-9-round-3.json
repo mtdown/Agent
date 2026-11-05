@@ -1,0 +1,12 @@
+{
+  "base": "f5ecb69bc2ccc292c44fa7ea1ee372abaa34f612",
+  "files": {
+    "cloud_front/vite/localEnvPlugin.ts": "482e62fb7aac6c5712c66ccb24ad344b8380d1ce901ad0da00ac6e588665ce37",
+    "cloud_front/src/constants/modelProfiles.ts": "801ab07660061aaef5a23ca4a9f462021c0fb1019679223e4e321caab9e3e139",
+    "cloud_front/src/components/ModelSelector.vue": "c5ca34b093b4e27dbf336b00ca19a954cdf0b9958d3616249e32361e0eef58ca",
+    "start-dev.ps1": "ad0f1f3330db434b89a50ecb395e67975bfe8233b6c45238424215865b8ad1dd",
+    "cloud_front/tests/local-env-isolation.cjs": "0b1f8bc4b6e6e94e4d1039855c150c23f58b26ad6707e262e93312acd79ed482",
+    "scripts/test-start-dev-tunnel.ps1": "85868acdc4d0d40134b135048edc8aab9f39517c942d8d581299734b1f19a23d"
+  },
+  "patch_sha256": "47dd0edd51dd8d937bcd78a510a69ee875777c6e1dfd255c587301bf93710f36"
+}

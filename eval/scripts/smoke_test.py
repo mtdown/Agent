@@ -18,21 +18,10 @@ import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ENV_PATH = os.path.join(os.path.dirname(HERE), ".env")
-
-
-def load_env(path):
-    cfg = {}
-    if not os.path.exists(path):
-        return cfg
-    for line in open(path, encoding="utf-8"):
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        cfg[k.strip()] = v.strip()
-    return cfg
+# 模型 API key 已迁至项目根 .env.local，统一复用 lib_eval.load_env() 的
+# 合并与旧名兼容逻辑，避免本文件再维护一套独立的 .env 解析。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib_eval import load_env  # noqa: E402
 
 
 def post(base_url, path, api_key, payload, timeout=90):
@@ -122,7 +111,7 @@ def main():
     ap.add_argument("--only", choices=["chat", "embedding"])
     args = ap.parse_args()
 
-    cfg = load_env(ENV_PATH)
+    cfg = load_env()
     llm_base = args.llm_base_url or args.base_url or cfg.get("LLM_BASE_URL", "")
     emb_base = args.emb_base_url or args.base_url or cfg.get("EMBEDDING_BASE_URL", "")
     llm_key = cfg.get("LLM_API_KEY", "")

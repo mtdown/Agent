@@ -277,7 +277,7 @@ powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
 powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 ```
 
-脚本构建并启动知识库后端（8123）、Agent（8124）和前端（3000），日志位于 `tmp/`。默认尝试开启 cloudflared 公网隧道，未安装时仅局域网访问；仅需局域网访问可加 `-NoTunnel`。按回车停止全部服务和隧道；关闭窗口后可用 `stop-dev.ps1` 停止。`-Preview` 构建并预览前端，`-NoPause` 跳过等待回车。
+脚本构建并启动知识库后端（8123）、Agent（8124）和前端（3000），日志位于 `tmp/`。临时公网隧道默认关闭；需要时给 `start-dev.ps1` 加 `-Tunnel` 显式开启 cloudflared，未安装时仅局域网访问。保留 `-NoTunnel`，与 `-Tunnel` 同时指定时优先关闭隧道。按回车停止全部服务和隧道；关闭窗口后可用 `stop-dev.ps1` 停止。`-Preview` 构建并预览前端，`-NoPause` 跳过等待回车。
 
 ## 访问地址
 

@@ -1,0 +1,10 @@
+{
+  "base": "f5ecb69bc2ccc292c44fa7ea1ee372abaa34f612",
+  "files": {
+    "README.md": "420ca6a6481aaee9203ad97f931b7b096ea9c4ecdd3d46f8e7e5657ff66d554a",
+    "docs/demo-public-tunnel.md": "f85f2d222c50f26b85c3f520d6a2a51d3910131c5ef391f05710d42da0bde6df",
+    "scripts/test-start-dev-tunnel.ps1": "889328410d77b047c51c361db49deccb933aca2cc5cba17739608731b3bbc97a",
+    "start-dev.ps1": "95cd63cb6b8d3bde2789ec2028ac16e284eab7ad592d51c610ccd923b66647f1"
+  },
+  "patch_sha256": "e08c37018ace211bd895de563586b8b95c187ce42e4d9a7a494e48b7c130e68f"
+}

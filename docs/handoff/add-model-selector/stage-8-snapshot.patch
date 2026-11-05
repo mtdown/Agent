@@ -1,0 +1,227 @@
+diff --git a/README.md b/README.md
+index 399b997..17acb79 100644
+--- a/README.md
++++ b/README.md
+@@ -277,7 +277,7 @@ powershell -ExecutionPolicy Bypass -File .\stop-dev.ps1
+ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+ ```
+ 
+-脚本构建并启动知识库后端（8123）、Agent（8124）和前端（3000），日志位于 `tmp/`。默认尝试开启 cloudflared 公网隧道，未安装时仅局域网访问；仅需局域网访问可加 `-NoTunnel`。按回车停止全部服务和隧道；关闭窗口后可用 `stop-dev.ps1` 停止。`-Preview` 构建并预览前端，`-NoPause` 跳过等待回车。
++脚本构建并启动知识库后端（8123）、Agent（8124）和前端（3000），日志位于 `tmp/`。临时公网隧道默认关闭；需要时给 `start-dev.ps1` 加 `-Tunnel` 显式开启 cloudflared，未安装时仅局域网访问。保留 `-NoTunnel`，与 `-Tunnel` 同时指定时优先关闭隧道。按回车停止全部服务和隧道；关闭窗口后可用 `stop-dev.ps1` 停止。`-Preview` 构建并预览前端，`-NoPause` 跳过等待回车。
+ 
+ ## 访问地址
+ 
+diff --git a/docs/demo-public-tunnel.md b/docs/demo-public-tunnel.md
+index 7fdf8f5..e156bac 100644
+--- a/docs/demo-public-tunnel.md
++++ b/docs/demo-public-tunnel.md
+@@ -5,10 +5,13 @@
+ ## 0. 一键启动
+ 
+ ```powershell
+-# 一键：起服务 + 自动起 cloudflared 隧道（默认行为，不用加参数）
++# 默认只启动服务，不启动临时公网隧道
+ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+ 
+-# 只在本机 / 局域网用，不暴露公网
++# 显式开启 cloudflared 临时公网隧道
++powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Tunnel
++
++# 明确关闭隧道；与 -Tunnel 同时指定时优先关闭
+ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -NoTunnel
+ ```
+ 
+@@ -40,7 +43,8 @@ Close this window directly to KEEP everything running
+ 
+ | 参数 | 作用 |
+ |---|---|
+-| `-NoTunnel` | **只走局域网，不暴露公网**（日常开发用这个） |
++| `-Tunnel` | 显式开启临时公网隧道（默认关闭） |
++| `-NoTunnel` | 关闭临时公网隧道；与 `-Tunnel` 同时指定时优先 |
+ | `-Preview` | **公网演示建议加**：先打包再提供服务，而不是跑 dev server |
+ | `-NoPause` | 末尾不等回车、不停服务（父脚本调用时用，手动启动不用加） |
+ 
+@@ -52,13 +56,12 @@ Vite 开发服务器是**未打包**的：浏览器要按模块发**几百个独
+ `-Preview` 会先 `npm run build`，再用 `vite preview` 提供打包产物，请求数从几百降到个位数：
+ 
+ ```powershell
+-powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Preview
++powershell -ExecutionPolicy Bypass -File .\start-dev.ps1 -Tunnel -Preview
+ ```
+ 
+ 代价：改代码后要重跑脚本（热更新失效），纯演示场景无所谓。
+ 
+-⚠️ 默认行为是**暴露到公网**：账号 `admin / 12345678` 会被放到公网上。
+-日常开发请加 `-NoTunnel`，或演示结束后在启动窗口按回车（或跑 `.\stop-dev.ps1`）。
++⚠️ 使用 `-Tunnel` 时账号 `admin / 12345678` 会被放到公网上。演示结束后在启动窗口按回车（或跑 `.\stop-dev.ps1`）。
+ 
+ ### 慢 / 打不开的排查顺序
+ 
+@@ -76,11 +79,11 @@ powershell -ExecutionPolicy Bypass -File .\start-main-dev.ps1
+ 
+ | 参数 | 作用 |
+ |---|---|
+-| `-NoTunnel` | 不起公网隧道（**默认会起**，和 `start-dev.ps1` 一致） |
++| `-NoTunnel` | 向所运行分支的 `start-dev.ps1` 传递关闭隧道参数 |
+ | `-Stay` | **不切回 main 分支**，在当前分支启动 |
+ 
+ ⚠️ 不加 `-Stay` 时该脚本会 `git checkout main` 并拉取最新代码 —— 演示尚未合入 main 的功能时
+-务必带 `-Stay`。启动后的回车全停、隧道展示与 `start-dev.ps1` 完全一致。
++务必带 `-Stay`。该脚本不支持透传 `-Tunnel`；所运行分支的 `start-dev.ps1` 决定默认隧道行为。当前版本默认关闭；需要临时隧道时直接使用上面的 `start-dev.ps1 -Tunnel` 命令。
+ 
+ 验收完想单独回收服务：
+ 
+diff --git a/start-dev.ps1 b/start-dev.ps1
+index 763fa12..4fad46c 100644
+--- a/start-dev.ps1
++++ b/start-dev.ps1
+@@ -1,11 +1,11 @@
+-# ============================================================
++﻿# ============================================================
+ #  start-dev.ps1 - one-click start for backend + frontend (dev)
+ #  Usage:  powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+ #  Starts: Spring Boot backend (127.0.0.1:8123) + Vite dev server
+ #          (0.0.0.0:3000, LAN accessible). Logs go to tmp/dev-backend.log
+ #          and tmp/dev-frontend.log.
+ #
+-#  Public tunnel (cloudflared quick tunnel) is ON by default; the
++#  Public tunnel (cloudflared quick tunnel) is OFF by default; the
+ #  public URL is scraped from the cloudflared log and shown in a
+ #  green box together with the local port it forwards. Front and
+ #  back share one port (the vite dev server proxies /api to 8123),
+@@ -21,7 +21,8 @@
+ #    - Close window -> everything keeps running (recover later
+ #      with .\stop-dev.ps1).
+ #
+-#  -NoTunnel  stay on the LAN only, do not expose anything publicly
++#  -Tunnel    enable the temporary public tunnel
++#  -NoTunnel  stay on the LAN only; takes precedence over -Tunnel
+ #  -Preview   build first and serve the bundle instead of the dev
+ #             server (far fewer requests through the tunnel)
+ #  -NoPause   do not wait for Enter at the end (used by parent
+@@ -32,7 +33,9 @@
+ #        non-ASCII message text can be misdecoded at parse time.
+ # ============================================================
+ param(
+-    # -NoTunnel / : stay on the LAN only (no public exposure)
++    # -Tunnel: explicitly enable the public tunnel
++    [switch]$Tunnel,
++    # -NoTunnel: stay on the LAN only, even when -Tunnel is set
+     [switch]$NoTunnel,
+     # -Preview: build first and serve the bundle instead of the dev server.
+     [switch]$Preview,
+@@ -156,14 +159,14 @@ if (-not $portsClear) { exit 1 }
+ $javaExe = Find-Java
+ if (-not $javaExe) { Write-Host '    ERROR: java not found. Set JAVA_HOME or install JDK 17.'; exit 1 }
+ 
+-# Load local secrets (.env.dev, git-ignored): each KEY=VALUE line becomes a
++# Load local secrets (.env.local, git-ignored): each KEY=VALUE line becomes a
+ # process env var so the backend jar started below inherits it. Values may be
+ # quoted ("v" or 'v'); blank lines and # comments are skipped. Only variable
+ # NAMES are printed - never the values.
+ function Import-DevEnvFile {
+-    $envFile = Join-Path $root '.env.dev'
++    $envFile = Join-Path $root '.env.local'
+     if (-not (Test-Path $envFile)) {
+-        Write-Host '    NOTE: .env.dev not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
++        Write-Host '    NOTE: .env.local not found - no RAG_* secrets injected (RAG embedding stays unconfigured).'
+         return
+     }
+     $loaded = @()
+@@ -182,13 +185,18 @@ function Import-DevEnvFile {
+             $value = $value.Substring(1, $value.Length - 2)
+         }
+         if ($key.Length -eq 0) { continue }
++        # 只注入模型相关的 RAG_*/DEEPSEEK_* 变量。评测专属的 DB_*/EVAL_*
++        # 与 VITE_* 不进入后端进程环境，避免被 Spring relaxed binding 误认。
++        if ($key -notmatch '^(RAG_|DEEPSEEK_)[A-Z0-9_]+$') { continue }
++        # 空值代表「未在此文件配置」，不能覆盖系统用户作用域已有的同名变量。
++        if ($value.Length -eq 0) { continue }
+         Set-Item -Path ("Env:" + $key) -Value $value
+         $loaded += $key
+     }
+     if ($loaded.Count -gt 0) {
+-        Write-Host ("    .env.dev injected env vars: " + ($loaded -join ', '))
++        Write-Host ("    .env.local injected env vars: " + ($loaded -join ', '))
+     } else {
+-        Write-Host '    WARN: .env.dev exists but contains no KEY=VALUE entries.'
++        Write-Host '    WARN: .env.local exists but contains no KEY=VALUE entries.'
+     }
+ }
+ Import-DevEnvFile
+@@ -383,12 +391,11 @@ function Start-PublicTunnel {
+ }
+ 
+ $publicUrl = $null
+-if (-not $NoTunnel) {
+-    # Default is ON: the site is exposed via cloudflared. Use -NoTunnel
+-    # to keep it on the LAN only.
++if ($Tunnel -and -not $NoTunnel) {
++    # Explicit opt-in; -NoTunnel takes precedence.
+     $publicUrl = Start-PublicTunnel -Port $frontPort
+ } else {
+-    Write-Host 'Public tunnel disabled (-NoTunnel) - LAN access only.'
++    Write-Host 'Public tunnel disabled - LAN access only.'
+ }
+ Write-Host ''
+ if ($publicUrl) {
+
+--- /dev/null
++++ b/scripts/test-start-dev-tunnel.ps1
+$ErrorActionPreference = 'Stop'
+$source = Join-Path (Split-Path -Parent $PSScriptRoot) 'start-dev.ps1'
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
+if ($errors.Count -ne 0) { throw "start-dev.ps1 parse failed: $($errors -join '; ')" }
+
+$parameters = @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
+foreach ($name in @('Tunnel', 'NoTunnel')) {
+    if ($parameters -notcontains $name) { throw "Missing parameter: $name" }
+}
+
+$calls = @($ast.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Start-PublicTunnel'
+}, $true))
+if ($calls.Count -ne 1) { throw "Expected exactly one tunnel call, found $($calls.Count)" }
+$call = $calls[0]
+$parent = $call.Parent
+while ($parent -and $parent -isnot [System.Management.Automation.Language.IfStatementAst]) {
+    $parent = $parent.Parent
+}
+if (-not $parent -or $parent.Clauses.Count -ne 1) { throw 'Tunnel call must belong to one if clause' }
+$condition = $parent.Clauses[0].Item1
+$body = $parent.Clauses[0].Item2
+if ($call.Extent.StartOffset -lt $body.Extent.StartOffset -or
+    $call.Extent.EndOffset -gt $body.Extent.EndOffset) { throw 'Tunnel call is not in the if body' }
+
+# Only evaluate a side-effect-free condition and the call to the local stub.
+if (@($condition.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)).Count -ne 0) {
+    throw 'Unexpected command in tunnel condition'
+}
+if ($call.Extent.Text -notmatch '^Start-PublicTunnel\s+-Port\s+\$frontPort$') {
+    throw 'Unexpected tunnel call; refusing to execute extracted expression'
+}
+$testBody = $ast.ParamBlock.Extent.Text + "`n" +
+    'if (' + $condition.Extent.Text + ') { ' + $call.Extent.Text + ' }'
+$invoke = [scriptblock]::Create($testBody)
+function Start-PublicTunnel { param([int]$Port) $script:callCount++ }
+$frontPort = 3000
+$cases = @(
+    @{ Name = 'default'; Args = @{}; Expected = 0 },
+    @{ Name = 'Tunnel'; Args = @{ Tunnel = $true }; Expected = 1 },
+    @{ Name = 'NoTunnel'; Args = @{ NoTunnel = $true }; Expected = 0 },
+    @{ Name = 'both'; Args = @{ Tunnel = $true; NoTunnel = $true }; Expected = 0 }
+)
+foreach ($case in $cases) {
+    $script:callCount = 0
+    $arguments = $case.Args
+    & $invoke @arguments
+    if ($script:callCount -ne $case.Expected) {
+        throw "$($case.Name): expected $($case.Expected) calls, got $script:callCount"
+    }
+    Write-Host "$($case.Name): $script:callCount calls"
+}
+Write-Host 'PowerShell AST parse and tunnel switch checks passed.'

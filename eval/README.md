@@ -58,7 +58,8 @@
 | `datasets/mhr-rag/` | **另一套数据集，与本节完全隔离**：MultiHop-RAG 609 篇英文新闻 + 2556 题多跳问答，自带 `scripts/` 与 `results/`，只共享 `lib_rag_eval.py` 的打分口径。见该目录的 README |
 | `tools/review.html` | 人工筛选页（离线可用，进度存 localStorage） |
 | `tmp/` | 中间产物与缓存，**已 gitignore** |
-| `.env` | 密钥与模型配置，**已 gitignore**（参照 `.env.dev` 重建） |
+| `.env` | 评测专属配置（DB / URL / 模型名 / EVAL_* 凭据），**已 gitignore** |
+| `../.env.local` | 项目根的模型 API key 唯一存放处（`RAG_LLM_API_KEY` / `RAG_EMBEDDING_API_KEY` / `DEEPSEEK_WEB_API_KEY`），**已 gitignore**；`load_env()` 自动合并并兼容旧名 `LLM_API_KEY` / `EMBEDDING_API_KEY` |
 
 ## 数据格式（JSONL，一行一题）
 

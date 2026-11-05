@@ -20,6 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 EVAL_DIR = os.path.join(ROOT, "eval")
 TMP_DIR = os.path.join(EVAL_DIR, "tmp")
 ENV_PATH = os.path.join(EVAL_DIR, ".env")
+LOCAL_ENV_PATH = os.path.join(ROOT, ".env.local")
 CORPUS = r"F:\AIProject\my\corpus-2026"
 
 UA = {
@@ -36,16 +37,39 @@ SECTIONS = [
 ]
 
 
-def load_env(path: str = ENV_PATH) -> dict:
+def _parse_env_file(path: str) -> dict:
     cfg = {}
     if not os.path.exists(path):
-        raise SystemExit(f"缺少配置文件 {path}")
+        return cfg
     for line in open(path, encoding="utf-8"):
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
         cfg[k.strip()] = v.strip()
+    return cfg
+
+
+def load_env(path: str = ENV_PATH) -> dict:
+    """加载配置：eval/.env < 根 .env.local < os.environ（后者优先）。
+
+    模型 API key 统一放在根 .env.local（变量名与云端 GitHub Secrets 对齐），
+    eval/.env 只保留评测专属配置。历史脚本仍用 LLM_API_KEY / EMBEDDING_API_KEY，
+    这里由 RAG_EMBEDDING_API_KEY 兼容填充，调用点无需改动。
+    """
+    if not os.path.exists(path):
+        raise SystemExit(f"缺少配置文件 {path}")
+    cfg = _parse_env_file(path)
+    cfg.update(_parse_env_file(LOCAL_ENV_PATH))
+    for key in list(cfg) + [
+        "RAG_LLM_API_KEY", "RAG_EMBEDDING_API_KEY", "DEEPSEEK_WEB_API_KEY",
+    ]:
+        if key in os.environ:
+            cfg[key] = os.environ[key]
+    dashscope_key = cfg.get("RAG_EMBEDDING_API_KEY") or cfg.get("RAG_LLM_API_KEY") or ""
+    if dashscope_key:
+        cfg.setdefault("LLM_API_KEY", dashscope_key)
+        cfg.setdefault("EMBEDDING_API_KEY", dashscope_key)
     return cfg
 
 
