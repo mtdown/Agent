@@ -9,6 +9,8 @@
       </a-layout-content>
       <a-layout-footer class="footer">
         <a href="https://github.com/mtdown/Agent" target="_blank"> 项目文件 </a>
+        <span aria-hidden="true"> · </span>
+        <a href="http://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026028042号-1</a>
       </a-layout-footer>
     </a-layout>
   </div>
