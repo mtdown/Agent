@@ -4,6 +4,8 @@
 
 本文件的共同规则适用于所有角色。总管开始协调时必须读取 [AGENTS_manager.md](AGENTS_manager.md)；派单时必须明确要求开发者读取 [AGENTS_rules.md](AGENTS_rules.md)，要求每轮测试者读取 [AGENTS_test.md](AGENTS_test.md)。角色专属职责不要求其他角色履行。三个角色共享工作区；上下文隔离不等于文件隔离或完全盲测，不得创建 Git worktree。
 
+**角色模型分配**：主智能体／总管使用 **GPT-6 Astra，High（高）**（`gpt-6-astra` / `high`）；开发子智能体与测试子智能体均使用 **GPT-6.1 SOL，Medium（中）**（`gpt-6.1-sol` / `medium`）。总管创建开发、测试实例时必须显式指定模型与推理强度，不继承总管配置；指定模型或强度不可用时停止相关派发并上报，不擅自替换。主智能体的模型与强度由启动会话时选择，本文不自动切换当前会话；无法确认或不匹配时如实上报。独立复核角色的模型不在本条分配范围内，若需派发则单独明确，不默认套用总管配置。
+
 本项目协作流程默认使用以下六个 local 技能，不以原版技能作为默认入口：总管读取 [openspec-explore-local](.agents/skills/openspec-explore-local/SKILL.md)、[openspec-propose-local](.agents/skills/openspec-propose-local/SKILL.md)、[openspec-update-change-local](.agents/skills/openspec-update-change-local/SKILL.md)、[openspec-sync-specs-local](.agents/skills/openspec-sync-specs-local/SKILL.md) 和 [openspec-archive-change-local](.agents/skills/openspec-archive-change-local/SKILL.md)；开发者读取 [openspec-apply-change-local](.agents/skills/openspec-apply-change-local/SKILL.md)。测试角色遵守测试规则，不以技能操作代替独立验收。
 
 正式新增、优化、重构或修复均使用 OpenSpec。新任务先检查工作区；存在未提交改动、未跟踪文件、分支占用或脚本拒绝创建分支时停止并向负责人说明，不自行清理或绕过。满足条件后使用根目录 `start-task.ps1` 从最新 `origin/main` 创建远程任务分支及本地跟踪分支，再运行 `openspec new change <change-id>`。新增、优化、重构分支为 `feature/<name>开发`，修复为 `fix/<name>修复`，name 为简短英文 kebab-case。不得直接在 main、master 开发或修改 OpenSpec；已有 change 先确认所属任务分支，无法确认则停止上报。开发、验证和归档准备均在该分支进行。
