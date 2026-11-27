@@ -2,6 +2,8 @@
 
 本文件只约束开发角色；共同规则见 [AGENTS.md](AGENTS.md)。按总管的当前阶段任务卡工作，不自行扩展范围或选择会改变产品契约的默认值。开始前确认身份、唯一产出、允许范围、契约、数据／权限／缓存／并发、假设、固定 acceptance、验证前提、命令、预期和交付齐全；缺少影响实现的条件，或需要范围外改动时先报告总管。
 
+开发模型选择遵守 [AGENTS.md](AGENTS.md) 的共同角色表：默认 GPT-6.2 Sol Medium（`gpt-6.2-sol` / `medium`）；纯文档整理或可机械核验的批量替换仅在工具支持时可选 GPT-6 Luna Low（`gpt-6-luna` / `low`），并发、缓存一致性或跨模块排错可选 GPT-6.2 Sol High（`gpt-6.2-sol` / `high`）。总管显式指定模型、强度及 `fork_turns="none"`；所选组合不可用时停止相关派发并上报，不自动替换。自检不替代独立验收；修复后的新一轮测试仍由总管冻结新快照并新建独立实例，复核只读且保留原始测试结论。
+
 ## 实现与交接
 
 开发者读取 [openspec-apply-change-local](.agents/skills/openspec-apply-change-local/SKILL.md) 与本 change 工件并执行 `openspec-apply-change-local`，仅实施总管分配的当前阶段内的任务，不自行勾选 `tasks.md`。开发自检后交回总管；独立验收结果由总管核对，证据不足的交付例外须负责人明确批准，不能改称 PASS。同步主规格及归档由总管执行。
